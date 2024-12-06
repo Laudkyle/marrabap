@@ -4,6 +4,8 @@ import { FiSearch } from "react-icons/fi";
 import { FaShoppingCart } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function Shop() {
   const [products, setProducts] = useState([]);
@@ -14,24 +16,30 @@ function Shop() {
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
-  const { cart, addToCart, clearCart, processSale } = useCart(); // Access processSale from context
+  const { cart, addToCart, clearCart, processSale, makeSale } = useCart(); // Access processSale from context
 
-  // Fetch products from the backend using Axios
-  useEffect(() => {
-    axios
-      .get("http://localhost:5000/products", { timeout: 5000 })
-      .then((response) => {
-        setProducts(response.data);
-        setLoading(false);
-      })
-      .catch((error) => {
-        setLoading(false);
-        alert(error);
+  const fetchProducts = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/products", {
+        timeout: 5000,
       });
-  }, [saleComplete]); // Refetch products after a sale is completed
+      setProducts(response.data);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      toast.error("Failed to fetch products. Please try again.");
+    }
+  };
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    fetchProducts();
+  }, [saleComplete]);
+
+  const filteredProducts = products.filter(
+    (product) =>
+      product &&
+      product.name &&
+      product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleProductClick = (product) => {
@@ -46,23 +54,34 @@ function Shop() {
     } else {
       addToCart(selectedProduct, quantity);
       setSelectedProduct(null);
+      toast.success(`${selectedProduct.name} added to cart`);
+    }
+  };
+
+  const handleMakeSale = async () => {
+    try {
+      await makeSale(selectedProduct, quantity); // Process sale for the selected product
+      setSaleComplete(!saleComplete); // Trigger product list refresh
+      setShowInvoice(false); // Close the invoice modal
+      toast.success("Sale completed successfully!");
+    } catch (error) {
+      console.error("Error completing sale:", error);
+      toast.error("An error occurred while processing the sale.");
     }
   };
 
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
-  // Use the processSale function from CartContext
   const handleCompleteSale = async () => {
     try {
       await processSale();
-
       setSaleComplete(!saleComplete); // Trigger product list refresh
       setShowInvoice(false); // Close the invoice modal
-      alert("Sale completed successfully!");
+      toast.success("Sale completed successfully!");
     } catch (error) {
       console.error("Error completing sale:", error);
-      alert("An error occurred while processing the sale.");
+      toast.error("An error occurred while processing the sale.");
     }
   };
 
@@ -76,6 +95,7 @@ function Shop() {
 
   return (
     <div className="relative">
+      <ToastContainer />
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-10 p-4 bg-gray-800 text-white">
         <h2 className="text-2xl font-semibold mb-4 text-center">Shop Products</h2>
@@ -148,12 +168,20 @@ function Shop() {
               >
                 Close
               </button>
-              <button
-                onClick={handleAddToCart}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Add to Cart
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleAddToCart}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Add to Cart
+                </button>
+                <button
+                  onClick={handleMakeSale}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  Make Sale
+                </button>
+              </div>
             </div>
           </div>
         </div>
