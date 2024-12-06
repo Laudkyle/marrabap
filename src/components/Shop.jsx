@@ -3,6 +3,7 @@ import ProductCard from "./ProductCard";
 import { FiSearch } from "react-icons/fi";
 import { FaShoppingCart } from "react-icons/fa";
 import { useCart } from "../CartContext";
+import axios from "axios";
 
 function Shop() {
   const [products, setProducts] = useState([]);
@@ -11,17 +12,17 @@ function Shop() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
-  const [showInvoice, setShowInvoice] = useState(false); // For invoice modal
+  const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const { cart, addToCart, clearCart } = useCart();
 
-  // Fetch products from the backend
+  // Fetch products from the backend using Axios
   useEffect(() => {
-    fetch("http://localhost:6000/products")
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data); 
-        setProducts(data);
+    axios
+      .get("http://localhost:6000/products")
+      .then((response) => {
+        console.log(response.data); // Log the response data
+        setProducts(response.data);
         setLoading(false);
       })
       .catch((error) => {
@@ -29,7 +30,6 @@ function Shop() {
         setLoading(false);
       });
   }, [saleComplete]); // Refetch products after a sale is completed
-  
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -61,15 +61,11 @@ function Shop() {
         quantity: item.quantity,
       }));
 
-      const response = await fetch("http://localhost:5000/sales", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ items: saleData }),
+      const response = await axios.post("http://localhost:5000/sales", {
+        items: saleData,
       });
 
-      if (response.ok) {
+      if (response.status === 200) {
         setSaleComplete(!saleComplete); // Trigger product list refresh
         clearCart(); // Clear the cart after successful sale
         setShowInvoice(false); // Close the invoice modal

@@ -15,16 +15,17 @@ const db = new sqlite3.Database('./shopdb.sqlite', (err) => {
 // Middleware to parse JSON requests
 app.use(express.json());
 
-// Get all products
 app.get('/products', (req, res) => {
-  db.all('SELECT * FROM products', [], (err, rows) => {
-    if (err) {
-      return console.error(err.message);
-    }
-    res.json(rows);
+    db.all('SELECT * FROM products', (err, rows) => {
+      if (err) {
+        console.error(err);
+        res.status(500).send("Error fetching products");
+      } else {
+        console.log(rows); // Log the products data
+        res.json(rows); // Send the products as JSON response
+      }
+    });
   });
-});
-
 // Get a specific product by ID
 app.get('/products/:id', (req, res) => {
   const { id } = req.params;
