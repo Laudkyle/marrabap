@@ -14,20 +14,19 @@ function Shop() {
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
-  const { cart, addToCart, clearCart } = useCart();
+  const { cart, addToCart, clearCart, processSale } = useCart(); // Access processSale from context
 
   // Fetch products from the backend using Axios
   useEffect(() => {
     axios
-      .get("http://localhost:6000/products")
+      .get("http://localhost:5000/products", { timeout: 5000 })
       .then((response) => {
-        console.log(response.data); // Log the response data
         setProducts(response.data);
         setLoading(false);
       })
       .catch((error) => {
-        console.error("Error fetching products:", error);
         setLoading(false);
+        alert(error);
       });
   }, [saleComplete]); // Refetch products after a sale is completed
 
@@ -53,26 +52,14 @@ function Shop() {
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
-  // Handle sale completion
+  // Use the processSale function from CartContext
   const handleCompleteSale = async () => {
     try {
-      const saleData = cart.map((item) => ({
-        productId: item.product.id,
-        quantity: item.quantity,
-      }));
+      await processSale();
 
-      const response = await axios.post("http://localhost:5000/sales", {
-        items: saleData,
-      });
-
-      if (response.status === 200) {
-        setSaleComplete(!saleComplete); // Trigger product list refresh
-        clearCart(); // Clear the cart after successful sale
-        setShowInvoice(false); // Close the invoice modal
-        alert("Sale completed successfully!");
-      } else {
-        alert("Failed to complete the sale. Please try again.");
-      }
+      setSaleComplete(!saleComplete); // Trigger product list refresh
+      setShowInvoice(false); // Close the invoice modal
+      alert("Sale completed successfully!");
     } catch (error) {
       console.error("Error completing sale:", error);
       alert("An error occurred while processing the sale.");
@@ -81,7 +68,7 @@ function Shop() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-[calc(100vh-8rem)]">
         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -91,9 +78,7 @@ function Shop() {
     <div className="relative">
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-10 p-4 bg-gray-800 text-white">
-        <h2 className="text-2xl font-semibold mb-4 text-center">
-          Shop Products
-        </h2>
+        <h2 className="text-2xl font-semibold mb-4 text-center">Shop Products</h2>
         <div className="flex justify-center items-center">
           <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
@@ -204,7 +189,7 @@ function Shop() {
               </button>
               <button
                 onClick={handleCompleteSale}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 Complete Sale
               </button>

@@ -1,7 +1,8 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const app = express();
-const port = 6000;
+const port = 5000;
+const cors = require("cors");
 
 // Open SQLite database
 const db = new sqlite3.Database('./shopdb.sqlite', (err) => {
@@ -14,6 +15,9 @@ const db = new sqlite3.Database('./shopdb.sqlite', (err) => {
 
 // Middleware to parse JSON requests
 app.use(express.json());
+app.use(cors({
+    origin: 'http://localhost:3000', // Make sure to allow your frontend's URL
+  }));
 
 app.get('/products', (req, res) => {
     db.all('SELECT * FROM products', (err, rows) => {

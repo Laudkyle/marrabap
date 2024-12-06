@@ -40,21 +40,26 @@ export const CartProvider = ({ children }) => {
   const processSale = () => {
     // Logic to update stock
     cart.forEach((item) => {
-      // Send an API request to update the stock on the server
-      fetch(`http://localhost:5000/products/${item.id}`, {
+      // Make sure to send the correct id and updated stock
+      fetch(`http://localhost:5000/products/${item.product.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          stock: item.stock - item.quantity,
+          stock: item.product.stock - item.quantity, // Corrected stock reference
         }),
-      }).catch((error) => console.error("Error updating stock:", error));
+      })
+        .then((response) => response.json())
+        .then(() => {
+          console.log(`Stock for product ${item.product.name} updated`);
+        })
+        .catch((error) => console.error("Error updating stock:", error));
     });
-
+  
     setCart([]); // Clear the cart after sale
   };
-
+  
   return (
     <CartContext.Provider value={{ cart, setCart, addToCart,processSale }}>
       {children}
