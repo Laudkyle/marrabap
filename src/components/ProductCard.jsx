@@ -1,9 +1,8 @@
-// ProductCard.jsx
 import React from 'react';
 
 const ProductCard = ({ product }) => {
   return (
-    <div className="max-w-sm rounded overflow-hidden shadow-lg border border-gray-200">
+    <div className="max-w-sm rounded overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-transform duration-200">
       <div className="p-4">
         {/* Product Image */}
         <img 
@@ -20,6 +19,6 @@ const ProductCard = ({ product }) => {
       </div>
     </div>
   );
-}
+};
 
 export default ProductCard;

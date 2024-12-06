@@ -45,7 +45,7 @@ const Sidebar = () => {
         }`}
       >
         <img
-          src={logo} // Replace with the path to your logo
+          src={logo} 
           alt="Marrabap Ventures"
           className={`w-12 h-12 ${isExpanded ? 'mr-3' : 'mb-2'}`}
         />
@@ -74,6 +74,15 @@ const Sidebar = () => {
           </svg>
         </button>
       )}
+
+      {/* Logo */}
+      <h1
+        className={`text-2xl font-bold p-4 border-b border-gray-600 transition-all duration-300 ${
+          isExpanded ? 'block' : 'hidden'
+        }`}
+      >
+        Shop Tracker
+      </h1>
 
       {/* Menu Items */}
       <nav className="flex-1">
@@ -134,42 +143,40 @@ const Sidebar = () => {
             )}
           </button>
 
-          {/* Dropdown Items */}
-          {(settingsOpen || isExpanded) && (
-            <div
-              className={`absolute left-0 top-full mt-1 w-full bg-gray-700 text-sm rounded-md shadow-lg overflow-hidden ${
-                !isExpanded ? 'block' : 'hidden'
-              }`}
-              onClick={() => setSettingsOpen(false)} // Close on click
-            >
-              <NavLink
-                to="/profile"
-                className="block px-4 py-2 hover:bg-gray-600 flex items-center"
-              >
-                <FaUser className="mr-3" />
-                <span
-                  className={`${
-                    isExpanded ? 'block' : 'hidden'
-                  }`}
-                >
-                  Profile
-                </span>
-              </NavLink>
-              <NavLink
-                to="/account-settings"
-                className="block px-4 py-2 hover:bg-gray-600 flex items-center"
-              >
-                <FaKey className="mr-3" />
-                <span
-                  className={`${
-                    isExpanded ? 'block' : 'hidden'
-                  }`}
-                >
-                  Account Settings
-                </span>
-              </NavLink>
-            </div>
-          )}
+         {/* Dropdown Items */}
+{settingsOpen && (
+  <div
+    className={`absolute left-0 top-full mt-1 w-full bg-gray-700 text-sm rounded-md shadow-lg overflow-hidden`}
+  >
+    <NavLink
+      to="/profile"
+      className="block px-4 py-2 hover:bg-gray-600 flex items-center"
+    >
+      <FaUser className="mr-3" />
+      <span
+        className={`${
+          isExpanded ? 'block' : 'hidden'
+        }`}
+      >
+        Profile
+      </span>
+    </NavLink>
+    <NavLink
+      to="/account-settings"
+      className="block px-4 py-2 hover:bg-gray-600 flex items-center"
+    >
+      <FaKey className="mr-3" />
+      <span
+        className={`${
+          isExpanded ? 'block' : 'hidden'
+        }`}
+      >
+        Account Settings
+      </span>
+    </NavLink>
+  </div>
+)}
+
         </div>
       </nav>
     </div>
