@@ -62,7 +62,7 @@ function Shop() {
     try {
       await makeSale(selectedProduct, quantity); // Process sale for the selected product
       setSaleComplete(!saleComplete); // Trigger product list refresh
-      setShowInvoice(false); // Close the invoice modal
+      setSelectedProduct(null);
       toast.success("Sale completed successfully!");
     } catch (error) {
       console.error("Error completing sale:", error);
@@ -95,7 +95,7 @@ function Shop() {
 
   return (
     <div className="relative">
-      <ToastContainer />
+      <ToastContainer newestOnTop />
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-10 p-4 bg-gray-800 text-white">
         <h2 className="text-2xl font-semibold mb-4 text-center">Shop Products</h2>

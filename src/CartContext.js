@@ -57,7 +57,7 @@ export const CartProvider = ({ children }) => {
           const updatedStock = currentProduct.stock - item.quantity;
           if (updatedStock < 0) {
             console.error(`Not enough stock for product ${item.product.name}`);
-            return; // Skip this item if there's not enough stock
+            return; 
           }
 
           // Update stock while preserving other fields
@@ -123,7 +123,6 @@ export const CartProvider = ({ children }) => {
   
       console.log(`Stock for product ${selectedProduct.name} updated`);
   
-      // You can add any additional sale completion logic here (e.g., invoice generation, logging the sale)
   
     } catch (error) {
       console.error("Error processing sale:", error);
