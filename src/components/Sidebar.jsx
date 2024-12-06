@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { FaTachometerAlt, FaStore, FaCogs, FaUser, FaKey } from 'react-icons/fa';
-
+import logo from '../images/Logo.png'
 const Sidebar = () => {
   const [settingsOpen, setSettingsOpen] = useState(false); // State for dropdown toggle
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
@@ -38,6 +38,20 @@ const Sidebar = () => {
         isExpanded ? 'w-64' : 'w-16'
       }`}
     >
+      {/* Logo and Shop Name */}
+      <div
+        className={`flex items-center justify-center p-4 border-b border-gray-600 transition-all duration-300 ${
+          isExpanded ? 'flex-row' : 'flex-col'
+        }`}
+      >
+        <img
+          src={logo} // Replace with the path to your logo
+          alt="Marrabap Ventures"
+          className={`w-12 h-12 ${isExpanded ? 'mr-3' : 'mb-2'}`}
+        />
+        {isExpanded && <h1 className="text-xl font-bold">Marrabap Ventures</h1>}
+      </div>
+
       {/* Toggle Button */}
       {!isMobile && (
         <button
@@ -60,15 +74,6 @@ const Sidebar = () => {
           </svg>
         </button>
       )}
-
-      {/* Logo */}
-      <h1
-        className={`text-2xl font-bold p-4 border-b border-gray-600 transition-all duration-300 ${
-          isExpanded ? 'block' : 'hidden'
-        }`}
-      >
-        Shop Tracker
-      </h1>
 
       {/* Menu Items */}
       <nav className="flex-1">
