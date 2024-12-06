@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Shop from './components/Shop';
 import Settings from './components/Settings';
+import 'typeface-inter';
 
 const App = () => {
   return (
