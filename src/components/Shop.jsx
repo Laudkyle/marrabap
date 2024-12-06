@@ -95,7 +95,7 @@ function Shop() {
 
   return (
     <div className="relative">
-      <ToastContainer newestOnTop />
+      <ToastContainer />
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-10 p-4 bg-gray-800 text-white">
         <h2 className="text-2xl font-semibold mb-4 text-center">Shop Products</h2>

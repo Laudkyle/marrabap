@@ -75,15 +75,6 @@ const Sidebar = () => {
         </button>
       )}
 
-      {/* Logo */}
-      <h1
-        className={`text-2xl font-bold p-4 border-b border-gray-600 transition-all duration-300 ${
-          isExpanded ? 'block' : 'hidden'
-        }`}
-      >
-        Shop Tracker
-      </h1>
-
       {/* Menu Items */}
       <nav className="flex-1">
         {menuItems.map((item) => (

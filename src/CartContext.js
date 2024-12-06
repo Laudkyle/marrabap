@@ -57,8 +57,11 @@ export const CartProvider = ({ children }) => {
           const updatedStock = currentProduct.stock - item.quantity;
           if (updatedStock < 0) {
             console.error(`Not enough stock for product ${item.product.name}`);
-            return; 
+            return;
           }
+
+          // Calculate the total price
+          const totalPrice = currentProduct.sp * item.quantity;
 
           // Update stock while preserving other fields
           fetch(`http://localhost:5000/products/${item.product.id}`, {
@@ -76,61 +79,106 @@ export const CartProvider = ({ children }) => {
             .then((response) => response.json())
             .then(() => {
               console.log(`Stock for product ${item.product.name} updated`);
+
+              // Now log the sale via POST method after stock update
+              fetch("http://localhost:5000/sales", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  product_id: item.product.id,
+                  quantity: item.quantity,
+                }),
+              })
+                .then((res) => res.json())
+                .then((saleDetails) => {
+                  console.log(`Sale logged:`, saleDetails);
+                })
+                .catch((error) => {
+                  console.error("Error logging sale:", error);
+                });
             })
             .catch((error) => console.error("Error updating stock:", error));
         })
         .catch((error) => console.error("Error fetching product:", error));
     });
   };
-
-
   const makeSale = async (selectedProduct, quantity) => {
     try {
       // Fetch the current product data
-      const response = await fetch(`http://localhost:5000/products/${selectedProduct.id}`);
+      const response = await fetch(
+        `http://localhost:5000/products/${selectedProduct.id}`
+      );
       const currentProduct = await response.json();
-  
+
       if (!currentProduct) {
         console.error(`Product with ID ${selectedProduct.id} not found`);
         return;
       }
-  
+
       // Calculate the new stock
       const updatedStock = currentProduct.stock - quantity;
       if (updatedStock < 0) {
         console.error(`Not enough stock for product ${selectedProduct.name}`);
         return; // If there isn't enough stock, don't proceed
       }
-  
+
+      // Calculate the total price
+      const totalPrice = currentProduct.sp * quantity;
+
       // Update stock while preserving other fields
-      const updateResponse = await fetch(`http://localhost:5000/products/${selectedProduct.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: currentProduct.name, // Keep the same name
-          cp: currentProduct.cp, // Keep the same cp
-          sp: currentProduct.sp, // Keep the same sp
-          stock: updatedStock, // Update stock only
-        }),
-      });
-  
+      const updateResponse = await fetch(
+        `http://localhost:5000/products/${selectedProduct.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: currentProduct.name, // Keep the same name
+            cp: currentProduct.cp, // Keep the same cp
+            sp: currentProduct.sp, // Keep the same sp
+            stock: updatedStock, // Update stock only
+          }),
+        }
+      );
+
       if (!updateResponse.ok) {
         console.error("Error updating product stock");
         return;
       }
-  
+
       console.log(`Stock for product ${selectedProduct.name} updated`);
-  
-  
+
+      // Log the sale after stock is updated
+      const saleResponse = await fetch("http://localhost:5000/sales", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product_id: selectedProduct.id,
+          quantity: quantity,
+        }),
+      });
+
+      if (!saleResponse.ok) {
+        console.error("Error logging sale");
+        return;
+      }
+
+      const saleDetails = await saleResponse.json();
+      console.log("Sale logged successfully:", saleDetails);
     } catch (error) {
       console.error("Error processing sale:", error);
     }
   };
-  
+
   return (
-    <CartContext.Provider value={{ cart, setCart, addToCart, processSale, makeSale }}>
+    <CartContext.Provider
+      value={{ cart, setCart, addToCart, processSale, makeSale }}
+    >
       {children}
     </CartContext.Provider>
   );

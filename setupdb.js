@@ -19,6 +19,15 @@ db.serialize(() => {
     stock INTEGER
   )`);
 
+   // Create sales table if it doesn't exist
+   db.run(`CREATE TABLE IF NOT EXISTS sales (
+      id INTEGER PRIMARY KEY,
+      product_id INTEGER,
+      quantity INTEGER,
+      total_price REAL,
+      date TEXT,
+      FOREIGN KEY (product_id) REFERENCES products (id)
+  )`);
   // Insert product data
   const insertStmt = db.prepare(`INSERT INTO products (id, name, cp, sp, stock)
     VALUES (?, ?, ?, ?, ?)`);
@@ -85,6 +94,7 @@ db.serialize(() => {
   // Finalize the insert statement
   insertStmt.finalize();
 });
+
 
 // Close the database connection
 db.close((err) => {
