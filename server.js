@@ -91,43 +91,55 @@ app.delete('/products/:id', (req, res) => {
   });
 });
 
-// Add a new sale
 app.post('/sales', (req, res) => {
   const { product_id, quantity } = req.body;
-  
+
+  // Fetch the product to check stock availability
   db.get('SELECT * FROM products WHERE id = ?', [product_id], (err, product) => {
     if (err) {
-      return console.error(err.message);
+      console.error(err.message);
+      return res.status(500).send('Internal Server Error');
     }
-    
+
     if (!product) {
       return res.status(404).send('Product not found');
     }
-    
+
     if (product.stock < quantity) {
       return res.status(400).send('Insufficient stock');
     }
-    
+
+    // Calculate total price
     const total_price = product.sp * quantity;
-    
-    const stmt = db.prepare('INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)');
-    stmt.run(product_id, quantity, total_price, new Date().toISOString(), function(err) {
+
+    // Begin transaction: Insert sale and update stock
+    db.run('BEGIN TRANSACTION');
+    const stmt = db.prepare(
+      'INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)'
+    );
+    stmt.run(product_id, quantity, total_price, new Date().toISOString(), function (err) {
       if (err) {
-        return console.error(err.message);
+        console.error(err.message);
+        db.run('ROLLBACK');
+        return res.status(500).send('Error logging sale');
       }
-      
+
+      // Update the product stock
       const updateStmt = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
       updateStmt.run(quantity, product_id, (err) => {
         if (err) {
-          return console.error(err.message);
+          console.error(err.message);
+          db.run('ROLLBACK');
+          return res.status(500).send('Error updating stock');
         }
-        
+
+        db.run('COMMIT');
         res.status(201).json({
           id: this.lastID,
           product_id,
           quantity,
           total_price,
-          date: new Date().toISOString()
+          date: new Date().toISOString(),
         });
       });
     });

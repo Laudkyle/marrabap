@@ -86,6 +86,10 @@ db.serialize(() => {
     { id: 51, name: "Voltic Water", cp: "N/A", sp: "N/A", stock: 0 }
   ];
 
+
+
+
+  
   // Insert products into the database
   products.forEach(product => {
     insertStmt.run(product.id, product.name, product.cp, product.sp, product.stock);

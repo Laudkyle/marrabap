@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, PointElement, LineElement, ArcElement } from 'chart.js';
-
+import axios from 'axios';
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -9,20 +9,22 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  PointElement,  // Register PointElement for line charts
-  LineElement,   // Register LineElement for line charts
-  ArcElement     // Register ArcElement for Pie and Doughnut charts
+  PointElement,  
+  LineElement,   
+  ArcElement     
 );
 
 const Dashboard = () => {
   const [salesData, setSalesData] = useState([]);
 
+
+  
   // Fetch the sales data
   useEffect(() => {
     fetch('http://localhost:5000/sales')
-      .then(response => response.json())
-      .then(data => setSalesData(data))
-      .catch(err => console.error('Error fetching sales data:', err));
+    .then(response => response.json())
+    .then(data => setSalesData(data))
+    .catch(err => console.error('Error fetching sales data:', err));
   }, []);
 
   // Prepare data for the bar chart (total sales by product)
