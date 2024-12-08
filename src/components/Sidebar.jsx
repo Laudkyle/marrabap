@@ -74,7 +74,7 @@ const Sidebar = ({ isExpanded }) => {
             </span>
             {isExpanded && (
               <svg
-                className={`ml-auto transition-transform ${
+                className={`ml-auto transition-transform duration-300 ${
                   openDropdown === 'products' ? 'rotate-180' : 'rotate-0'
                 }`}
                 xmlns="http://www.w3.org/2000/svg"
@@ -95,9 +95,19 @@ const Sidebar = ({ isExpanded }) => {
           </button>
 
           {/* Products Dropdown Items */}
-          {openDropdown === 'products' && (
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              openDropdown === 'products' 
+                ? 'max-h-24 opacity-100 visible' 
+                : 'max-h-0 opacity-0 invisible'
+            }`}
+          >
             <div
-              className={`flex flex-col space-y-2 mt-2 bg-gray-700 text-sm rounded-md shadow-lg w-full`}
+              className={`flex flex-col space-y-2 mt-2 bg-gray-700 text-sm rounded-md shadow-lg w-full transform transition-transform duration-300 ${
+                openDropdown === 'products' 
+                  ? 'translate-y-0' 
+                  : '-translate-y-4'
+              }`}
             >
               <NavLink
                 to="/add-product"
@@ -126,7 +136,7 @@ const Sidebar = ({ isExpanded }) => {
                 </span>
               </NavLink>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Settings with Dropdown */}
@@ -145,7 +155,7 @@ const Sidebar = ({ isExpanded }) => {
             </span>
             {isExpanded && (
               <svg
-                className={`ml-auto transition-transform ${
+                className={`ml-auto transition-transform duration-300 ${
                   openDropdown === 'settings' ? 'rotate-180' : 'rotate-0'
                 }`}
                 xmlns="http://www.w3.org/2000/svg"
@@ -166,9 +176,19 @@ const Sidebar = ({ isExpanded }) => {
           </button>
 
           {/* Settings Dropdown Items */}
-          {openDropdown === 'settings' && (
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              openDropdown === 'settings' 
+                ? 'max-h-24 opacity-100 visible' 
+                : 'max-h-0 opacity-0 invisible'
+            }`}
+          >
             <div
-              className={`flex flex-col space-y-2 mt-2 bg-gray-700 text-sm rounded-md shadow-lg w-full`}
+              className={`flex flex-col space-y-2 mt-2 bg-gray-700 text-sm rounded-md shadow-lg w-full transform transition-transform duration-300 ${
+                openDropdown === 'settings' 
+                  ? 'translate-y-0' 
+                  : '-translate-y-4'
+              }`}
             >
               <NavLink
                 to="/profile"
@@ -197,7 +217,7 @@ const Sidebar = ({ isExpanded }) => {
                 </span>
               </NavLink>
             </div>
-          )}
+          </div>
         </div>
       </nav>
     </div>
