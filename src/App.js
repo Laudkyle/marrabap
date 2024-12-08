@@ -1,16 +1,20 @@
-import React from 'react';
+import React,{useState} from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Shop from './components/Shop';
 import Settings from './components/Settings';
 import 'typeface-inter';
+import Header from './components/Header';
 const App = () => {
+  const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
+
   return (
     <Router>
       <div className="flex">
-        <Sidebar />
-        <div className="flex-1 p-6 bg-gray-100">
+        <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
+        <div className="flex-1 bg-gray-100">
+          <Header isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/shop" element={<Shop />} />

@@ -5,13 +5,26 @@ const ProductCard = ({ product }) => {
     <div className="max-w-sm rounded overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-transform duration-200">
       <div className="p-4">
         {/* Product Image */}
-        <img 
-          src={product.imageUrl} 
-          alt={product.name} 
-          className="w-full h-48 object-cover rounded-md mb-4" 
-        />
-        {/* Product Price */}
-        <p className="text-xl font-semibold mb-2">Price: ${product.sp}</p>
+        {product.imageUrl ? (
+          <img 
+            src={product.imageUrl} 
+            alt={product.name} 
+            className="w-full h-48 object-cover rounded-md mb-4" 
+          />
+        ) : (
+          <div 
+            className="w-full bg-gray-300 h-48 flex items-center justify-center rounded-md mb-4 text-gray-500 text-sm font-medium"
+          >
+            Add product Image
+          </div>
+        )}
+
+        {/* Product Name and Price */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-md font-semibold text-gray-800">{product.name}</span>
+          <span className="text-sm font-semibold text-gray-700">₵{product.sp}</span>
+        </div>
+
         {/* Stock Status */}
         <p className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
           {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
