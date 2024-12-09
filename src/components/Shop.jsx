@@ -98,7 +98,6 @@ function Shop() {
       <ToastContainer />
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-10 p-4 bg-gray-800 text-white">
-        <h2 className="text-2xl font-semibold mb-4 text-center">Shop Products</h2>
         <div className="flex justify-center items-center">
           <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
@@ -114,7 +113,7 @@ function Shop() {
           </div>
           <div className="relative w-10 h-10">
             <FaShoppingCart
-              className="text-3xl cursor-pointer"
+              className="text-3xl mt-1 cursor-pointer"
               onClick={() => setShowInvoice(true)} // Show invoice modal
             />
             {cart.length > 0 && (

@@ -134,7 +134,7 @@ const Sidebar = ({ isExpanded }) => {
                 >
                   List Products
                 </span>
-              </NavLink>
+              </NavLink >
             </div>
           </div>
         </div>
