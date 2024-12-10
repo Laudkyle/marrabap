@@ -1,146 +1,195 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const app = express();
+const port = 5000;
+const cors = require("cors");
 
-toast.configure();
+// Open SQLite database
+const db = new sqlite3.Database('./shopdb.sqlite', (err) => {
+  if (err) {
+    console.error('Error opening database:', err.message);
+  } else {
+    console.log('Connected to the SQLite database.');
+  }
+});
 
-const AddProduct = ({ onProductAdded }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    cp: '',
-    sp: '',
-    stock: '',
+// Middleware to parse JSON requests
+app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:3000',
+}));
+
+// Get all products
+app.get('/products', (req, res) => {
+  db.all('SELECT * FROM products', (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send("Error fetching products");
+    } else {
+      res.json(rows);
+    }
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+});
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
+// Get a specific product by ID
+app.get('/products/:id', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT * FROM products WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      return console.error(err.message);
+    }
+    if (row) {
+      res.json(row);
+    } else {
+      res.status(404).send('Product not found');
+    }
+  });
+});
+
+// Add a new product
+app.post('/products', (req, res) => {
+  const { name, cp, sp, stock } = req.body;
+  const stmt = db.prepare('INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)');
+  stmt.run(name, cp, sp, stock, function (err) {
+    if (err) {
+      return console.error(err.message);
+    }
+    res.status(201).json({ id: this.lastID, name, cp, sp, stock });
+  });
+});
+
+// Update product details
+app.put('/products/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, cp, sp, stock } = req.body;
+  const stmt = db.prepare('UPDATE products SET name = ?, cp = ?, sp = ?, stock = ? WHERE id = ?');
+  stmt.run(name, cp, sp, stock, id, function (err) {
+    if (err) {
+      return console.error(err.message);
+    }
+    if (this.changes === 0) {
+      res.status(404).send('Product not found');
+    } else {
+      res.json({ id, name, cp, sp, stock });
+    }
+  });
+});
+
+// Delete a product
+app.delete('/products/:id', (req, res) => {
+  const { id } = req.params;
+  const stmt = db.prepare('DELETE FROM products WHERE id = ?');
+  stmt.run(id, function (err) {
+    if (err) {
+      return console.error(err.message);
+    }
+    if (this.changes === 0) {
+      res.status(404).send('Product not found');
+    } else {
+      res.status(204).send();
+    }
+  });
+});
+
+app.post('/sales', (req, res) => {
+  const salesData = req.body; // Array of {product_id, quantity}
+  
+  db.run('BEGIN TRANSACTION', (err) => {
+    if (err) {
+      console.error(err.message);
+      return res.status(500).send('Internal Server Error');
+    }
+
+    let errorOccurred = false;
+
+    salesData.forEach((sale, index) => {
+      const { product_id, quantity } = sale;
+
+      db.get('SELECT * FROM products WHERE id = ?', [product_id], (err, product) => {
+        if (err || !product) {
+          errorOccurred = true;
+          console.error(err ? err.message : 'Product not found');
+          return;
+        }
+
+        if (product.stock < quantity) {
+          errorOccurred = true;
+          console.error('Insufficient stock');
+          return;
+        }
+
+        const total_price = product.sp * quantity;
+
+        const stmt = db.prepare('INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)');
+        stmt.run(product_id, quantity, total_price, new Date().toISOString(), function (err) {
+          if (err) {
+            errorOccurred = true;
+            console.error(err.message);
+            return;
+          }
+
+          const updateStmt = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
+          updateStmt.run(quantity, product_id, (err) => {
+            if (err) {
+              errorOccurred = true;
+              console.error(err.message);
+              return;
+            }
+
+            if (index === salesData.length - 1) {
+              if (errorOccurred) {
+                db.run('ROLLBACK');
+                return res.status(400).send('Error processing some sales');
+              } else {
+                db.run('COMMIT');
+                return res.status(201).send('Sales processed successfully');
+              }
+            }
+          });
+        });
+      });
     });
-  };
+  });
+});
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const { name, cp, sp, stock } = formData;
-
-    if (!name || !cp || !sp || !stock) {
-      toast.error('All fields are required!', { position: toast.POSITION.TOP_RIGHT });
-      return;
+// Get all sales
+app.get('/sales', (req, res) => {
+  db.all('SELECT sales.id, products.name AS product_name, sales.quantity, sales.total_price, sales.date FROM sales JOIN products ON sales.product_id = products.id', (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send('Error fetching sales');
+    } else {
+      res.json(rows);
     }
+  });
+});
 
-    if (isNaN(cp) || isNaN(sp) || isNaN(stock)) {
-      toast.error('Cost price, selling price, and stock must be numbers!', {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-      return;
+// Get sales for a specific product
+app.get('/sales/product/:id', (req, res) => {
+  const { id } = req.params;
+  db.all('SELECT * FROM sales WHERE product_id = ?', [id], (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send('Error fetching sales for this product');
+    } else {
+      res.json(rows);
     }
+  });
+});
 
-    setIsSubmitting(true);
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
 
-    try {
-      const response = await axios.post('http://localhost:5000/products', {
-        name,
-        cp: parseFloat(cp),
-        sp: parseFloat(sp),
-        stock: parseInt(stock, 10),
-      });
-
-      toast.success('Product added successfully!', {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-
-      setFormData({ name: '', cp: '', sp: '', stock: '' });
-      setIsSubmitting(false);
-
-      if (onProductAdded) onProductAdded(response.data);
-    } catch (error) {
-      console.error('Error adding product:', error);
-      toast.error('Failed to add product. Please try again.', {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-      setIsSubmitting(false);
+// Close the database connection gracefully on exit
+process.on('SIGINT', () => {
+  db.close((err) => {
+    if (err) {
+      console.error('Error closing the database:', err.message);
+    } else {
+      console.log('Database connection closed.');
     }
-  };
-
-  return (
-    <div className="max-w-md mx-auto mt-8 p-6 bg-white shadow-md rounded-lg">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Add New Product</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Product Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="cp" className="block text-sm font-medium text-gray-700">
-            Cost Price (CP)
-          </label>
-          <input
-            type="text"
-            id="cp"
-            name="cp"
-            value={formData.cp}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="sp" className="block text-sm font-medium text-gray-700">
-            Selling Price (SP)
-          </label>
-          <input
-            type="text"
-            id="sp"
-            name="sp"
-            value={formData.sp}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="stock" className="block text-sm font-medium text-gray-700">
-            Stock Quantity
-          </label>
-          <input
-            type="text"
-            id="stock"
-            name="stock"
-            value={formData.stock}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          className={`w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white shadow-sm ${
-            isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Adding Product...' : 'Add Product'}
-        </button>
-      </form>
-    </div>
-  );
-};
-
-export default AddProduct;
+    process.exit(0);
+  });
+});

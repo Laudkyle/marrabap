@@ -8,6 +8,7 @@ import {
   FaPrint,
   FaSort,
   FaSortUp,
+  FaImage,
   FaSortDown,
 } from "react-icons/fa";
 import ReactModal from "react-modal";
@@ -26,7 +27,7 @@ const ProductList = () => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "" });
-
+  const [imagePreview, setImagePreview] = useState(null);
   // Fetch products from the backend
   useEffect(() => {
     axios
@@ -38,7 +39,23 @@ const ProductList = () => {
         console.error("There was an error fetching the products:", error);
       });
   }, []);
-
+  // Handle image file change
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Set image preview
+        setImagePreview(reader.result);
+        // Update selected product with image
+        setSelectedProduct((prev) => ({
+          ...prev,
+          image: reader.result,
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   // Handle sorting
   const requestSort = (key) => {
     let direction = "ascending";
@@ -89,13 +106,31 @@ const ProductList = () => {
         toast.error("Error deleting the product.");
       });
   };
-
-  // Handle product update
+  // Modified handleUpdate to include image
   const handleUpdate = () => {
-    const { id, name, cp, sp, stock } = selectedProduct;
+    const { id, name, cp, sp, stock, image } = selectedProduct;
+
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("cp", cp);
+    formData.append("sp", sp);
+    formData.append("stock", stock);
+
+    // If image is a File or Blob, append it. If it's a base64 string, convert to blob
+    if (image instanceof File || image instanceof Blob) {
+      formData.append("image", image);
+    } else if (image && image.startsWith("data:")) {
+      // Convert base64 to blob
+      const blob = dataURItoBlob(image);
+      formData.append("image", blob, "product-image.jpg");
+    }
 
     axios
-      .put(`http://localhost:5000/products/${id}`, { name, cp, sp, stock })
+      .put(`http://localhost:5000/products/${id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
       .then((response) => {
         const updatedProduct = response.data;
         setProducts(
@@ -106,11 +141,24 @@ const ProductList = () => {
         toast.success("Product updated successfully!");
         setIsEditing(false);
         setSelectedProduct(null);
+        setImagePreview(null);
       })
       .catch((error) => {
         console.error("There was an error updating the product:", error);
         toast.error("Error updating the product.");
       });
+  };
+
+  // Utility function to convert data URI to Blob
+  const dataURItoBlob = (dataURI) => {
+    const byteString = atob(dataURI.split(",")[1]);
+    const mimeString = dataURI.split(",")[0].split(":")[1].split(";")[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
   };
 
   // Handle change in input fields (for editing)
@@ -200,6 +248,9 @@ const ProductList = () => {
         <table className="min-w-full bg-gray-100">
           <thead className="bg-gray-200">
             <tr>
+              <th className="py-2 px-4 text-left text-sm font-medium text-gray-700">
+                Product Image
+              </th>
               <th
                 onClick={() => requestSort("name")}
                 className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
@@ -286,6 +337,19 @@ const ProductList = () => {
                 key={product.id}
                 className="border-b hover:bg-gray-50 transition duration-300"
               >
+                <td className="py-3 px-6">
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-16 h-16 object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-gray-200 flex items-center justify-center rounded-lg">
+                      <FaImage className="text-gray-500" />
+                    </div>
+                  )}
+                </td>
                 <td className="py-3 px-6">{product.name}</td>
                 <td className="py-3 px-6">{product.cp}</td>
                 <td className="py-3 px-6">{product.sp}</td>
@@ -314,12 +378,12 @@ const ProductList = () => {
 
       {/* Delete Confirmation Modal */}
       <ReactModal
-          isOpen={showDeleteConfirmation}
-          onRequestClose={() => setShowDeleteConfirmation(false)}
-          contentLabel="Confirm Delete"
-          className="bg-white p-4 rounded-lg shadow-lg z-50 w-1/3 h-1/4 absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2"
-          overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center"
-        >
+        isOpen={showDeleteConfirmation}
+        onRequestClose={() => setShowDeleteConfirmation(false)}
+        contentLabel="Confirm Delete"
+        className="bg-white p-4 rounded-lg shadow-lg z-50 w-1/3 h-1/4 absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center"
+      >
         <h2 className="text-xl font-semibold text-gray-800 mb-4">
           Confirm Delete
         </h2>
@@ -344,103 +408,138 @@ const ProductList = () => {
 
       {/* Product Edit Modal */}
       {isEditing && selectedProduct && (
-         <ReactModal
-         isOpen={isEditing}
-         onRequestClose={() => setIsEditing(false)}
-         contentLabel="Edit Product Modal"
-         className="bg-white absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[60vw] w-max-[800px] h-1/2 p-6 shadow-lg rounded-lg z-50"
-         overlayClassName="fixed inset-0 bg-black bg-opacity-50"
-       >
-         <h3 className="text-2xl font-semibold text-gray-800 mb-4">
-           Edit Product
-         </h3>
- 
-         <form
-           onSubmit={(e) => {
-             e.preventDefault();
-             handleUpdate();
-           }}
-         >
-           <div className="grid grid-cols-2 gap-4">
-             {/* Product Name */}
-             <div className="space-y-2">
-               <label className="block text-sm font-medium text-gray-600">
-                 Product Name
-               </label>
-               <input
-                 type="text"
-                 name="name"
-                 value={selectedProduct?.name}
-                 onChange={handleChange}
-                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                 required
-               />
-             </div>
- 
-             {/* Cost Price */}
-             <div className="space-y-2">
-               <label className="block text-sm font-medium text-gray-600">
-                 Cost Price
-               </label>
-               <input
-                 type="number"
-                 name="cp"
-                 value={selectedProduct?.cp}
-                 onChange={handleChange}
-                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                 required
-               />
-             </div>
- 
-             {/* Selling Price */}
-             <div className="space-y-2">
-               <label className="block text-sm font-medium text-gray-600">
-                 Selling Price
-               </label>
-               <input
-                 type="number"
-                 name="sp"
-                 value={selectedProduct?.sp}
-                 onChange={handleChange}
-                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                 required
-               />
-             </div>
- 
-             {/* Stock */}
-             <div className="space-y-2">
-               <label className="block text-sm font-medium text-gray-600">
-                 Stock
-               </label>
-               <input
-                 type="number"
-                 name="stock"
-                 value={selectedProduct?.stock}
-                 onChange={handleChange}
-                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                 required
-               />
-             </div>
-           </div>
- 
-           <div className="flex justify-end space-x-4 mt-6">
-             <button
-               type="submit"
-               className="bg-blue-500 text-white py-2 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-             >
-               Update
-             </button>
-             <button
-               type="button"
-               onClick={() => setIsEditing(false)}
-               className="bg-gray-300 text-gray-700 py-2 px-6 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-             >
-               Cancel
-             </button>
-           </div>
-         </form>
-       </ReactModal>
+        <ReactModal
+          isOpen={isEditing}
+          onRequestClose={() => setIsEditing(false)}
+          contentLabel="Edit Product Modal"
+          className="bg-white absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[60vw] max-w-[800px] h-auto p-8 shadow-xl rounded-lg z-50"
+          overlayClassName="fixed inset-0 bg-black bg-opacity-50"
+        >
+          <h3 className="text-3xl font-bold text-gray-800 mb-6">
+            Edit Product
+          </h3>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleUpdate();
+            }}
+            className="space-y-6"
+          >
+            <div className="grid grid-cols-3 gap-6">
+              {/* Image Upload Section */}
+              <div className="col-span-1 flex flex-col items-center">
+                <div className="mb-4">
+                  {imagePreview || selectedProduct.image ? (
+                    <img
+                      src={imagePreview || selectedProduct.image}
+                      alt="Product"
+                      className="w-48 h-48 object-cover rounded-lg shadow-md border"
+                    />
+                  ) : (
+                    <div className="w-48 h-48 bg-gray-100 flex items-center justify-center rounded-lg border border-gray-300">
+                      <FaImage className="text-gray-400 text-4xl" />
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  id="product-image-upload"
+                />
+                <label
+                  htmlFor="product-image-upload"
+                  className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Upload Image
+                </label>
+              </div>
+
+              {/* Product Details Section */}
+              <div className="col-span-2 grid grid-cols-2 gap-6">
+                {/* Product Name */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-600">
+                    Product Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={selectedProduct?.name}
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                {/* Cost Price */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-600">
+                    Cost Price
+                  </label>
+                  <input
+                    type="number"
+                    name="cp"
+                    value={selectedProduct?.cp}
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                {/* Selling Price */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-600">
+                    Selling Price
+                  </label>
+                  <input
+                    type="number"
+                    name="sp"
+                    value={selectedProduct?.sp}
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                {/* Stock */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-600">
+                    Stock
+                  </label>
+                  <input
+                    type="number"
+                    name="stock"
+                    value={selectedProduct?.stock}
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-4 mt-6">
+              <button
+                type="submit"
+                className="bg-blue-500 text-white py-2 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Update
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="bg-gray-300 text-gray-700 py-2 px-6 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </ReactModal>
       )}
+
       <ToastContainer />
     </div>
   );

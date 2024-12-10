@@ -5,9 +5,9 @@ const ProductCard = ({ product }) => {
     <div className="max-w-sm rounded overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-transform duration-200">
       <div className="p-4">
         {/* Product Image */}
-        {product.imageUrl ? (
+        {product.image ? (
           <img 
-            src={product.imageUrl} 
+            src={product.image} 
             alt={product.name} 
             className="w-full h-48 object-cover rounded-md mb-4" 
           />
@@ -15,7 +15,7 @@ const ProductCard = ({ product }) => {
           <div 
             className="w-full bg-gray-300 h-48 flex items-center justify-center rounded-md mb-4 text-gray-500 text-sm font-medium"
           >
-            Add product Image
+            Add Product Image
           </div>
         )}
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { FaTachometerAlt, FaStore, FaCogs, FaUser, FaKey, FaBoxOpen, FaPlusCircle, FaListUl } from 'react-icons/fa';
-import logo from '../images/Logo.png';
+import logo from '../images/logo.png';
 
 const Sidebar = ({ isExpanded }) => {
   const [openDropdown, setOpenDropdown] = useState(null);

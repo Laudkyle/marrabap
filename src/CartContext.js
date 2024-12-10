@@ -42,33 +42,32 @@ export const CartProvider = ({ children }) => {
     });
   };
   const processSale = () => {
-    cart.forEach((item) => {
-      // Log the sale directly
-      fetch("http://localhost:5000/sales", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product_id: item.product.id,
-          quantity: item.quantity,
-        }),
+    const salesData = cart.map((item) => ({
+      product_id: item.product.id,
+      quantity: item.quantity,
+    }));
+  
+    fetch("http://localhost:5000/sales", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(salesData),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          return res.text().then((error) => {
+            throw new Error(error);
+          });
+        }
+        return res.json();
       })
-        .then((res) => {
-          if (!res.ok) {
-            return res.text().then((error) => {
-              throw new Error(error);
-            });
-          }
-          return res.json();
-        })
-        .then((saleDetails) => {
-          console.log(`Sale logged:`, saleDetails);
-        })
-        .catch((error) => {
-          console.error("Error logging sale:", error.message);
-        });
-    });
+      .then((response) => {
+        console.log("Sales logged:", response);
+      })
+      .catch((error) => {
+        console.error("Error logging sales:", error.message);
+      });
   };
   
   const makeSale = async (selectedProduct, quantity) => {
