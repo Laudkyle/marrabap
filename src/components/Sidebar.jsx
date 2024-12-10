@@ -1,19 +1,67 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaTachometerAlt, FaStore, FaCogs, FaUser, FaKey, FaBoxOpen, FaPlusCircle, FaListUl } from 'react-icons/fa';
+import {
+  FaTachometerAlt,
+  FaStore,
+  FaCogs,
+  FaUser,
+  FaKey,
+  FaBoxOpen,
+  FaPlusCircle,
+  FaListUl,
+  FaWarehouse,
+  FaMoneyBillWave,
+  FaChevronDown,
+} from 'react-icons/fa';
 import logo from '../images/logo.png';
 
 const Sidebar = ({ isExpanded }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
 
-  const menuItems = [
-    { name: 'Dashboard', path: '/', icon: <FaTachometerAlt /> },
-    { name: 'Shop', path: '/shop', icon: <FaStore /> },
-  ];
-
   const toggleDropdown = (dropdown) => {
     setOpenDropdown(openDropdown === dropdown ? null : dropdown);
   };
+
+  const dropdownItemClass = `block px-6 py-2 hover:bg-gray-600 flex items-center`;
+
+  const dropdownMenus = [
+    {
+      name: 'Products',
+      icon: <FaBoxOpen />,
+      dropdown: 'products',
+      links: [
+        { path: '/add-product', label: 'Add Product', icon: <FaPlusCircle /> },
+        { path: '/list-products', label: 'List Products', icon: <FaListUl /> },
+      ],
+    },
+    {
+      name: 'Stock',
+      icon: <FaWarehouse />,
+      dropdown: 'stock',
+      links: [
+        { path: '/add-stock', label: 'Add Stock', icon: <FaPlusCircle /> },
+        { path: '/list-stock', label: 'List Stock', icon: <FaListUl /> },
+      ],
+    },
+    {
+      name: 'Expenses',
+      icon: <FaMoneyBillWave />,
+      dropdown: 'expenses',
+      links: [
+        { path: '/add-expense', label: 'Add Expense', icon: <FaPlusCircle /> },
+        { path: '/list-expenses', label: 'List Expenses', icon: <FaListUl /> },
+      ],
+    },
+    {
+      name: 'Settings',
+      icon: <FaCogs />,
+      dropdown: 'settings',
+      links: [
+        { path: '/profile', label: 'Profile', icon: <FaUser /> },
+        { path: '/account-settings', label: 'Account Settings', icon: <FaKey /> },
+      ],
+    },
+  ];
 
   return (
     <div
@@ -37,188 +85,96 @@ const Sidebar = ({ isExpanded }) => {
 
       {/* Menu Items */}
       <nav className="flex-1 overflow-y-auto">
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center px-4 py-3 hover:bg-gray-700 ${
-                isActive ? 'bg-gray-700' : ''
-              }`
-            }
+        {/* Static Menu Items */}
+        <NavLink
+          to="/"
+          className={({ isActive }) =>
+            `flex items-center px-4 py-3 hover:bg-gray-700 ${
+              isActive ? 'bg-gray-700' : ''
+            }`
+          }
+        >
+          <span className="text-xl w-5 h-5 flex items-center justify-center">
+            <FaTachometerAlt />
+          </span>
+          <span
+            className={`ml-3 transition-all duration-300 ${
+              isExpanded ? 'block' : 'hidden'
+            }`}
           >
-            <span className="text-xl w-5 h-5 flex items-center justify-center">{item.icon}</span>
-            <span
-              className={`ml-3 transition-all duration-300 ${
-                isExpanded ? 'block' : 'hidden'
+            Dashboard
+          </span>
+        </NavLink>
+        <NavLink
+          to="/shop"
+          className={({ isActive }) =>
+            `flex items-center px-4 py-3 hover:bg-gray-700 ${
+              isActive ? 'bg-gray-700' : ''
+            }`
+          }
+        >
+          <span className="text-xl w-5 h-5 flex items-center justify-center">
+            <FaStore />
+          </span>
+          <span
+            className={`ml-3 transition-all duration-300 ${
+              isExpanded ? 'block' : 'hidden'
+            }`}
+          >
+            Shop
+          </span>
+        </NavLink>
+
+        {/* Dropdown Menus */}
+        {dropdownMenus.map(({ name, icon, dropdown, links }) => (
+          <div className="relative" key={dropdown}>
+            {/* Dropdown Header */}
+            <button
+              onClick={() => toggleDropdown(dropdown)}
+              className="flex items-center w-full px-4 py-3 hover:bg-gray-700 justify-between"
+            >
+              <div className="flex items-center">
+                <span className="text-xl w-5 h-5 flex items-center justify-center">{icon}</span>
+                <span
+                  className={`ml-3 transition-all duration-300 ${
+                    isExpanded ? 'block' : 'hidden'
+                  }`}
+                >
+                  {name}
+                </span>
+              </div>
+              {isExpanded && (
+                <FaChevronDown
+                  className={`transition-transform ${
+                    openDropdown === dropdown ? 'rotate-180' : ''
+                  }`}
+                />
+              )}
+            </button>
+
+            {/* Dropdown Items */}
+            <div
+              className={`overflow-hidden transition-all duration-300 ${
+                openDropdown === dropdown ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'
               }`}
             >
-              {item.name}
-            </span>
-          </NavLink>
+              <div className="flex flex-col mt-2 bg-gray-700 text-sm rounded-md shadow-lg">
+                {links.map(({ path, label, icon }) => (
+                  <NavLink
+                    to={path}
+                    className={dropdownItemClass}
+                    key={path}
+                  >
+                    <span className="w-5 h-5 flex items-center justify-center mr-3">
+                      {icon}
+                    </span>
+                    {isExpanded && label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          </div>
         ))}
-
-        {/* Products with Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => toggleDropdown('products')}
-            className="flex items-center w-full px-4 py-3 hover:bg-gray-700"
-          >
-            <span className="text-xl w-5 h-5 flex items-center justify-center"><FaBoxOpen /></span>
-            <span
-              className={`ml-3 transition-all duration-300 ${
-                isExpanded ? 'block' : 'hidden'
-              }`}
-            >
-              Products
-            </span>
-            {isExpanded && (
-              <svg
-                className={`ml-auto transition-transform duration-300 ${
-                  openDropdown === 'products' ? 'rotate-180' : 'rotate-0'
-                }`}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                width="16"
-                height="16"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            )}
-          </button>
-
-          {/* Products Dropdown Items */}
-          <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              openDropdown === 'products' 
-                ? 'max-h-24 opacity-100 visible' 
-                : 'max-h-0 opacity-0 invisible'
-            }`}
-          >
-            <div
-              className={`flex flex-col space-y-2 mt-2 bg-gray-700 text-sm rounded-md shadow-lg w-full transform transition-transform duration-300 ${
-                openDropdown === 'products' 
-                  ? 'translate-y-0' 
-                  : '-translate-y-4'
-              }`}
-            >
-              <NavLink
-                to="/add-product"
-                className="block px-6 py-2 hover:bg-gray-600 flex items-center"
-              >
-                <span className="w-5 h-5 flex items-center justify-center mr-3"><FaPlusCircle /></span>
-                <span
-                  className={`${
-                    isExpanded ? 'block' : 'hidden'
-                  }`}
-                >
-                  Add Products
-                </span>
-              </NavLink>
-              <NavLink
-                to="/list-products"
-                className="block px-6 py-2 hover:bg-gray-600 flex items-center"
-              >
-                <span className="w-5 h-5 flex items-center justify-center mr-3"><FaListUl /></span>
-                <span
-                  className={`${
-                    isExpanded ? 'block' : 'hidden'
-                  }`}
-                >
-                  List Products
-                </span>
-              </NavLink >
-            </div>
-          </div>
-        </div>
-
-        {/* Settings with Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => toggleDropdown('settings')}
-            className="flex items-center w-full px-4 py-3 hover:bg-gray-700"
-          >
-            <span className="text-xl w-5 h-5 flex items-center justify-center"><FaCogs /></span>
-            <span
-              className={`ml-3 transition-all duration-300 ${
-                isExpanded ? 'block' : 'hidden'
-              }`}
-            >
-              Settings
-            </span>
-            {isExpanded && (
-              <svg
-                className={`ml-auto transition-transform duration-300 ${
-                  openDropdown === 'settings' ? 'rotate-180' : 'rotate-0'
-                }`}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                width="16"
-                height="16"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            )}
-          </button>
-
-          {/* Settings Dropdown Items */}
-          <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              openDropdown === 'settings' 
-                ? 'max-h-24 opacity-100 visible' 
-                : 'max-h-0 opacity-0 invisible'
-            }`}
-          >
-            <div
-              className={`flex flex-col space-y-2 mt-2 bg-gray-700 text-sm rounded-md shadow-lg w-full transform transition-transform duration-300 ${
-                openDropdown === 'settings' 
-                  ? 'translate-y-0' 
-                  : '-translate-y-4'
-              }`}
-            >
-              <NavLink
-                to="/profile"
-                className="block px-6 py-2 hover:bg-gray-600 flex items-center"
-              >
-                <span className="w-5 h-5 flex items-center justify-center mr-3"><FaUser /></span>
-                <span
-                  className={`${
-                    isExpanded ? 'block' : 'hidden'
-                  }`}
-                >
-                  Profile
-                </span>
-              </NavLink>
-              <NavLink
-                to="/account-settings"
-                className="block px-6 py-2 hover:bg-gray-600 flex items-center"
-              >
-                <span className="w-5 h-5 flex items-center justify-center mr-3"><FaKey /></span>
-                <span
-                  className={`${
-                    isExpanded ? 'block' : 'hidden'
-                  }`}
-                >
-                  Account Settings
-                </span>
-              </NavLink>
-            </div>
-          </div>
-        </div>
       </nav>
     </div>
   );

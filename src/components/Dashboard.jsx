@@ -127,7 +127,7 @@ const Dashboard = () => {
   return (
     <div className="h-[85vh] overflow-scroll bg-gray-100 p-8">
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        Dashboard
+        Marrabap Ventures
       </h1>
       <div>
         <div className="grid grid-cols-3 grid-rows-2 gap-6 mb-12">
