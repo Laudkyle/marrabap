@@ -1,4 +1,3 @@
-// CartContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
@@ -41,12 +40,18 @@ export const CartProvider = ({ children }) => {
       return [...prevCart, { product, quantity }];
     });
   };
+
+  const clearCart = () => {
+    setCart([]);
+    localStorage.removeItem("cart");
+  };
+
   const processSale = () => {
     const salesData = cart.map((item) => ({
       product_id: item.product.id,
       quantity: item.quantity,
     }));
-  
+
     fetch("http://localhost:5000/sales", {
       method: "POST",
       headers: {
@@ -64,12 +69,13 @@ export const CartProvider = ({ children }) => {
       })
       .then((response) => {
         console.log("Sales logged:", response);
+        clearCart(); // Clear the cart after successful sale
       })
       .catch((error) => {
         console.error("Error logging sales:", error.message);
       });
   };
-  
+
   const makeSale = async (selectedProduct, quantity) => {
     try {
       // Log the sale directly
@@ -83,23 +89,22 @@ export const CartProvider = ({ children }) => {
           quantity: quantity,
         }),
       });
-  
+
       if (!saleResponse.ok) {
         const errorMessage = await saleResponse.text();
         throw new Error(errorMessage);
       }
-  
+
       const saleDetails = await saleResponse.json();
       console.log("Sale logged successfully:", saleDetails);
     } catch (error) {
       console.error("Error processing sale:", error.message);
     }
   };
-  
 
   return (
     <CartContext.Provider
-      value={{ cart, setCart, addToCart, processSale, makeSale }}
+      value={{ cart, setCart, addToCart, processSale, makeSale, clearCart }}
     >
       {children}
     </CartContext.Provider>

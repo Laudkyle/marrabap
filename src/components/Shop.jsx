@@ -78,6 +78,7 @@ function Shop() {
       await processSale();
       setSaleComplete(!saleComplete); // Trigger product list refresh
       setShowInvoice(false); // Close the invoice modal
+      clearCart()
       toast.success("Sale completed successfully!");
     } catch (error) {
       console.error("Error completing sale:", error);
