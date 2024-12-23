@@ -76,7 +76,7 @@ export const CartProvider = ({ children }) => {
       });
   };
 
-  const makeSale = async (selectedProduct, quantity) => {
+  const makeSale = async  (selectedProduct, quantity) => {
     try {
       // Log the sale directly
       const saleResponse = await fetch("http://localhost:5000/sales", {

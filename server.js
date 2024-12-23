@@ -141,10 +141,12 @@ app.delete('/products/:id', (req, res) => {
   });
 });
 
-// Add sales
 app.post('/sales', (req, res) => {
-  const salesData = req.body; // Array of {product_id, quantity}
-  
+  const salesData = req.body;
+
+  // Normalize salesData into an array if it's a single object
+  const salesArray = Array.isArray(salesData) ? salesData : [salesData];
+
   db.run('BEGIN TRANSACTION', (err) => {
     if (err) {
       console.error(err.message);
@@ -153,7 +155,7 @@ app.post('/sales', (req, res) => {
 
     let errorOccurred = false;
 
-    salesData.forEach((sale, index) => {
+    salesArray.forEach((sale, index) => {
       const { product_id, quantity } = sale;
 
       db.get('SELECT * FROM products WHERE id = ?', [product_id], (err, product) => {
@@ -165,13 +167,15 @@ app.post('/sales', (req, res) => {
 
         if (product.stock < quantity) {
           errorOccurred = true;
-          console.error('Insufficient stock');
+          console.error('Insufficient stock for product ID:', product_id);
           return;
         }
 
         const total_price = product.sp * quantity;
 
-        const stmt = db.prepare('INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)');
+        const stmt = db.prepare(
+          'INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)'
+        );
         stmt.run(product_id, quantity, total_price, new Date().toISOString(), function (err) {
           if (err) {
             errorOccurred = true;
@@ -187,7 +191,7 @@ app.post('/sales', (req, res) => {
               return;
             }
 
-            if (index === salesData.length - 1) {
+            if (index === salesArray.length - 1) {
               if (errorOccurred) {
                 db.run('ROLLBACK');
                 return res.status(400).send('Error processing some sales');
@@ -202,6 +206,7 @@ app.post('/sales', (req, res) => {
     });
   });
 });
+
 
 // Get all sales
 app.get('/sales', (req, res) => {
