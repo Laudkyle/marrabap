@@ -38,7 +38,7 @@ const StockList = () => {
       .catch((error) => {
         console.error("There was an error fetching the products:", error);
       });
-  }, []);
+  }, [isEditing, setIsEditing]);
   // Handle image file change
   const handleImageChange = (e) => {
     const file = e.target.files[0];

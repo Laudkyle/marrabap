@@ -4,13 +4,13 @@ import {
   FaTachometerAlt,
   FaStore,
   FaCogs,
-  FaUser,
-  FaKey,
-  FaBoxOpen,
-  FaPlusCircle,
-  FaListUl,
+  FaUserCircle,
+  FaUserLock,
+  FaBox,
+  FaPlus,
+  FaList,
   FaWarehouse,
-  FaMoneyBillWave,
+  FaCashRegister,
   FaChevronDown,
 } from 'react-icons/fa';
 import logo from '../images/logo.png';
@@ -27,11 +27,11 @@ const Sidebar = ({ isExpanded }) => {
   const dropdownMenus = [
     {
       name: 'Products',
-      icon: <FaBoxOpen />,
+      icon: <FaBox />,
       dropdown: 'products',
       links: [
-        { path: '/add-product', label: 'Edit Product', icon: <FaPlusCircle /> },
-        { path: '/list-products', label: 'List Products', icon: <FaListUl /> },
+        { path: '/add-product', label: 'Edit Product', icon: <FaPlus /> },
+        { path: '/list-products', label: 'List Products', icon: <FaList /> },
       ],
     },
     {
@@ -39,17 +39,18 @@ const Sidebar = ({ isExpanded }) => {
       icon: <FaWarehouse />,
       dropdown: 'stock',
       links: [
-        { path: '/add-stock', label: 'Add Stock', icon: <FaPlusCircle /> },
-        { path: '/list-stock', label: 'List Stock', icon: <FaListUl /> },
+        { path: '/add-stock', label: 'Add Stock', icon: <FaPlus /> },
+        { path: '/edit-stock', label: 'Update Stock', icon: <FaPlus /> },
+        { path: '/list-stock', label: 'List Stock', icon: <FaList /> },
       ],
     },
     {
       name: 'Expenses',
-      icon: <FaMoneyBillWave />,
+      icon: <FaCashRegister />,
       dropdown: 'expenses',
       links: [
-        { path: '/add-expense', label: 'Add Expense', icon: <FaPlusCircle /> },
-        { path: '/list-expenses', label: 'List Expenses', icon: <FaListUl /> },
+        { path: '/add-expense', label: 'Add Expense', icon: <FaPlus /> },
+        { path: '/list-expenses', label: 'List Expenses', icon: <FaList /> },
       ],
     },
     {
@@ -57,8 +58,8 @@ const Sidebar = ({ isExpanded }) => {
       icon: <FaCogs />,
       dropdown: 'settings',
       links: [
-        { path: '/profile', label: 'Profile', icon: <FaUser /> },
-        { path: '/account-settings', label: 'Account Settings', icon: <FaKey /> },
+        { path: '/profile', label: 'Profile', icon: <FaUserCircle /> },
+        { path: '/account-settings', label: 'Account Settings', icon: <FaUserLock /> },
       ],
     },
   ];
