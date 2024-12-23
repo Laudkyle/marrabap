@@ -58,6 +58,56 @@ app.post('/products', (req, res) => {
   });
 });
 
+// Add multiple products in bulk
+app.post('/products/bulk', (req, res) => {
+  const { products } = req.body;
+
+  if (!Array.isArray(products) || products.length === 0) {
+    return res.status(400).send('Invalid product data');
+  }
+
+  db.run('BEGIN TRANSACTION', (err) => {
+    if (err) {
+      console.error('Transaction start error:', err.message);
+      return res.status(500).send('Internal Server Error');
+    }
+
+    let errorOccurred = false;
+
+    products.forEach((product, index) => {
+      const { name, cp, sp, stock } = product;
+
+      const stmt = db.prepare('INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)');
+      stmt.run(name, cp, sp, stock, (err) => {
+        if (err) {
+          errorOccurred = true;
+          console.error('Error inserting product:', err.message);
+        }
+
+        if (index === products.length - 1) {
+          if (errorOccurred) {
+            db.run('ROLLBACK', (rollbackErr) => {
+              if (rollbackErr) {
+                console.error('Rollback error:', rollbackErr.message);
+              }
+              res.status(400).send('Error adding one or more products');
+            });
+          } else {
+            db.run('COMMIT', (commitErr) => {
+              if (commitErr) {
+                console.error('Commit error:', commitErr.message);
+                res.status(500).send('Internal Server Error');
+              } else {
+                res.status(201).send('Products added successfully');
+              }
+            });
+          }
+        }
+      });
+    });
+  });
+});
+
 // Update product details
 app.put('/products/:id', (req, res) => {
   const { id } = req.params;
@@ -91,6 +141,7 @@ app.delete('/products/:id', (req, res) => {
   });
 });
 
+// Add sales
 app.post('/sales', (req, res) => {
   const salesData = req.body; // Array of {product_id, quantity}
   

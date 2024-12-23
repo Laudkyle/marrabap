@@ -8,6 +8,7 @@ import 'typeface-inter';
 import Header from './components/Header';
 import ProductList from './components/ProductList';
 import AddProduct from './components/AddProduct';
+import AddStock from './components/AddStock';
 import ExpenseList from './components/ExpenseList';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
@@ -23,6 +24,7 @@ const App = () => {
             <Route path="/shop" element={<Shop />} />
             <Route path="/list-expenses" element={<ExpenseList />} />
             <Route path="/add-product" element={<AddProduct />} />
+            <Route path="/add-stock" element={<AddStock />} />
             <Route path="/list-products" element={<ProductList />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
