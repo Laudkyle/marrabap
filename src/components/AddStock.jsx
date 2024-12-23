@@ -62,8 +62,8 @@ const AddStock = ({ onProductsAdded }) => {
 
       if (onProductsAdded) onProductsAdded(response.data);
     } catch (error) {
-      console.error("Error adding products:", error);
-      toast.error("Failed to add products. Please try again.");
+      console.error("Error adding stock:", error);
+      toast.error("Failed to add stock. Please try again.");
       setIsSubmitting(false);
     }
   };

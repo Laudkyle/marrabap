@@ -30,7 +30,7 @@ const Sidebar = ({ isExpanded }) => {
       icon: <FaBoxOpen />,
       dropdown: 'products',
       links: [
-        { path: '/add-product', label: 'Add Product', icon: <FaPlusCircle /> },
+        { path: '/add-product', label: 'Edit Product', icon: <FaPlusCircle /> },
         { path: '/list-products', label: 'List Products', icon: <FaListUl /> },
       ],
     },

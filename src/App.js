@@ -7,7 +7,8 @@ import Settings from './components/Settings';
 import 'typeface-inter';
 import Header from './components/Header';
 import ProductList from './components/ProductList';
-import AddProduct from './components/AddProduct';
+import StockList from './components/StockList';
+import Edit from './components/EditProduct';
 import AddStock from './components/AddStock';
 import ExpenseList from './components/ExpenseList';
 const App = () => {
@@ -23,9 +24,10 @@ const App = () => {
             <Route path="/" element={<Dashboard />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/list-expenses" element={<ExpenseList />} />
-            <Route path="/add-product" element={<AddProduct />} />
+            <Route path="/add-product" element={<Edit />} />
             <Route path="/add-stock" element={<AddStock />} />
             <Route path="/list-products" element={<ProductList />} />
+            <Route path="/list-stock" element={<StockList />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>
