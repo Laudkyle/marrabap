@@ -55,19 +55,19 @@ const EditProduct = ({ onProductUpdated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { name, cp, sp, stock } = formData;
-
+  
     if (!name || !cp || !sp || !stock) {
       toast.error("All fields are required!");
       return;
     }
-
+  
     if (isNaN(cp) || isNaN(sp) || isNaN(stock)) {
       toast.error("Cost price, selling price, and stock must be numbers!");
       return;
     }
-
+  
     setIsSubmitting(true);
-
+  
     try {
       await axios.put(`http://localhost:5000/products/${selectedProduct.id}`, {
         name,
@@ -75,10 +75,14 @@ const EditProduct = ({ onProductUpdated }) => {
         sp: parseFloat(sp),
         stock: parseInt(stock, 10),
       });
-
+  
       toast.success("Product updated successfully!");
+  
+      // Clear form and reset selection
+      setFormData({ name: "", cp: "", sp: "", stock: "" });
+      setSelectedProduct(null);
       setIsSubmitting(false);
-
+  
       if (onProductUpdated) onProductUpdated();
     } catch (error) {
       console.error("Error updating product:", error);
@@ -86,8 +90,7 @@ const EditProduct = ({ onProductUpdated }) => {
       setIsSubmitting(false);
     }
   };
-
-  return (
+    return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white shadow-md rounded-lg">
       <ToastContainer />
 
