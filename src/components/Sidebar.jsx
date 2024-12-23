@@ -9,6 +9,7 @@ import {
   FaBox,
   FaPlus,
   FaList,
+  FaEdit,
   FaWarehouse,
   FaCashRegister,
   FaChevronDown,
@@ -40,7 +41,7 @@ const Sidebar = ({ isExpanded }) => {
       dropdown: 'stock',
       links: [
         { path: '/add-stock', label: 'Add Stock', icon: <FaPlus /> },
-        { path: '/edit-stock', label: 'Update Stock', icon: <FaPlus /> },
+        { path: '/edit-stock', label: 'Update Stock', icon: <FaEdit /> },
         { path: '/list-stock', label: 'List Stock', icon: <FaList /> },
       ],
     },

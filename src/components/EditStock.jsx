@@ -44,7 +44,6 @@ const EditStock = ({ onStockUpdated }) => {
       [name]: value,
     });
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { additionalStock } = formData;
@@ -71,10 +70,14 @@ const EditStock = ({ onStockUpdated }) => {
 
       // Clear form, reset selection, and optionally refetch products
       setFormData({ additionalStock: "" });
-      setSelectedProduct(null);
+      setSelectedProduct(null); // Reset the selected product
       setIsSubmitting(false);
 
+      // If you have a parent handler for stock update, call it
       if (onStockUpdated) onStockUpdated();
+
+      // Reset the dropdown to the default value (placeholder)
+      document.getElementById("productSelect").value = "";
     } catch (error) {
       console.error("Error updating stock:", error);
       toast.error("Failed to update stock. Please try again.");
