@@ -13,6 +13,9 @@ import {
   FaWarehouse,
   FaCashRegister,
   FaChevronDown,
+  FaUsers,
+  FaUserFriends,
+  FaPeopleCarry,
 } from 'react-icons/fa';
 import logo from '../images/logo.png';
 
@@ -55,6 +58,17 @@ const Sidebar = ({ isExpanded }) => {
       ],
     },
     {
+      name: 'Contacts',
+      icon: <FaUsers />,
+      dropdown: 'contacts',
+      links: [
+        { path: '/suppliers', label: 'Suppliers', icon: <FaPeopleCarry /> },
+        { path: '/customers', label: 'Customers', icon: <FaUserFriends /> },
+        { path: '/customer-groups', label: 'Customer Groups', icon: <FaUsers /> },
+        { path: '/operations', label: 'Operations', icon: <FaCogs /> },
+      ],
+    },
+    {
       name: 'Settings',
       icon: <FaCogs />,
       dropdown: 'settings',
@@ -68,7 +82,7 @@ const Sidebar = ({ isExpanded }) => {
   return (
     <div
       className={`h-screen bg-gray-800 border-r border-gray-600 text-white flex flex-col transition-all duration-300 ${
-        isExpanded ? 'w-64' : 'w-16'
+        isExpanded ? 'min-w-64' : 'w-16'
       }`}
     >
       {/* Logo and Shop Name */}

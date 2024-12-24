@@ -99,7 +99,7 @@ function Shop() {
       <ToastContainer />
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-10 p-4 bg-gray-800 text-white">
-        <div className="flex justify-center items-center">
+        <div className="flex justify-end items-center">
           <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
               <FiSearch className="h-5 w-5" />

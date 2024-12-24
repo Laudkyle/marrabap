@@ -12,6 +12,8 @@ import Edit from './components/EditProduct';
 import AddStock from './components/AddStock';
 import EditStock from './components/EditStock';
 import ExpenseList from './components/ExpenseList';
+import Supplier from './components/Supplier';
+import Customer from './components/Customer';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
 
@@ -28,6 +30,8 @@ const App = () => {
             <Route path="/add-product" element={<Edit />} />
             <Route path="/add-stock" element={<AddStock />} />
             <Route path="/edit-stock" element={<EditStock />} />
+            <Route path="/suppliers" element={<Supplier/>} />
+            <Route path="/customers" element={<Customer/>} />
             <Route path="/list-products" element={<ProductList />} />
             <Route path="/list-stock" element={<StockList />} />
             <Route path="/settings" element={<Settings />} />

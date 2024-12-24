@@ -27,6 +27,43 @@ db.serialize(() => {
     date TEXT,
     FOREIGN KEY (product_id) REFERENCES products (id)
   )`);
+// Create the 'suppliers' table if it doesn't exist
+db.run(`CREATE TABLE IF NOT EXISTS suppliers (
+  id INTEGER PRIMARY KEY,
+  type TEXT, -- "Individual" or "Business"
+  contact_id TEXT UNIQUE,
+  business_name TEXT, -- Null for individuals
+  name TEXT,
+  email TEXT,
+  tax_number TEXT,
+  pay_term TEXT,
+  opening_balance REAL,
+  advance_balance REAL,
+  added_on TEXT,
+  address TEXT,
+  mobile TEXT UNIQUE,
+  total_purchase_due REAL DEFAULT 0,
+  total_purchase_return_due REAL DEFAULT 0
+)`);
+// Create the 'customers' table if it doesn't exist
+db.run(`CREATE TABLE IF NOT EXISTS customers (
+  id INTEGER PRIMARY KEY,
+  contact_id TEXT UNIQUE,
+  business_name TEXT, -- Null for individuals
+  name TEXT,
+  email TEXT,
+  tax_number TEXT,
+  credit_limit REAL DEFAULT 0,
+  pay_term TEXT,
+  opening_balance REAL DEFAULT 0,
+  advance_balance REAL DEFAULT 0,
+  added_on TEXT,
+  address TEXT,
+  mobile TEXT UNIQUE,
+  customer_group TEXT,
+  total_sale_due REAL DEFAULT 0,
+  total_sell_return_due REAL DEFAULT 0
+)`);
 
   // Insert product data
   const insertStmt =

@@ -258,6 +258,353 @@ app.get('/sales', (req, res) => {
     }
   );
 });
+// ===================== Suppliers Endpoints =====================
+
+// Get all suppliers
+app.get('/suppliers', (req, res) => {
+  db.all('SELECT * FROM suppliers', (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send('Error fetching suppliers');
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// Get a specific supplier by ID
+app.get('/suppliers/:id', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT * FROM suppliers WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Error fetching supplier');
+    } else if (!row) {
+      res.status(404).send('Supplier not found');
+    } else {
+      res.json(row);
+    }
+  });
+});
+
+// Add a new supplier
+app.post('/suppliers', (req, res) => {
+  const {
+    type,
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    pay_term,
+    opening_balance,
+    advance_balance,
+    address,
+    mobile,
+  } = req.body;
+
+  const stmt = db.prepare(
+    `INSERT INTO suppliers 
+    (type, contact_id, business_name, name, email, tax_number, pay_term, opening_balance, advance_balance, added_on, address, mobile, total_purchase_due, total_purchase_return_due) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+  );
+
+  stmt.run(
+    type,
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    pay_term,
+    opening_balance || 0,
+    advance_balance || 0,
+    new Date().toISOString(),
+    address,
+    mobile,
+    function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send('Error adding supplier');
+      } else {
+        res.status(201).json({ id: this.lastID, ...req.body });
+      }
+    }
+  );
+});
+
+// Update a supplier
+app.put('/suppliers/:id', (req, res) => {
+  const { id } = req.params;
+  const {
+    type,
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    pay_term,
+    opening_balance,
+    advance_balance,
+    address,
+    mobile,
+  } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (type) {
+    fields.push('type = ?');
+    values.push(type);
+  }
+  if (contact_id) {
+    fields.push('contact_id = ?');
+    values.push(contact_id);
+  }
+  if (business_name) {
+    fields.push('business_name = ?');
+    values.push(business_name);
+  }
+  if (name) {
+    fields.push('name = ?');
+    values.push(name);
+  }
+  if (email) {
+    fields.push('email = ?');
+    values.push(email);
+  }
+  if (tax_number) {
+    fields.push('tax_number = ?');
+    values.push(tax_number);
+  }
+  if (pay_term) {
+    fields.push('pay_term = ?');
+    values.push(pay_term);
+  }
+  if (opening_balance) {
+    fields.push('opening_balance = ?');
+    values.push(opening_balance);
+  }
+  if (advance_balance) {
+    fields.push('advance_balance = ?');
+    values.push(advance_balance);
+  }
+  if (address) {
+    fields.push('address = ?');
+    values.push(address);
+  }
+  if (mobile) {
+    fields.push('mobile = ?');
+    values.push(mobile);
+  }
+
+  values.push(id);
+
+  const query = `UPDATE suppliers SET ${fields.join(', ')} WHERE id = ?`;
+
+  db.run(query, values, function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Error updating supplier');
+    } else if (this.changes === 0) {
+      res.status(404).send('Supplier not found');
+    } else {
+      res.json({ id, ...req.body });
+    }
+  });
+});
+
+// Delete a supplier
+app.delete('/suppliers/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM suppliers WHERE id = ?', [id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Error deleting supplier');
+    } else if (this.changes === 0) {
+      res.status(404).send('Supplier not found');
+    } else {
+      res.status(204).send();
+    }
+  });
+});
+// ===================== Customers Endpoints =====================
+
+// Get all customers
+app.get('/customers', (req, res) => {
+  db.all('SELECT * FROM customers', (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send('Error fetching customers');
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// Get a specific customer by ID
+app.get('/customers/:id', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT * FROM customers WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Error fetching customer');
+    } else if (!row) {
+      res.status(404).send('Customer not found');
+    } else {
+      res.json(row);
+    }
+  });
+});
+
+// Add a new customer
+app.post('/customers', (req, res) => {
+  const {
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    credit_limit,
+    pay_term,
+    opening_balance,
+    advance_balance,
+    address,
+    mobile,
+    customer_group,
+  } = req.body;
+
+  const stmt = db.prepare(
+    `INSERT INTO customers 
+    (contact_id, business_name, name, email, tax_number, credit_limit, pay_term, opening_balance, advance_balance, added_on, address, mobile, customer_group, total_sale_due, total_sell_return_due) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+  );
+
+  stmt.run(
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    credit_limit || 0,
+    pay_term || 0,
+    opening_balance || 0,
+    advance_balance || 0,
+    new Date().toISOString(),
+    address,
+    mobile,
+    customer_group,
+    function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send('Error adding customer');
+      } else {
+        res.status(201).json({ id: this.lastID, ...req.body });
+      }
+    }
+  );
+});
+
+// Update a customer
+app.put('/customers/:id', (req, res) => {
+  const { id } = req.params;
+  const {
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    credit_limit,
+    pay_term,
+    opening_balance,
+    advance_balance,
+    address,
+    mobile,
+    customer_group,
+  } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (contact_id) {
+    fields.push('contact_id = ?');
+    values.push(contact_id);
+  }
+  if (business_name) {
+    fields.push('business_name = ?');
+    values.push(business_name);
+  }
+  if (name) {
+    fields.push('name = ?');
+    values.push(name);
+  }
+  if (email) {
+    fields.push('email = ?');
+    values.push(email);
+  }
+  if (tax_number) {
+    fields.push('tax_number = ?');
+    values.push(tax_number);
+  }
+  if (credit_limit) {
+    fields.push('credit_limit = ?');
+    values.push(credit_limit);
+  }
+  if (pay_term) {
+    fields.push('pay_term = ?');
+    values.push(pay_term);
+  }
+  if (opening_balance) {
+    fields.push('opening_balance = ?');
+    values.push(opening_balance);
+  }
+  if (advance_balance) {
+    fields.push('advance_balance = ?');
+    values.push(advance_balance);
+  }
+  if (address) {
+    fields.push('address = ?');
+    values.push(address);
+  }
+  if (mobile) {
+    fields.push('mobile = ?');
+    values.push(mobile);
+  }
+  if (customer_group) {
+    fields.push('customer_group = ?');
+    values.push(customer_group);
+  }
+
+  values.push(id);
+
+  const query = `UPDATE customers SET ${fields.join(', ')} WHERE id = ?`;
+
+  db.run(query, values, function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Error updating customer');
+    } else if (this.changes === 0) {
+      res.status(404).send('Customer not found');
+    } else {
+      res.json({ id, ...req.body });
+    }
+  });
+});
+
+// Delete a customer
+app.delete('/customers/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM customers WHERE id = ?', [id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Error deleting customer');
+    } else if (this.changes === 0) {
+      res.status(404).send('Customer not found');
+    } else {
+      res.status(204).send();
+    }
+  });
+});
 
 // ===================== Server Initialization =====================
 app.listen(port, () => {
