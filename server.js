@@ -1,37 +1,39 @@
-const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const multer = require('multer');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+const express = require("express");
+const sqlite3 = require("sqlite3").verbose();
+const multer = require("multer");
+const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 
 // Initialize the app
 const app = express();
 const port = 5000;
 
 // Ensure `uploads` directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
 // Open SQLite database
-const db = new sqlite3.Database('./shopdb.sqlite', (err) => {
+const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
   if (err) {
-    console.error('Error opening database:', err.message);
+    console.error("Error opening database:", err.message);
   } else {
-    console.log('Connected to the SQLite database.');
+    console.log("Connected to the SQLite database.");
   }
 });
 
 // Middleware to parse JSON requests
 app.use(express.json());
-app.use(cors({
-  origin: 'http://localhost:3000',
-}));
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+  })
+);
 
 // Serve static files from the `uploads` directory
-app.use('/uploads', express.static(uploadsDir));
+app.use("/uploads", express.static(uploadsDir));
 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
@@ -48,11 +50,11 @@ const upload = multer({ storage });
 // ===================== Products Endpoints =====================
 
 // Get all products
-app.get('/products', (req, res) => {
-  db.all('SELECT * FROM products', (err, rows) => {
+app.get("/products", (req, res) => {
+  db.all("SELECT * FROM products", (err, rows) => {
     if (err) {
       console.error(err);
-      res.status(500).send('Error fetching products');
+      res.status(500).send("Error fetching products");
     } else {
       res.json(rows);
     }
@@ -60,14 +62,14 @@ app.get('/products', (req, res) => {
 });
 
 // Get a specific product by ID
-app.get('/products/:id', (req, res) => {
+app.get("/products/:id", (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM products WHERE id = ?', [id], (err, row) => {
+  db.get("SELECT * FROM products WHERE id = ?", [id], (err, row) => {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error fetching product');
+      res.status(500).send("Error fetching product");
     } else if (!row) {
-      res.status(404).send('Product not found');
+      res.status(404).send("Product not found");
     } else {
       res.json(row);
     }
@@ -75,13 +77,15 @@ app.get('/products/:id', (req, res) => {
 });
 
 // Add a new product
-app.post('/products', (req, res) => {
+app.post("/products", (req, res) => {
   const { name, cp, sp, stock } = req.body;
-  const stmt = db.prepare('INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)');
+  const stmt = db.prepare(
+    "INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)"
+  );
   stmt.run(name, cp, sp, stock, function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error adding product');
+      res.status(500).send("Error adding product");
     } else {
       res.status(201).json({ id: this.lastID, name, cp, sp, stock });
     }
@@ -89,41 +93,43 @@ app.post('/products', (req, res) => {
 });
 
 // Add multiple products in bulk
-app.post('/products/bulk', (req, res) => {
+app.post("/products/bulk", (req, res) => {
   const { products } = req.body;
 
   if (!Array.isArray(products) || products.length === 0) {
-    return res.status(400).send('Invalid product data');
+    return res.status(400).send("Invalid product data");
   }
 
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run("BEGIN TRANSACTION");
 
     let errorOccurred = false;
 
     products.forEach((product) => {
       const { name, cp, sp, stock } = product;
-      const stmt = db.prepare('INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)');
+      const stmt = db.prepare(
+        "INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)"
+      );
       stmt.run(name, cp, sp, stock, (err) => {
         if (err) {
-          console.error('Error inserting product:', err.message);
+          console.error("Error inserting product:", err.message);
           errorOccurred = true;
         }
       });
     });
 
     if (errorOccurred) {
-      db.run('ROLLBACK');
-      res.status(400).send('Error adding products');
+      db.run("ROLLBACK");
+      res.status(400).send("Error adding products");
     } else {
-      db.run('COMMIT');
-      res.status(201).send('Products added successfully');
+      db.run("COMMIT");
+      res.status(201).send("Products added successfully");
     }
   });
 });
 
 // Update a product
-app.put('/products/:id', upload.single('image'), (req, res) => {
+app.put("/products/:id", upload.single("image"), (req, res) => {
   const { id } = req.params;
   const { name, cp, sp, stock } = req.body;
   const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
@@ -132,36 +138,36 @@ app.put('/products/:id', upload.single('image'), (req, res) => {
   const values = [];
 
   if (name) {
-    fields.push('name = ?');
+    fields.push("name = ?");
     values.push(name);
   }
   if (cp) {
-    fields.push('cp = ?');
+    fields.push("cp = ?");
     values.push(cp);
   }
   if (sp) {
-    fields.push('sp = ?');
+    fields.push("sp = ?");
     values.push(sp);
   }
   if (stock) {
-    fields.push('stock = ?');
+    fields.push("stock = ?");
     values.push(stock);
   }
   if (imagePath) {
-    fields.push('image = ?');
+    fields.push("image = ?");
     values.push(imagePath);
   }
 
   values.push(id);
 
-  const query = `UPDATE products SET ${fields.join(', ')} WHERE id = ?`;
+  const query = `UPDATE products SET ${fields.join(", ")} WHERE id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error updating product');
+      res.status(500).send("Error updating product");
     } else if (this.changes === 0) {
-      res.status(404).send('Product not found');
+      res.status(404).send("Product not found");
     } else {
       res.json({ id, name, cp, sp, stock, image: imagePath });
     }
@@ -169,14 +175,14 @@ app.put('/products/:id', upload.single('image'), (req, res) => {
 });
 
 // Delete a product
-app.delete('/products/:id', (req, res) => {
+app.delete("/products/:id", (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM products WHERE id = ?', [id], function (err) {
+  db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error deleting product');
+      res.status(500).send("Error deleting product");
     } else if (this.changes === 0) {
-      res.status(404).send('Product not found');
+      res.status(404).send("Product not found");
     } else {
       res.status(204).send();
     }
@@ -186,64 +192,71 @@ app.delete('/products/:id', (req, res) => {
 // ===================== Sales Endpoints =====================
 
 // Add a sale or bulk sales
-app.post('/sales', (req, res) => {
+app.post("/sales", (req, res) => {
   const salesData = Array.isArray(req.body) ? req.body : [req.body];
 
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run("BEGIN TRANSACTION");
 
     let errorOccurred = false;
 
     salesData.forEach(({ product_id, quantity }) => {
-      db.get('SELECT * FROM products WHERE id = ?', [product_id], (err, product) => {
-        if (err || !product) {
-          errorOccurred = true;
-          return console.error(err ? err.message : 'Product not found');
-        }
-
-        if (product.stock < quantity) {
-          errorOccurred = true;
-          return console.error('Insufficient stock for product ID:', product_id);
-        }
-
-        const total_price = product.sp * quantity;
-
-        db.run(
-          'INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)',
-          [product_id, quantity, total_price, new Date().toISOString()],
-          (err) => {
-            if (err) {
-              errorOccurred = true;
-              console.error(err.message);
-            }
+      db.get(
+        "SELECT * FROM products WHERE id = ?",
+        [product_id],
+        (err, product) => {
+          if (err || !product) {
+            errorOccurred = true;
+            return console.error(err ? err.message : "Product not found");
           }
-        );
 
-        db.run(
-          'UPDATE products SET stock = stock - ? WHERE id = ?',
-          [quantity, product_id],
-          (err) => {
-            if (err) {
-              errorOccurred = true;
-              console.error(err.message);
-            }
+          if (product.stock < quantity) {
+            errorOccurred = true;
+            return console.error(
+              "Insufficient stock for product ID:",
+              product_id
+            );
           }
-        );
-      });
+
+          const total_price = product.sp * quantity;
+
+          db.run(
+            "INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)",
+            [product_id, quantity, total_price, new Date().toISOString()],
+            (err) => {
+              if (err) {
+                errorOccurred = true;
+                console.error(err.message);
+              }
+            }
+          );
+
+          db.run(
+            "UPDATE products SET stock = stock - ? WHERE id = ?",
+            [quantity, product_id],
+            (err) => {
+              if (err) {
+                errorOccurred = true;
+                console.error(err.message);
+              }
+            }
+          );
+        }
+      );
     });
 
     if (errorOccurred) {
-      db.run('ROLLBACK');
-      res.status(400).send('Error processing sales');
+      db.run("ROLLBACK");
+      res.status(400).send("Error processing sales");
     } else {
-      db.run('COMMIT');
-      res.status(201).send('Sales processed successfully');
+      db.run("COMMIT");
+      res.status(201).send("Sales processed successfully");
     }
   });
 });
 
 // Get all sales
-app.get('/sales', (req, res) => {
+app.get("/sales", (req, res) => {
   db.all(
     `SELECT sales.id, products.name AS product_name, sales.quantity, sales.total_price, sales.date 
      FROM sales 
@@ -251,7 +264,7 @@ app.get('/sales', (req, res) => {
     (err, rows) => {
       if (err) {
         console.error(err);
-        res.status(500).send('Error fetching sales');
+        res.status(500).send("Error fetching sales");
       } else {
         res.json(rows);
       }
@@ -261,11 +274,11 @@ app.get('/sales', (req, res) => {
 // ===================== Suppliers Endpoints =====================
 
 // Get all suppliers
-app.get('/suppliers', (req, res) => {
-  db.all('SELECT * FROM suppliers', (err, rows) => {
+app.get("/suppliers", (req, res) => {
+  db.all("SELECT * FROM suppliers", (err, rows) => {
     if (err) {
       console.error(err);
-      res.status(500).send('Error fetching suppliers');
+      res.status(500).send("Error fetching suppliers");
     } else {
       res.json(rows);
     }
@@ -273,14 +286,14 @@ app.get('/suppliers', (req, res) => {
 });
 
 // Get a specific supplier by ID
-app.get('/suppliers/:id', (req, res) => {
+app.get("/suppliers/:id", (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM suppliers WHERE id = ?', [id], (err, row) => {
+  db.get("SELECT * FROM suppliers WHERE id = ?", [id], (err, row) => {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error fetching supplier');
+      res.status(500).send("Error fetching supplier");
     } else if (!row) {
-      res.status(404).send('Supplier not found');
+      res.status(404).send("Supplier not found");
     } else {
       res.json(row);
     }
@@ -288,7 +301,7 @@ app.get('/suppliers/:id', (req, res) => {
 });
 
 // Add a new supplier
-app.post('/suppliers', (req, res) => {
+app.post("/suppliers", (req, res) => {
   const {
     type,
     contact_id,
@@ -325,7 +338,7 @@ app.post('/suppliers', (req, res) => {
     function (err) {
       if (err) {
         console.error(err.message);
-        res.status(500).send('Error adding supplier');
+        res.status(500).send("Error adding supplier");
       } else {
         res.status(201).json({ id: this.lastID, ...req.body });
       }
@@ -334,7 +347,7 @@ app.post('/suppliers', (req, res) => {
 });
 
 // Update a supplier
-app.put('/suppliers/:id', (req, res) => {
+app.put("/suppliers/:id", (req, res) => {
   const { id } = req.params;
   const {
     type,
@@ -354,60 +367,60 @@ app.put('/suppliers/:id', (req, res) => {
   const values = [];
 
   if (type) {
-    fields.push('type = ?');
+    fields.push("type = ?");
     values.push(type);
   }
   if (contact_id) {
-    fields.push('contact_id = ?');
+    fields.push("contact_id = ?");
     values.push(contact_id);
   }
   if (business_name) {
-    fields.push('business_name = ?');
+    fields.push("business_name = ?");
     values.push(business_name);
   }
   if (name) {
-    fields.push('name = ?');
+    fields.push("name = ?");
     values.push(name);
   }
   if (email) {
-    fields.push('email = ?');
+    fields.push("email = ?");
     values.push(email);
   }
   if (tax_number) {
-    fields.push('tax_number = ?');
+    fields.push("tax_number = ?");
     values.push(tax_number);
   }
   if (pay_term) {
-    fields.push('pay_term = ?');
+    fields.push("pay_term = ?");
     values.push(pay_term);
   }
   if (opening_balance) {
-    fields.push('opening_balance = ?');
+    fields.push("opening_balance = ?");
     values.push(opening_balance);
   }
   if (advance_balance) {
-    fields.push('advance_balance = ?');
+    fields.push("advance_balance = ?");
     values.push(advance_balance);
   }
   if (address) {
-    fields.push('address = ?');
+    fields.push("address = ?");
     values.push(address);
   }
   if (mobile) {
-    fields.push('mobile = ?');
+    fields.push("mobile = ?");
     values.push(mobile);
   }
 
   values.push(id);
 
-  const query = `UPDATE suppliers SET ${fields.join(', ')} WHERE id = ?`;
+  const query = `UPDATE suppliers SET ${fields.join(", ")} WHERE id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error updating supplier');
+      res.status(500).send("Error updating supplier");
     } else if (this.changes === 0) {
-      res.status(404).send('Supplier not found');
+      res.status(404).send("Supplier not found");
     } else {
       res.json({ id, ...req.body });
     }
@@ -415,14 +428,14 @@ app.put('/suppliers/:id', (req, res) => {
 });
 
 // Delete a supplier
-app.delete('/suppliers/:id', (req, res) => {
+app.delete("/suppliers/:id", (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM suppliers WHERE id = ?', [id], function (err) {
+  db.run("DELETE FROM suppliers WHERE id = ?", [id], function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error deleting supplier');
+      res.status(500).send("Error deleting supplier");
     } else if (this.changes === 0) {
-      res.status(404).send('Supplier not found');
+      res.status(404).send("Supplier not found");
     } else {
       res.status(204).send();
     }
@@ -431,11 +444,11 @@ app.delete('/suppliers/:id', (req, res) => {
 // ===================== Customers Endpoints =====================
 
 // Get all customers
-app.get('/customers', (req, res) => {
-  db.all('SELECT * FROM customers', (err, rows) => {
+app.get("/customers", (req, res) => {
+  db.all("SELECT * FROM customers", (err, rows) => {
     if (err) {
       console.error(err);
-      res.status(500).send('Error fetching customers');
+      res.status(500).send("Error fetching customers");
     } else {
       res.json(rows);
     }
@@ -443,14 +456,14 @@ app.get('/customers', (req, res) => {
 });
 
 // Get a specific customer by ID
-app.get('/customers/:id', (req, res) => {
+app.get("/customers/:id", (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM customers WHERE id = ?', [id], (err, row) => {
+  db.get("SELECT * FROM customers WHERE id = ?", [id], (err, row) => {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error fetching customer');
+      res.status(500).send("Error fetching customer");
     } else if (!row) {
-      res.status(404).send('Customer not found');
+      res.status(404).send("Customer not found");
     } else {
       res.json(row);
     }
@@ -458,9 +471,10 @@ app.get('/customers/:id', (req, res) => {
 });
 
 // Add a new customer
-app.post('/customers', (req, res) => {
+app.post("/customers", (req, res) => {
   const {
     contact_id,
+    customer_type,
     business_name,
     name,
     email,
@@ -476,12 +490,13 @@ app.post('/customers', (req, res) => {
 
   const stmt = db.prepare(
     `INSERT INTO customers 
-    (contact_id, business_name, name, email, tax_number, credit_limit, pay_term, opening_balance, advance_balance, added_on, address, mobile, customer_group, total_sale_due, total_sell_return_due) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+    (contact_id, customer_type,business_name, name, email, tax_number, credit_limit, pay_term, opening_balance, advance_balance, added_on, address, mobile, customer_group, total_sale_due, total_sell_return_due) 
+    VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
   );
 
   stmt.run(
     contact_id,
+    customer_type,
     business_name,
     name,
     email,
@@ -497,7 +512,7 @@ app.post('/customers', (req, res) => {
     function (err) {
       if (err) {
         console.error(err.message);
-        res.status(500).send('Error adding customer');
+        res.status(500).send("Error adding customer");
       } else {
         res.status(201).json({ id: this.lastID, ...req.body });
       }
@@ -506,10 +521,11 @@ app.post('/customers', (req, res) => {
 });
 
 // Update a customer
-app.put('/customers/:id', (req, res) => {
+app.put("/customers/:id", (req, res) => {
   const { id } = req.params;
   const {
     contact_id,
+    customer_type,
     business_name,
     name,
     email,
@@ -527,64 +543,70 @@ app.put('/customers/:id', (req, res) => {
   const values = [];
 
   if (contact_id) {
-    fields.push('contact_id = ?');
+    fields.push("contact_id = ?");
     values.push(contact_id);
   }
   if (business_name) {
-    fields.push('business_name = ?');
+    fields.push("business_name = ?");
     values.push(business_name);
   }
   if (name) {
-    fields.push('name = ?');
+    fields.push("name = ?");
     values.push(name);
   }
   if (email) {
-    fields.push('email = ?');
+    fields.push("email = ?");
     values.push(email);
   }
   if (tax_number) {
-    fields.push('tax_number = ?');
+    fields.push("tax_number = ?");
     values.push(tax_number);
   }
   if (credit_limit) {
-    fields.push('credit_limit = ?');
+    fields.push("credit_limit = ?");
     values.push(credit_limit);
   }
   if (pay_term) {
-    fields.push('pay_term = ?');
+    fields.push("pay_term = ?");
     values.push(pay_term);
   }
   if (opening_balance) {
-    fields.push('opening_balance = ?');
+    fields.push("opening_balance = ?");
     values.push(opening_balance);
   }
   if (advance_balance) {
-    fields.push('advance_balance = ?');
+    fields.push("advance_balance = ?");
     values.push(advance_balance);
   }
   if (address) {
-    fields.push('address = ?');
+    fields.push("address = ?");
     values.push(address);
   }
   if (mobile) {
-    fields.push('mobile = ?');
+    fields.push("mobile = ?");
     values.push(mobile);
   }
   if (customer_group) {
-    fields.push('customer_group = ?');
+    fields.push("customer_group = ?");
     values.push(customer_group);
+  }
+  if (customer_type) {
+    fields.push("customer_type = ?");
+    values.push(customer_type);
   }
 
   values.push(id);
 
-  const query = `UPDATE customers SET ${fields.join(', ')} WHERE id = ?`;
+  const query = `UPDATE customers SET ${fields.join(
+    ", "
+  )} WHERE contact_id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error updating customer');
+      res.status(500).send("Error updating customer");
     } else if (this.changes === 0) {
-      res.status(404).send('Customer not found');
+      res.status(404).send("Customer not found");
     } else {
       res.json({ id, ...req.body });
     }
@@ -592,16 +614,35 @@ app.put('/customers/:id', (req, res) => {
 });
 
 // Delete a customer
-app.delete('/customers/:id', (req, res) => {
+app.delete("/customers/:id", (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM customers WHERE id = ?', [id], function (err) {
+  db.run("DELETE FROM customers WHERE contact_id = ?", [id], function (err) {
     if (err) {
       console.error(err.message);
-      res.status(500).send('Error deleting customer');
+      res.status(500).send("Error deleting customer");
     } else if (this.changes === 0) {
-      res.status(404).send('Customer not found');
+      res.status(404).send("Customer not found");
     } else {
       res.status(204).send();
+    }
+  });
+});
+// Update customer active status
+app.patch("/customers/:id", (req, res) => {
+  const { id } = req.params;
+  const { activeStatus } = req.body;
+
+  // Update the activeStatus field for the customer
+  const query = "UPDATE customers SET active_status = ? WHERE contact_id = ?";
+
+  db.run(query, [activeStatus, id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating active status");
+    } else if (this.changes === 0) {
+      res.status(404).send("Customer not found");
+    } else {
+      res.json({ id, activeStatus });
     }
   });
 });
@@ -611,12 +652,12 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
-process.on('SIGINT', () => {
+process.on("SIGINT", () => {
   db.close((err) => {
     if (err) {
-      console.error('Error closing the database:', err.message);
+      console.error("Error closing the database:", err.message);
     } else {
-      console.log('Database connection closed.');
+      console.log("Database connection closed.");
     }
     process.exit(0);
   });

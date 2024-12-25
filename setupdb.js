@@ -48,21 +48,23 @@ db.run(`CREATE TABLE IF NOT EXISTS suppliers (
 // Create the 'customers' table if it doesn't exist
 db.run(`CREATE TABLE IF NOT EXISTS customers (
   id INTEGER PRIMARY KEY,
-  contact_id TEXT UNIQUE,
+  contact_id TEXT UNIQUE NOT NULL,
+  customer_type TEXT NOT NULL, 
   business_name TEXT, -- Null for individuals
-  name TEXT,
-  email TEXT,
-  tax_number TEXT,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE, -- Can be NULL, but you can add NOT NULL if desired
+  tax_number TEXT, -- Optional for individuals
   credit_limit REAL DEFAULT 0,
   pay_term TEXT,
   opening_balance REAL DEFAULT 0,
   advance_balance REAL DEFAULT 0,
-  added_on TEXT,
+  added_on TEXT, -- Date or timestamp can be added here
   address TEXT,
-  mobile TEXT UNIQUE,
+  mobile TEXT,
   customer_group TEXT,
   total_sale_due REAL DEFAULT 0,
-  total_sell_return_due REAL DEFAULT 0
+  total_sell_return_due REAL DEFAULT 0,
+  active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
 )`);
 
   // Insert product data
