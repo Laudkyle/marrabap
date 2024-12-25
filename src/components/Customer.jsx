@@ -10,11 +10,13 @@ import {
   FaToggleOff,
   FaEye,
 } from "react-icons/fa";
-import { Tooltip } from "react-tooltip"; // Correct import
+import { Tooltip } from "react-tooltip";
 
 const Customer = () => {
   const [customers, setCustomers] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isEditFormVisible, setIsEditFormVisible] = useState(false);
+  const [customerGroups, setCustomerGroups] = useState([]);
   const [formData, setFormData] = useState({
     customer_type: "business", // Default to Business
     contact_id: "",
@@ -87,6 +89,28 @@ const Customer = () => {
     }
     return true;
   };
+  const handleEditClick = (customer) => {
+    setFormData({
+      customer_type: customer.customer_type || "business",
+      contact_id: customer.contact_id || "",
+      business_name: customer.business_name || "",
+      name: customer.name || "",
+      email: customer.email || "",
+      tax_number: customer.tax_number || "",
+      credit_limit: customer.credit_limit || "0",
+      pay_term: customer.pay_term || "0",
+      opening_balance: customer.opening_balance || "0",
+      advance_balance: customer.advance_balance || "0",
+      added_on: customer.added_on || "",
+      customer_group: customer.customer_group || "",
+      address: customer.address || "",
+      mobile: customer.mobile || "",
+      total_sale_due: customer.total_sale_due || "0",
+      total_sell_return_due: customer.total_sell_return_due || "0",
+      active_status: customer.active_status ?? true,
+    });
+    setIsEditFormVisible(true);
+  };
 
   const toggleActiveStatus = async (customer) => {
     try {
@@ -149,12 +173,81 @@ const Customer = () => {
         setIsFormVisible(false);
       }
     } catch (error) {
-        console.log(formData.customer_type);
+      console.log(formData.customer_type);
 
       console.error("Error adding customer:", error);
       toast.error(error.response?.data?.message || "Error adding customer.");
     }
   };
+  const handleEditCustomer = async () => {
+    try {
+      if (!validateForm()) return;
+
+      // Prepare the customer data
+      const customerData = {
+        ...formData,
+        added_on: formData.added_on || new Date().toISOString().split("T")[0],
+      };
+
+      // Make a PUT request to update the customer
+      const response = await axios.put(
+        `${API_URL}/${formData.contact_id}`,
+        customerData
+      );
+
+      if (response.data) {
+        // Update the customer list in state
+        setCustomers(
+          customers.map((customer) =>
+            customer.contact_id === formData.contact_id
+              ? response.data
+              : customer
+          )
+        );
+        toast.success("Customer updated successfully!");
+
+        // Reset form data and close the form
+        setFormData({
+          customer_type: "business",
+          contact_id: "",
+          business_name: "",
+          name: "",
+          email: "",
+          tax_number: "",
+          credit_limit: "0",
+          pay_term: "0",
+          opening_balance: "0",
+          advance_balance: "0",
+          added_on: "",
+          customer_group: "",
+          address: "",
+          mobile: "",
+          total_sale_due: "0",
+          total_sell_return_due: "0",
+          active_status: true,
+        });
+
+        setIsEditFormVisible(false); // Hide the edit form
+      }
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      toast.error(error.response?.data?.message || "Error updating customer.");
+    }
+  };
+
+  // Fetch customer groups from the backend
+  useEffect(() => {
+    const fetchCustomerGroups = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/customer_groups");
+        const data = await response.json();
+        setCustomerGroups(data); // Assuming the response is an array of customer groups
+      } catch (error) {
+        console.error("Error fetching customer groups:", error);
+      }
+    };
+    fetchCustomerGroups();
+  }, []);
 
   const handleDeleteCustomer = async (contact_id) => {
     try {
@@ -164,7 +257,7 @@ const Customer = () => {
       );
       toast.success("Customer deleted successfully!");
     } catch (error) {
-        console.log(contact_id)
+      console.log(contact_id);
       toast.error("Error deleting customer.");
       console.error("Error deleting customer:", error);
     }
@@ -185,8 +278,8 @@ const Customer = () => {
   );
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen max-w-[80vw] overflow-x-scroll">
-        <ToastContainer />
+    <div className="p-6 bg-gray-100  max-w-[80vw] h-[70vh] overflow-scroll">
+      <ToastContainer />
       <h1 className="text-2xl font-bold mb-6 text-gray-800">
         Manage Customers
       </h1>
@@ -199,268 +292,523 @@ const Customer = () => {
       </button>
 
       {isFormVisible && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-    <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
-      <h2 className="text-xl font-semibold text-gray-700 mb-4">
-        Add New Customer
-      </h2>
-      <form
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        onSubmit={(e) => e.preventDefault()}
-      >
-        {/* Customer Type */}
-        <div className="col-span-3">
-          <label className="block text-gray-700 font-semibold mb-2">
-            Customer Type
-          </label>
-          <select
-            name="customer_type"
-            value={formData.customer_type}
-            onChange={handleInputChange}
-            className="border border-gray-300 p-2 rounded w-full"
-          >
-            <option value="business">Business</option>
-            <option value="individual">Individual</option>
-          </select>
-        </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-4">
+              Add New Customer
+            </h2>
+            <form
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              {/* Customer Type */}
+              <div className="col-span-3">
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Customer Type
+                </label>
+                <select
+                  name="customer_type"
+                  value={formData.customer_type}
+                  onChange={handleInputChange}
+                  className="border border-gray-300 p-2 rounded w-full"
+                >
+                  <option value="business">Business</option>
+                  <option value="individual">Individual</option>
+                </select>
+              </div>
 
-        {/* Conditional fields for Business */}
-        {formData.customer_type === "business" && (
-          <>
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">
-                Business Name *
-              </label>
-              <input
-                type="text"
-                name="business_name"
-                value={formData.business_name}
-                onChange={handleInputChange}
-                placeholder="Business Name"
-                className="border border-gray-300 p-2 rounded w-full"
-              />
+              {/* Conditional fields for Business */}
+              {formData.customer_type === "business" && (
+                <>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Business Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="business_name"
+                      value={formData.business_name}
+                      onChange={handleInputChange}
+                      placeholder="Business Name"
+                      className="border border-gray-300 p-2 rounded w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Tax Number
+                    </label>
+                    <input
+                      type="text"
+                      name="tax_number"
+                      value={formData.tax_number}
+                      onChange={handleInputChange}
+                      placeholder="Tax Number"
+                      className="border border-gray-300 p-2 rounded w-full"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Conditional fields for Individual */}
+              {formData.customer_type === "individual" && (
+                <>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="Fullname Name"
+                      className="border border-gray-300 p-2 rounded w-full"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Common Fields */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Email"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Mobile *
+                </label>
+                <input
+                  type="text"
+                  name="mobile"
+                  value={formData.mobile}
+                  onChange={handleInputChange}
+                  placeholder="Mobile"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              {/* Optional Fields */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Credit Limit
+                </label>
+                <input
+                  type="number"
+                  name="credit_limit"
+                  value={formData.credit_limit}
+                  onChange={handleInputChange}
+                  placeholder="Credit Limit"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Pay Term
+                </label>
+                <input
+                  type="text"
+                  name="pay_term"
+                  value={formData.pay_term}
+                  onChange={handleInputChange}
+                  placeholder="Pay Term"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Opening Balance
+                </label>
+                <input
+                  type="number"
+                  name="opening_balance"
+                  value={formData.opening_balance}
+                  onChange={handleInputChange}
+                  placeholder="Opening Balance"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Advance Balance
+                </label>
+                <input
+                  type="number"
+                  name="advance_balance"
+                  value={formData.advance_balance}
+                  onChange={handleInputChange}
+                  placeholder="Advance Balance"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Customer Group
+                </label>
+                <select
+                  name="customer_group"
+                  value={formData.customer_group}
+                  onChange={handleInputChange}
+                  className="border border-gray-300 p-2 rounded w-full"
+                >
+                  <option value="">Select Customer Group</option>
+                  {customerGroups.map((group) => (
+                    <option key={group.id} value={group.group_name}>
+                      {group.group_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder="Address"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Total Sale Due
+                </label>
+                <input
+                  type="number"
+                  name="total_sale_due"
+                  value={formData.total_sale_due}
+                  onChange={handleInputChange}
+                  placeholder="Total Sale Due"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Total Sell Return Due
+                </label>
+                <input
+                  type="number"
+                  name="total_sell_return_due"
+                  value={formData.total_sell_return_due}
+                  onChange={handleInputChange}
+                  placeholder="Total Sell Return Due"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+            </form>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setIsFormVisible(false)}
+                className="mr-4 bg-gray-400 text-white px-6 py-2 rounded shadow hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCustomer}
+                className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700"
+              >
+                Add Customer
+              </button>
             </div>
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">
-                Tax Number
-              </label>
-              <input
-                type="text"
-                name="tax_number"
-                value={formData.tax_number}
-                onChange={handleInputChange}
-                placeholder="Tax Number"
-                className="border border-gray-300 p-2 rounded w-full"
-              />
+          </div>
+        </div>
+      )}
+      {isEditFormVisible && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-4">
+              Add New Customer
+            </h2>
+            <form
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              {/* Customer Type */}
+              <div className="col-span-3">
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Customer Type
+                </label>
+                <select
+                  name="customer_type"
+                  value={formData.customer_type}
+                  onChange={handleInputChange}
+                  className="border border-gray-300 p-2 rounded w-full"
+                >
+                  <option value="business">Business</option>
+                  <option value="individual">Individual</option>
+                </select>
+              </div>
+
+              {/* Conditional fields for Business */}
+              {formData.customer_type === "business" && (
+                <>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Business Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="business_name"
+                      value={formData.business_name}
+                      onChange={handleInputChange}
+                      placeholder="Business Name"
+                      className="border border-gray-300 p-2 rounded w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Tax Number
+                    </label>
+                    <input
+                      type="text"
+                      name="tax_number"
+                      value={formData.tax_number}
+                      onChange={handleInputChange}
+                      placeholder="Tax Number"
+                      className="border border-gray-300 p-2 rounded w-full"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Conditional fields for Individual */}
+              {formData.customer_type === "individual" && (
+                <>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="Fullname Name"
+                      className="border border-gray-300 p-2 rounded w-full"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Common Fields */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Email"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Mobile *
+                </label>
+                <input
+                  type="text"
+                  name="mobile"
+                  value={formData.mobile}
+                  onChange={handleInputChange}
+                  placeholder="Mobile"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              {/* Optional Fields */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Credit Limit
+                </label>
+                <input
+                  type="number"
+                  name="credit_limit"
+                  value={formData.credit_limit}
+                  onChange={handleInputChange}
+                  placeholder="Credit Limit"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Pay Term
+                </label>
+                <input
+                  type="text"
+                  name="pay_term"
+                  value={formData.pay_term}
+                  onChange={handleInputChange}
+                  placeholder="Pay Term"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Opening Balance
+                </label>
+                <input
+                  type="number"
+                  name="opening_balance"
+                  value={formData.opening_balance}
+                  onChange={handleInputChange}
+                  placeholder="Opening Balance"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Advance Balance
+                </label>
+                <input
+                  type="number"
+                  name="advance_balance"
+                  value={formData.advance_balance}
+                  onChange={handleInputChange}
+                  placeholder="Advance Balance"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Customer Group
+                </label>
+                <select
+                  name="customer_group"
+                  value={formData.customer_group}
+                  onChange={handleInputChange}
+                  className="border border-gray-300 p-2 rounded w-full"
+                >
+                  <option value="">Select Customer Group</option>
+                  {customerGroups.map((group) => (
+                    <option key={group.id} value={group.group_name}>
+                      {group.group_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder="Address"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Total Sale Due
+                </label>
+                <input
+                  type="number"
+                  name="total_sale_due"
+                  value={formData.total_sale_due}
+                  onChange={handleInputChange}
+                  placeholder="Total Sale Due"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Total Sell Return Due
+                </label>
+                <input
+                  type="number"
+                  name="total_sell_return_due"
+                  value={formData.total_sell_return_due}
+                  onChange={handleInputChange}
+                  placeholder="Total Sell Return Due"
+                  className="border border-gray-300 p-2 rounded w-full"
+                />
+              </div>
+            </form>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setIsEditFormVisible(false)}
+                className="mr-4 bg-gray-400 text-white px-6 py-2 rounded shadow hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditCustomer}
+                className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700"
+              >
+                Update Customer
+              </button>
             </div>
-          </>
-        )}
-
-        {/* Conditional fields for Individual */}
-        {formData.customer_type === "individual" && (
-         <>
-         <div>
-           <label className="block text-gray-700 font-semibold mb-2">
-             Full Name *
-           </label>
-           <input
-             type="text"
-             name="name"
-             value={formData.name}
-             onChange={handleInputChange}
-             placeholder="Fullname Name"
-             className="border border-gray-300 p-2 rounded w-full"
-           />
-         </div>
-         
-       </>
-        )}
-
-        {/* Common Fields */}
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Email *
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="Email"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
+          </div>
         </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Mobile *
-          </label>
-          <input
-            type="text"
-            name="mobile"
-            value={formData.mobile}
-            onChange={handleInputChange}
-            placeholder="Mobile"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        {/* Optional Fields */}
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Credit Limit
-          </label>
-          <input
-            type="number"
-            name="credit_limit"
-            value={formData.credit_limit}
-            onChange={handleInputChange}
-            placeholder="Credit Limit"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Pay Term
-          </label>
-          <input
-            type="text"
-            name="pay_term"
-            value={formData.pay_term}
-            onChange={handleInputChange}
-            placeholder="Pay Term"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Opening Balance
-          </label>
-          <input
-            type="number"
-            name="opening_balance"
-            value={formData.opening_balance}
-            onChange={handleInputChange}
-            placeholder="Opening Balance"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Advance Balance
-          </label>
-          <input
-            type="number"
-            name="advance_balance"
-            value={formData.advance_balance}
-            onChange={handleInputChange}
-            placeholder="Advance Balance"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Customer Group
-          </label>
-          <input
-            type="text"
-            name="customer_group"
-            value={formData.customer_group}
-            onChange={handleInputChange}
-            placeholder="Customer Group"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Address
-          </label>
-          <input
-            type="text"
-            name="address"
-            value={formData.address}
-            onChange={handleInputChange}
-            placeholder="Address"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Total Sale Due
-          </label>
-          <input
-            type="number"
-            name="total_sale_due"
-            value={formData.total_sale_due}
-            onChange={handleInputChange}
-            placeholder="Total Sale Due"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-semibold mb-2">
-            Total Sell Return Due
-          </label>
-          <input
-            type="number"
-            name="total_sell_return_due"
-            value={formData.total_sell_return_due}
-            onChange={handleInputChange}
-            placeholder="Total Sell Return Due"
-            className="border border-gray-300 p-2 rounded w-full"
-          />
-        </div>
-      </form>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={() => setIsFormVisible(false)}
-          className="mr-4 bg-gray-400 text-white px-6 py-2 rounded shadow hover:bg-gray-500"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleAddCustomer}
-          className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700"
-        >
-          Add Customer
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* Customer Table */}
-      <div className="bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">
+      <div className="bg-white shadow-sm rounded-md p-6">
+        <h2 className="text-lg font-medium text-gray-800 mb-4">
           Customer List
         </h2>
         <div className="overflow-x-auto">
-          <table className="table-auto w-full border-collapse border border-gray-200">
-            <thead className="bg-gray-100">
+          <table className="table-auto w-full border-collapse">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="border border-gray-200 px-4 py-2">Action</th>
-                {Object.keys(formData).map((field) => (
-                  <th key={field} className="border border-gray-200 px-4 py-2">
-                  {field.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())}
+                <th className="text-left text-sm font-medium text-gray-600 px-4 py-2">
+                  Action
                 </th>
-                
+                {Object.keys(formData).map((field) => (
+                  <th
+                    key={field}
+                    className="text-left text-sm font-medium text-gray-600 px-4 py-2"
+                  >
+                    {field
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char) => char.toUpperCase())}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {customers.length > 0 ? (
                 customers.map((customer) => (
-                  <tr key={customer.contact_id} className="hover:bg-gray-100">
-                    <td className="border border-gray-200 px-4 py-2">
-                      <div className="flex items-center space-x-3">
+                  <tr
+                    key={customer.contact_id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-4 py-2">
+                      <div className="flex items-center space-x-2">
                         <ActionButton
                           id={`payment-${customer.contact_id}`}
                           icon={<FaMoneyBillWave />}
@@ -487,7 +835,7 @@ const Customer = () => {
                           id={`edit-${customer.contact_id}`}
                           icon={<FaEdit />}
                           tooltip="Edit"
-                          onClick={() => setIsFormVisible(true)}
+                          onClick={() => handleEditClick(customer)}
                           color="yellow-500"
                         />
                         <ActionButton
@@ -511,9 +859,13 @@ const Customer = () => {
                     {Object.keys(formData).map((field) => (
                       <td
                         key={field}
-                        className="border border-gray-200 px-4 py-2"
+                        className="text-sm text-gray-700 px-4 py-2 border-b border-gray-200"
                       >
-                        {customer[field]}
+                        {field === "active_status"
+                          ? customer[field]
+                            ? "Active"
+                            : "Not Active"
+                          : customer[field]}
                       </td>
                     ))}
                   </tr>
@@ -522,7 +874,7 @@ const Customer = () => {
                 <tr>
                   <td
                     colSpan={Object.keys(formData).length + 1}
-                    className="border border-gray-200 px-4 py-2 text-center"
+                    className="text-center text-sm text-gray-500 px-4 py-2"
                   >
                     No customers found.
                   </td>

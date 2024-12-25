@@ -1,19 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { FaEdit, FaCheck, FaTimes, FaTrash } from 'react-icons/fa';
 
 const CustomerGroup = () => {
   const [formData, setFormData] = useState({
     group_name: '',
     discount: 0,
-    discount_type: 'percentage', // type of discount (percentage or amount)
-    tax_type: 'VAT', // Tax type (VAT, Sales Tax, GST, etc.)
-    tax_rate: 0, // Tax rate or amount
-    tax_type_details: '', // For any custom tax-related details
+    discount_type: 'percentage',
+    tax_type: 'VAT',
+    tax_rate: 0,
+    tax_type_details: '',
     description: '',
     activeStatus: true,
   });
 
   const [customerGroups, setCustomerGroups] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState(null);
+
+  const API_URL = "http://localhost:5000/customer_groups"; // Correct URL
+
+  // Fetch customer groups from the backend
+  useEffect(() => {
+    const fetchCustomerGroups = async () => {
+      try {
+        const response = await fetch(API_URL);  // Use API_URL here
+        const data = await response.json();
+        setCustomerGroups(data);
+      } catch (error) {
+        console.error('Error fetching customer groups:', error);
+      }
+    };
+    fetchCustomerGroups();
+  }, []);
 
   // Handle form input change
   const handleInputChange = (e) => {
@@ -22,36 +40,54 @@ const CustomerGroup = () => {
   };
 
   // Handle toggling the active status
-  const handleToggleActiveStatus = (groupId) => {
-    setCustomerGroups(
-      customerGroups.map((group) =>
-        group.id === groupId ? { ...group, activeStatus: !group.activeStatus } : group
-      )
-    );
+  const handleToggleActiveStatus = async (groupId) => {
+    const group = customerGroups.find((group) => group.id === groupId);
+    const newActiveStatus = !group.activeStatus;
+
+    try {
+      await fetch(`${API_URL}/${groupId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active_status: newActiveStatus }),
+      });
+
+      setCustomerGroups(
+        customerGroups.map((group) =>
+          group.id === groupId ? { ...group, activeStatus: newActiveStatus } : group
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling active status:', error);
+    }
   };
 
-  // Handle adding a customer group
-  const handleAddGroup = () => {
-    const newGroup = {
-      ...formData,
-      id: customerGroups.length + 1, // simple ID generation
-    };
+  // Handle adding a new customer group
+  const handleAddGroup = async () => {
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-    setCustomerGroups([...customerGroups, newGroup]);
+      const newGroup = await response.json();
+      setCustomerGroups([...customerGroups, newGroup]);
 
-    // Reset the form data after adding the group
-    setFormData({
-      group_name: '',
-      discount: 0,
-      discount_type: 'percentage',
-      tax_rate: 0,
-      tax_type: 'VAT',
-      tax_type_details: '',
-      description: '',
-      activeStatus: true,
-    });
-
-    setIsFormVisible(false);
+      // Reset form and hide it
+      setFormData({
+        group_name: '',
+        discount: 0,
+        discount_type: 'percentage',
+        tax_rate: 0,
+        tax_type: 'VAT',
+        tax_type_details: '',
+        description: '',
+        activeStatus: true,
+      });
+      setIsFormVisible(false);
+    } catch (error) {
+      console.error('Error adding customer group:', error);
+    }
   };
 
   // Handle editing an existing group
@@ -66,8 +102,59 @@ const CustomerGroup = () => {
       description: group.description,
       activeStatus: group.activeStatus,
     });
-
+    setEditingGroupId(group.id);
     setIsFormVisible(true);
+  };
+
+  // Handle updating a customer group
+  const handleUpdateGroup = async () => {
+    try {
+      const response = await fetch(`${API_URL}/${editingGroupId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const updatedGroup = await response.json();
+
+      setCustomerGroups(
+        customerGroups.map((group) =>
+          group.id === editingGroupId ? updatedGroup : group
+        )
+      );
+
+      // Reset form and hide it
+      setFormData({
+        group_name: '',
+        discount: 0,
+        discount_type: 'percentage',
+        tax_rate: 0,
+        tax_type: 'VAT',
+        tax_type_details: '',
+        description: '',
+        activeStatus: true,
+      });
+      setIsFormVisible(false);
+      setEditingGroupId(null);
+    } catch (error) {
+      console.error('Error updating customer group:', error);
+    }
+  };
+
+  // Handle deleting a customer group
+  const handleDeleteGroup = async (groupId) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this customer group?');
+    if (confirmDelete) {
+      try {
+        await fetch(`${API_URL}/${groupId}`, {
+          method: 'DELETE',
+        });
+
+        setCustomerGroups(customerGroups.filter((group) => group.id !== groupId));
+      } catch (error) {
+        console.error('Error deleting customer group:', error);
+      }
+    }
   };
 
   return (
@@ -82,7 +169,9 @@ const CustomerGroup = () => {
       {isFormVisible && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
-            <h2 className="text-2xl font-medium text-gray-800 mb-6 text-center">Create Customer Group</h2>
+            <h2 className="text-2xl font-medium text-gray-800 mb-6 text-center">
+              {editingGroupId ? 'Edit Customer Group' : 'Create Customer Group'}
+            </h2>
             <form
               className="grid grid-cols-1 md:grid-cols-3 gap-4"
               onSubmit={(e) => e.preventDefault()}
@@ -196,10 +285,10 @@ const CustomerGroup = () => {
                 Cancel
               </button>
               <button
-                onClick={handleAddGroup}
+                onClick={editingGroupId ? handleUpdateGroup : handleAddGroup}
                 className="bg-indigo-500 text-white px-5 py-2 rounded-xl hover:bg-indigo-600 transition duration-200 text-sm"
               >
-                Add Group
+                {editingGroupId ? 'Update Group' : 'Add Group'}
               </button>
             </div>
           </div>
@@ -224,27 +313,27 @@ const CustomerGroup = () => {
               <tr key={group.id} className="hover:bg-gray-50">
                 <td className="border border-gray-200 px-6 py-3">{group.group_name}</td>
                 <td className="border border-gray-200 px-6 py-3">
-                  {group.discount} {group.discount_type}
+                  {group.discount} {group.discount_type === 'percentage' ? '%' : ''}
                 </td>
                 <td className="border border-gray-200 px-6 py-3">{group.tax_type}</td>
                 <td className="border border-gray-200 px-6 py-3">
                   {group.tax_rate} {group.tax_type === 'percentage' ? '%' : ''}
                 </td>
                 <td className="border border-gray-200 px-6 py-3">
-                  <input
-                    type="checkbox"
-                    checked={group.activeStatus}
-                    onChange={() => handleToggleActiveStatus(group.id)}
-                    className="mr-2"
-                  />
-                  {group.activeStatus ? 'Active' : 'Inactive'}
+                  {group.activeStatus ? 'Active' : 'Not Active'}
                 </td>
                 <td className="border border-gray-200 px-6 py-3">
                   <button
                     onClick={() => handleEditCustomerGroup(group)}
                     className="text-indigo-600 hover:text-indigo-800"
                   >
-                    Edit
+                    <FaEdit className="inline-block" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteGroup(group.id)}
+                    className="text-red-600 hover:text-red-800 ml-4"
+                  >
+                    <FaTrash className="inline-block" />
                   </button>
                 </td>
               </tr>
