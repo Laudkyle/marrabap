@@ -159,6 +159,7 @@ const CustomerGroup = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
+        
       <button
         onClick={() => setIsFormVisible(true)}
         className="bg-indigo-500 text-white px-6 py-2 rounded-full shadow-md hover:bg-indigo-600 mb-6 transition-all duration-300 text-sm"

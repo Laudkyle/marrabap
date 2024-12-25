@@ -10,6 +10,8 @@ import {
   FaToggleOff,
   FaEye,
 } from "react-icons/fa";
+import { FiSearch } from "react-icons/fi";
+
 import { Tooltip } from "react-tooltip";
 
 const Customer = () => {
@@ -17,6 +19,8 @@ const Customer = () => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isEditFormVisible, setIsEditFormVisible] = useState(false);
   const [customerGroups, setCustomerGroups] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [formData, setFormData] = useState({
     customer_type: "business", // Default to Business
     contact_id: "",
@@ -57,6 +61,48 @@ const Customer = () => {
   useEffect(() => {
     fetchCustomers();
   }, []);
+  const [filteredCustomers, setFilteredCustomers] = useState(customers);
+
+  const handleFilterChange = (filter) => {
+    let updatedList = customers;
+    if (filter === "active") {
+      updatedList = customers.filter((customer) => customer.active_status);
+    } else if (filter === "inactive") {
+      updatedList = customers.filter((customer) => !customer.active_status);
+    } else if (filter === "business") {
+      updatedList = customers.filter((customer) => customer.customer_type==='business');
+    } else if (filter === "individual") {
+      updatedList = customers.filter((customer) => customer.customer_type==='individual');
+    }
+    setFilteredCustomers(updatedList);
+  };
+
+  // Handle live search
+  const handleSearchChange = (e) => {
+    const query = e.target.value.toLowerCase(); // Convert query to lowercase for case-insensitive comparison
+    setSearchQuery(query);
+
+    if (query === "") {
+      setFilteredCustomers(customers); // Show all customers if search is empty
+    } else {
+      const filtered = customers.filter((customer) => {
+        // Check if any of the specified fields contain the query
+        return (
+          customer.business_name?.toLowerCase().includes(query) ||
+          customer.name?.toLowerCase().includes(query) ||
+          customer.email?.toLowerCase().includes(query) ||
+          customer.customer_group?.toLowerCase().includes(query) ||
+          customer.address?.toLowerCase().includes(query) ||
+          customer.mobile?.toLowerCase().includes(query)
+        );
+      });
+      setFilteredCustomers(filtered);
+    }
+  };
+
+  useEffect(() => {
+    setFilteredCustomers(customers);
+  }, [customers]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -278,8 +324,39 @@ const Customer = () => {
   );
 
   return (
-    <div className="p-6 bg-gray-100  max-w-[80vw] h-[70vh] overflow-scroll">
+    <div className=" bg-gray-100  max-w-[80vw] h-[70vh] overflow-scroll">
       <ToastContainer />
+      <div className="sticky top-0 z-10 p-4 h-16 bg-gray-800 flex mb-2 justify-center">
+        <div className="flex justify-between items-center w-full">
+          {/* <h2 className="text-lg font-medium text-gray-800">Customer List</h2> */}
+          <div className="flex items-center justify-end space-x-3">
+            {/* Filter Dropdown */}
+            <select
+              className="border border-gray-300 text-sm rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => handleFilterChange(e.target.value)}
+            >
+              <option value="">All Customers</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="business">Business</option>
+              <option value="individual">Individual</option>
+            </select>
+
+            <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <FiSearch className="h-5 w-5" />
+              </span>
+              <input
+                type="text"
+                placeholder="Search for customers..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="w-full p-2 pl-10 pr-4 outline-none text-black rounded-3xl"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
       <h1 className="text-2xl font-bold mb-6 text-gray-800">
         Manage Customers
       </h1>
@@ -778,9 +855,6 @@ const Customer = () => {
 
       {/* Customer Table */}
       <div className="bg-white shadow-sm rounded-md p-6">
-        <h2 className="text-lg font-medium text-gray-800 mb-4">
-          Customer List
-        </h2>
         <div className="overflow-x-auto">
           <table className="table-auto w-full border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -801,8 +875,8 @@ const Customer = () => {
               </tr>
             </thead>
             <tbody>
-              {customers.length > 0 ? (
-                customers.map((customer) => (
+              {filteredCustomers.length > 0 ? (
+                filteredCustomers.map((customer) => (
                   <tr
                     key={customer.contact_id}
                     className="hover:bg-gray-50 transition-colors"
