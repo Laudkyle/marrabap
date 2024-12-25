@@ -326,20 +326,19 @@ const Customer = () => {
   return (
     <div className=" bg-gray-100  max-w-[80vw] h-[70vh] overflow-scroll">
       <ToastContainer />
-      <div className="sticky top-0 z-10 p-4 h-16 bg-gray-800 flex mb-2 justify-center">
+      <div className="sticky top-0 z-2 p-4 h-16 bg-gray-800 flex mb-2 justify-center">
         <div className="flex justify-between items-center w-full">
-          {/* <h2 className="text-lg font-medium text-gray-800">Customer List</h2> */}
-          <div className="flex items-center justify-end space-x-3">
+          <div className="flex w-full items-center justify-end space-x-3">
             {/* Filter Dropdown */}
             <select
-              className="border border-gray-300 text-sm rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-gray-300 w-64  text-sm rounded px-3 py-2 focus:outline-none "
               onChange={(e) => handleFilterChange(e.target.value)}
             >
-              <option value="">All Customers</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="business">Business</option>
-              <option value="individual">Individual</option>
+              <option value=""> Filter By</option>
+              <option value="active"> Active</option>
+              <option value="inactive"> Inactive</option>
+              <option value="business"> Business</option>
+              <option value="individual"> Individual</option>
             </select>
 
             <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
@@ -357,6 +356,7 @@ const Customer = () => {
           </div>
         </div>
       </div>
+      <div className="px-6 flex justify-between items-center">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">
         Manage Customers
       </h1>
@@ -367,6 +367,7 @@ const Customer = () => {
       >
         Add Customer
       </button>
+      </div>
 
       {isFormVisible && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
@@ -854,7 +855,10 @@ const Customer = () => {
       )}
 
       {/* Customer Table */}
-      <div className="bg-white shadow-sm rounded-md p-6">
+      <div className="bg-white mx-6 shadow-sm rounded-md p-6">
+      <h2 className="text-xl font-semibold text-gray-700 mb-4">
+          Customer List
+        </h2>
         <div className="overflow-x-auto">
           <table className="table-auto w-full border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
