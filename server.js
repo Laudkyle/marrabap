@@ -646,6 +646,174 @@ app.patch("/customers/:id", (req, res) => {
     }
   });
 });
+// ===================== Customer Groups Endpoints =====================
+
+// Get all customer groups
+app.get("/customer_groups", (req, res) => {
+  db.all("SELECT * FROM customer_groups", (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send("Error fetching customer groups");
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// Get a specific customer group by ID
+app.get("/customer_groups/:id", (req, res) => {
+  const { id } = req.params;
+  db.get("SELECT * FROM customer_groups WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error fetching customer group");
+    } else if (!row) {
+      res.status(404).send("Customer group not found");
+    } else {
+      res.json(row);
+    }
+  });
+});
+
+// Add a new customer group
+app.post("/customer_groups", (req, res) => {
+  const {
+    group_name,
+    discount,
+    discount_type,
+    tax_type,
+    tax_rate,
+    tax_type_details,
+    description,
+    active_status,
+  } = req.body;
+
+  const stmt = db.prepare(
+    `INSERT INTO customer_groups 
+    (group_name, discount, discount_type, tax_type, tax_rate, tax_type_details, description, active_status) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  stmt.run(
+    group_name,
+    discount || 0,
+    discount_type || "percentage",
+    tax_type || "VAT",
+    tax_rate || 0,
+    tax_type_details || "",
+    description || "",
+    active_status || 1,
+    function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error adding customer group");
+      } else {
+        res.status(201).json({ id: this.lastID, ...req.body });
+      }
+    }
+  );
+});
+
+// Update a customer group
+app.put("/customer_groups/:id", (req, res) => {
+  const { id } = req.params;
+  const {
+    group_name,
+    discount,
+    discount_type,
+    tax_type,
+    tax_rate,
+    tax_type_details,
+    description,
+    active_status,
+  } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (group_name) {
+    fields.push("group_name = ?");
+    values.push(group_name);
+  }
+  if (discount !== undefined) {
+    fields.push("discount = ?");
+    values.push(discount);
+  }
+  if (discount_type) {
+    fields.push("discount_type = ?");
+    values.push(discount_type);
+  }
+  if (tax_type) {
+    fields.push("tax_type = ?");
+    values.push(tax_type);
+  }
+  if (tax_rate !== undefined) {
+    fields.push("tax_rate = ?");
+    values.push(tax_rate);
+  }
+  if (tax_type_details) {
+    fields.push("tax_type_details = ?");
+    values.push(tax_type_details);
+  }
+  if (description) {
+    fields.push("description = ?");
+    values.push(description);
+  }
+  if (active_status !== undefined) {
+    fields.push("active_status = ?");
+    values.push(active_status);
+  }
+
+  values.push(id);
+
+  const query = `UPDATE customer_groups SET ${fields.join(", ")} WHERE id = ?`;
+
+  db.run(query, values, function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating customer group");
+    } else if (this.changes === 0) {
+      res.status(404).send("Customer group not found");
+    } else {
+      res.json({ id, ...req.body });
+    }
+  });
+});
+
+// Delete a customer group
+app.delete("/customer_groups/:id", (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM customer_groups WHERE id = ?", [id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error deleting customer group");
+    } else if (this.changes === 0) {
+      res.status(404).send("Customer group not found");
+    } else {
+      res.status(204).send();
+    }
+  });
+});
+
+// Update customer group active status
+app.patch("/customer_groups/:id", (req, res) => {
+  const { id } = req.params;
+  const { active_status } = req.body;
+
+  // Update the active_status field for the customer group
+  const query = "UPDATE customer_groups SET active_status = ? WHERE id = ?";
+
+  db.run(query, [active_status, id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating active status");
+    } else if (this.changes === 0) {
+      res.status(404).send("Customer group not found");
+    } else {
+      res.json({ id, active_status });
+    }
+  });
+});
 
 // ===================== Server Initialization =====================
 app.listen(port, () => {

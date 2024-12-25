@@ -74,17 +74,17 @@ const CustomerGroup = () => {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <button
         onClick={() => setIsFormVisible(true)}
-        className="bg-indigo-600 text-white px-6 py-2 rounded-full shadow-md hover:bg-indigo-700 mb-6 transition-all duration-300"
+        className="bg-indigo-500 text-white px-6 py-2 rounded-full shadow-md hover:bg-indigo-600 mb-6 transition-all duration-300 text-sm"
       >
         Add New Customer Group
       </button>
 
       {isFormVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl p-8">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-6">Add New Customer Group</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
+            <h2 className="text-2xl font-medium text-gray-800 mb-6 text-center">Create Customer Group</h2>
             <form
-              className="grid grid-cols-1 md:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
               onSubmit={(e) => e.preventDefault()}
             >
               <div className="col-span-3">
@@ -95,7 +95,7 @@ const CustomerGroup = () => {
                   value={formData.group_name}
                   onChange={handleInputChange}
                   placeholder="Enter group name"
-                  className="border border-gray-300 p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                 />
               </div>
 
@@ -108,16 +108,16 @@ const CustomerGroup = () => {
                     value={formData.discount}
                     onChange={handleInputChange}
                     placeholder="Discount"
-                    className="border border-gray-300 p-3 rounded-lg w-2/3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="border border-gray-300 p-3 rounded-xl w-2/3 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                     min="0"
                   />
                   <select
                     name="discount_type"
                     value={formData.discount_type}
                     onChange={handleInputChange}
-                    className="border border-gray-300 p-3 rounded-lg w-1/3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="border border-gray-300 p-3 rounded-xl w-1/3 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                   >
-                    <option value="percentage">Percentage</option>
+                    <option value="percentage">%</option>
                     <option value="amount">Amount</option>
                   </select>
                 </div>
@@ -129,7 +129,7 @@ const CustomerGroup = () => {
                   name="tax_type"
                   value={formData.tax_type}
                   onChange={handleInputChange}
-                  className="border border-gray-300 p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                 >
                   <option value="VAT">VAT</option>
                   <option value="Sales Tax">Sales Tax</option>
@@ -147,7 +147,7 @@ const CustomerGroup = () => {
                   value={formData.tax_rate}
                   onChange={handleInputChange}
                   placeholder="Tax Rate"
-                  className="border border-gray-300 p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                   min="0"
                 />
               </div>
@@ -160,7 +160,7 @@ const CustomerGroup = () => {
                   value={formData.tax_type_details}
                   onChange={handleInputChange}
                   placeholder="Custom Tax Details (optional)"
-                  className="border border-gray-300 p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                 />
               </div>
 
@@ -171,8 +171,8 @@ const CustomerGroup = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   placeholder="Group Description"
-                  className="border border-gray-300 p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  rows="4"
+                  className="border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+                  rows="3"
                 />
               </div>
 
@@ -184,20 +184,20 @@ const CustomerGroup = () => {
                   onChange={(e) => setFormData({ ...formData, activeStatus: e.target.checked })}
                   className="h-5 w-5"
                 />
-                <label className="text-gray-700">Active Status</label>
+                <label className="text-gray-700 text-sm">Active Status</label>
               </div>
             </form>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end space-x-4">
               <button
                 onClick={() => setIsFormVisible(false)}
-                className="mr-4 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg shadow-md hover:bg-gray-400 transition duration-300"
+                className="bg-gray-200 text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-300 transition duration-200 text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddGroup}
-                className="bg-indigo-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-indigo-700 transition duration-300"
+                className="bg-indigo-500 text-white px-5 py-2 rounded-xl hover:bg-indigo-600 transition duration-200 text-sm"
               >
                 Add Group
               </button>
@@ -207,7 +207,7 @@ const CustomerGroup = () => {
       )}
 
       <div className="mt-8 overflow-x-auto bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Customer Groups</h2>
+        <h2 className="text-xl font-medium text-gray-800 mb-4">Customer Groups</h2>
         <table className="min-w-full table-auto border-collapse border border-gray-200">
           <thead>
             <tr className="text-left bg-gray-100">

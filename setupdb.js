@@ -66,6 +66,18 @@ db.run(`CREATE TABLE IF NOT EXISTS customers (
   total_sell_return_due REAL DEFAULT 0,
   active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
 )`);
+// Create the 'customer_groups' table if it doesn't exist
+db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
+  id INTEGER PRIMARY KEY,
+  group_name TEXT NOT NULL UNIQUE, 
+  discount REAL DEFAULT 0, 
+  discount_type TEXT DEFAULT 'percentage', -- 'percentage' or 'amount'
+  tax_type TEXT DEFAULT 'VAT', -- 'VAT', 'Sales Tax', 'GST', etc.
+  tax_rate REAL DEFAULT 0, -- Tax rate or amount
+  tax_type_details TEXT, -- Optional, for any custom tax-related details
+  description TEXT, -- Optional
+  active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
+)`);
 
   // Insert product data
   const insertStmt =
