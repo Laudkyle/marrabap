@@ -18,16 +18,19 @@ import CustomerGroup from './components/CutomerGroup';
 import SaleReturn from './components/SaleReturn';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
-
+  const companyName="Essential Anchor";
+  const companyAddress="123 Business St, City, Country" 
+  const email="support@company.com" 
+  const phone="(123) 456-7890" 
   return (
     <Router>
       <div className="flex">
-        <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
+        <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} companyName={companyName} />
         <div className="flex-1 bg-gray-100">
           <Header isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/pos" element={<Shop />} />
+            <Route path="/pos" element={<Shop companyName={companyName} email={email} phone={phone} companyAddress={companyAddress} />} />
             <Route path="/sale-return" element={<SaleReturn />} />
             <Route path="/list-expenses" element={<ExpenseList />} />
             <Route path="/add-product" element={<Edit />} />

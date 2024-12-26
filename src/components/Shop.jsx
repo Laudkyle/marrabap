@@ -7,7 +7,7 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-function Shop() {
+function Shop({ companyName, companyAddress, email, phone}) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,7 +16,8 @@ function Shop() {
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
-  const { cart, addToCart, clearCart, processSale, makeSale } = useCart(); 
+  const [refNum, setRefNum] = useState("");
+  const { cart, addToCart, clearCart, processSale, makeSale } = useCart();
 
   const fetchProducts = async () => {
     try {
@@ -58,46 +59,49 @@ function Shop() {
     }
   };
 
-
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
-// Utility function to generate a unique reference number
-const generateReferenceNumber = () => {
-  const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
-  return `REF ${uniqueNumber}`;
-};
+  // Utility function to generate a unique reference number
+  const generateReferenceNumber = () => {
+    const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
+    return `REF ${uniqueNumber}`;
+  };
 
-// Updated handleMakeSale function
-const handleMakeSale = async () => {
-  try {
-    const referenceNumber = generateReferenceNumber(); // Generate unique reference number
-    await makeSale(selectedProduct, quantity, referenceNumber); // Pass reference number to makeSale
-    setSaleComplete(!saleComplete); // Trigger product list refresh
-    setSelectedProduct(null);
-    toast.success("Sale completed successfully!");
-  } catch (error) {
-    console.error("Error completing sale:", error);
-    toast.error("An error occurred while processing the sale.");
-  }
-};
+  // Updated handleMakeSale function
+  const handleMakeSale = async () => {
+    try {
+      const referenceNumber = refNum; // Generate unique reference number
+      await makeSale(selectedProduct, quantity, referenceNumber); // Pass reference number to makeSale
+      setSaleComplete(!saleComplete); // Trigger product list refresh
+      setSelectedProduct(null);
+      toast.success("Sale completed successfully!");
+    } catch (error) {
+      console.error("Error completing sale:", error);
+      toast.error("An error occurred while processing the sale.");
+    }
+  };
 
-// Updated handleCompleteSale function
-const handleCompleteSale = async () => {
-  try {
-    const referenceNumber = generateReferenceNumber(); // Generate unique reference number
-    await processSale(referenceNumber); // Pass cart and reference number to processSale
-    setSaleComplete(!saleComplete); // Trigger product list refresh
-    setShowInvoice(false); // Close the invoice modal
-    clearCart();
-    toast.success("Sale completed successfully!");
-  } catch (error) {
-    console.error("Error completing sale:", error);
-    toast.error("An error occurred while processing the sale.");
-  }
-};
-
-
+  // Updated handleCompleteSale function
+  const handleCompleteSale = async () => {
+    try {
+      const referenceNumber = refNum; // Generate unique reference number
+      await processSale(referenceNumber); // Pass cart and reference number to processSale
+      setSaleComplete(!saleComplete); // Trigger product list refresh
+      setShowInvoice(false); // Close the invoice modal
+      clearCart();
+      toast.success("Sale completed successfully!");
+    } catch (error) {
+      console.error("Error completing sale:", error);
+      toast.error("An error occurred while processing the sale.");
+    }
+  };
+  useEffect(() => {
+    setRefNum(generateReferenceNumber());
+  }, []);
+  useEffect(() => {
+    setRefNum(generateReferenceNumber());
+  }, [showInvoice]);
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-8rem)]">
@@ -201,25 +205,68 @@ const handleCompleteSale = async () => {
 
       {/* Invoice Modal */}
       {showInvoice && (
-        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-6 w-[90%] sm:w-[60%] md:w-[40%] lg:w-[30%] shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Invoice</h2>
-            <div>
+        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%] shadow-2xl">
+            <div className="border-b pb-4 mb-4">
+              <h1 className="text-2xl font-bold text-blue-600 mb-1">
+                {companyName || "Company Name"}
+              </h1>
+              <p className="text-sm text-gray-600">
+                {companyAddress || "123 Business St, City, Country"}
+              </p>
+              <p className="text-sm text-gray-600">
+                Email: {email || "support@company.com"} | Phone:{" "}
+                {phone || "(123) 456-7890"}
+              </p>
+              <h2 className="text-lg font-semibold mt-4">Invoice</h2>
+              <p className="text-sm text-gray-600">
+                Reference Number:{" "}
+                <span className="font-medium">{refNum}</span>
+              </p>
+              <p className="text-sm text-gray-600">
+                Date: <span className="font-medium">{new Date().toLocaleDateString()}</span>
+              </p>
+            </div>
+
+            {/* Invoice Items */}
+            <div className="max-h-[30vh] overflow-scroll px-2">
               <ul className="space-y-2">
                 {cart.map((item, index) => (
-                  <li key={index} className="flex justify-between">
-                    <span>{item.product.name}</span>
-                    <span>
-                      {item.quantity} x ${item.product.sp}
+                  <li
+                    key={index}
+                    className="flex justify-between items-center border-b pb-2"
+                  >
+                    <span className="font-medium">{item.product.name}</span>
+                    <span className="text-sm text-gray-600">
+                      {item.quantity} x ₵{item.product.sp}
+                    </span>
+                    <span className="text-right font-medium">
+                    ₵{item.quantity * item.product.sp}
                     </span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="mt-4 flex justify-between">
-              <span className="font-semibold">Total:</span>
-              <span className="text-xl">${calculateTotal()}</span>
+
+            {/* Summary */}
+            <div className="mt-6">
+              <div className="flex justify-between">
+                <span className="font-semibold text-gray-700">Subtotal:</span>
+                <span>₵{calculateTotal().toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-gray-700">Tax (10%):</span>
+                <span>₵{(calculateTotal() * 0.1).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mt-2 border-t pt-2">
+                <span className="font-semibold text-lg">Grand Total:</span>
+                <span className="text-xl font-bold">
+                ₵{(calculateTotal() * 1.1).toFixed(2)}
+                </span>
+              </div>
             </div>
+
+            {/* Buttons */}
             <div className="mt-6 flex justify-between">
               <button
                 onClick={() => setShowInvoice(false)}

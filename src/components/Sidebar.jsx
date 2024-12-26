@@ -19,7 +19,7 @@ import {
 } from 'react-icons/fa';
 import logo from '../images/logo.png';
 
-const Sidebar = ({ isExpanded }) => {
+const Sidebar = ({ isExpanded,companyName }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
 
   const toggleDropdown = (dropdown) => {
@@ -105,7 +105,7 @@ const Sidebar = ({ isExpanded }) => {
           alt="Marrabap Ventures"
           className={`w-12 h-12 ${isExpanded ? 'mr-3' : 'mb-2'}`}
         />
-        {isExpanded && <h1 className="text-xl font-bold">Marrabap Ventures</h1>}
+        {isExpanded && <h1 className="text-xl font-bold">{companyName}</h1>}
       </div>
 
       {/* Menu Items */}
