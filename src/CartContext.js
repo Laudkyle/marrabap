@@ -46,12 +46,14 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem("cart");
   };
 
-  const processSale = () => {
+  const processSale = (referenceNumber) => {
+    // Include reference number in each sale data
     const salesData = cart.map((item) => ({
       product_id: item.product.id,
       quantity: item.quantity,
+      reference_number: referenceNumber, 
     }));
-
+  
     fetch("http://localhost:5000/sales", {
       method: "POST",
       headers: {
@@ -75,10 +77,10 @@ export const CartProvider = ({ children }) => {
         console.error("Error logging sales:", error.message);
       });
   };
-
-  const makeSale = async  (selectedProduct, quantity) => {
+  
+  const makeSale = async (selectedProduct, quantity, referenceNumber) => {
     try {
-      // Log the sale directly
+      // Log the sale with the reference number
       const saleResponse = await fetch("http://localhost:5000/sales", {
         method: "POST",
         headers: {
@@ -87,21 +89,22 @@ export const CartProvider = ({ children }) => {
         body: JSON.stringify({
           product_id: selectedProduct.id,
           quantity: quantity,
+          reference_number: referenceNumber, // Add reference number to sale
         }),
       });
-
+  
       if (!saleResponse.ok) {
         const errorMessage = await saleResponse.text();
         throw new Error(errorMessage);
       }
-
+  
       const saleDetails = await saleResponse.json();
       console.log("Sale logged successfully:", saleDetails);
     } catch (error) {
       console.error("Error processing sale:", error.message);
     }
   };
-
+  
   return (
     <CartContext.Provider
       value={{ cart, setCart, addToCart, processSale, makeSale, clearCart }}

@@ -21,7 +21,7 @@ db.serialize(() => {
   // Create the 'sales' table if it doesn't exist
   db.run(`CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY,
-    refence_number TEXT UNIQUE,
+    reference_number TEXT NOT NULL,
     product_id INTEGER,
     quantity INTEGER,
     total_price REAL,

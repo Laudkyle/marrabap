@@ -16,7 +16,7 @@ function Shop() {
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
-  const { cart, addToCart, clearCart, processSale, makeSale } = useCart(); // Access processSale from context
+  const { cart, addToCart, clearCart, processSale, makeSale } = useCart(); 
 
   const fetchProducts = async () => {
     try {
@@ -58,33 +58,45 @@ function Shop() {
     }
   };
 
-  const handleMakeSale = async () => {
-    try {
-      await makeSale(selectedProduct, quantity); // Process sale for the selected product
-      setSaleComplete(!saleComplete); // Trigger product list refresh
-      setSelectedProduct(null);
-      toast.success("Sale completed successfully!");
-    } catch (error) {
-      console.error("Error completing sale:", error);
-      toast.error("An error occurred while processing the sale.");
-    }
-  };
 
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
-  const handleCompleteSale = async () => {
-    try {
-      await processSale();
-      setSaleComplete(!saleComplete); // Trigger product list refresh
-      setShowInvoice(false); // Close the invoice modal
-      clearCart()
-      toast.success("Sale completed successfully!");
-    } catch (error) {
-      console.error("Error completing sale:", error);
-      toast.error("An error occurred while processing the sale.");
-    }
-  };
+// Utility function to generate a unique reference number
+const generateReferenceNumber = () => {
+  const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
+  return `REF ${uniqueNumber}`;
+};
+
+// Updated handleMakeSale function
+const handleMakeSale = async () => {
+  try {
+    const referenceNumber = generateReferenceNumber(); // Generate unique reference number
+    await makeSale(selectedProduct, quantity, referenceNumber); // Pass reference number to makeSale
+    setSaleComplete(!saleComplete); // Trigger product list refresh
+    setSelectedProduct(null);
+    toast.success("Sale completed successfully!");
+  } catch (error) {
+    console.error("Error completing sale:", error);
+    toast.error("An error occurred while processing the sale.");
+  }
+};
+
+// Updated handleCompleteSale function
+const handleCompleteSale = async () => {
+  try {
+    const referenceNumber = generateReferenceNumber(); // Generate unique reference number
+    await processSale(referenceNumber); // Pass cart and reference number to processSale
+    setSaleComplete(!saleComplete); // Trigger product list refresh
+    setShowInvoice(false); // Close the invoice modal
+    clearCart();
+    toast.success("Sale completed successfully!");
+  } catch (error) {
+    console.error("Error completing sale:", error);
+    toast.error("An error occurred while processing the sale.");
+  }
+};
+
 
   if (loading) {
     return (

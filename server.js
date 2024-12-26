@@ -200,7 +200,7 @@ app.post("/sales", (req, res) => {
 
     let errorOccurred = false;
 
-    salesData.forEach(({ product_id, quantity }) => {
+    salesData.forEach(({ product_id, quantity, reference_number }) => {
       db.get(
         "SELECT * FROM products WHERE id = ?",
         [product_id],
@@ -221,8 +221,8 @@ app.post("/sales", (req, res) => {
           const total_price = product.sp * quantity;
 
           db.run(
-            "INSERT INTO sales (product_id, quantity, total_price, date) VALUES (?, ?, ?, ?)",
-            [product_id, quantity, total_price, new Date().toISOString()],
+            "INSERT INTO sales (product_id,reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?)",
+            [product_id,reference_number, quantity, total_price, new Date().toISOString()],
             (err) => {
               if (err) {
                 errorOccurred = true;
