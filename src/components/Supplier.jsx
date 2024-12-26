@@ -687,33 +687,7 @@ const Supplier = () => {
                   className="border border-gray-300 p-2 rounded w-full"
                 />
               </div>
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  Total Purchase Due
-                </label>
-                <input
-                  type="number"
-                  name="total_purchase_due"
-                  value={formData.total_purchase_due}
-                  onChange={handleInputChange}
-                  placeholder="Total Purchase Due"
-                  className="border border-gray-300 p-2 rounded w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  Total Purchase Return Due
-                </label>
-                <input
-                  type="number"
-                  name="total_purchase_return_due"
-                  value={formData.total_purchase_return_due}
-                  onChange={handleInputChange}
-                  placeholder="Total Purchase Return Due"
-                  className="border border-gray-300 p-2 rounded w-full"
-                />
-              </div>
+              
             </form>
 
             <div className="mt-4 flex justify-end">

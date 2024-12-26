@@ -318,8 +318,8 @@ app.post("/suppliers", (req, res) => {
 
   const stmt = db.prepare(
     `INSERT INTO suppliers 
-    (type, contact_id, business_name, name, email, tax_number, pay_term, opening_balance, advance_balance, added_on, address, mobile, total_purchase_due, total_purchase_return_due) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+    (type, contact_id, business_name, name, email, tax_number, pay_term, opening_balance, advance_balance, added_on, address, mobile, total_purchase_due, total_purchase_return_due,active_status) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0,?)`
   );
 
   stmt.run(
@@ -361,6 +361,7 @@ app.put("/suppliers/:id", (req, res) => {
     advance_balance,
     address,
     mobile,
+    active_status,
   } = req.body;
 
   const fields = [];
@@ -410,10 +411,14 @@ app.put("/suppliers/:id", (req, res) => {
     fields.push("mobile = ?");
     values.push(mobile);
   }
+  if (active_status) {
+    fields.push("active_status = ?");
+    values.push(active_status);
+  }
 
   values.push(id);
 
-  const query = `UPDATE suppliers SET ${fields.join(", ")} WHERE id = ?`;
+  const query = `UPDATE suppliers SET ${fields.join(", ")} WHERE contact_id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {
