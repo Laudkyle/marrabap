@@ -22,17 +22,18 @@ const Supplier = () => {
 
   const [formData, setFormData] = useState({
     type: "individual",
-    contactId: "",
-    businessName: "",
+    contact_id: "",
+    business_name: "",
     name: "",
     email: "",
-    taxNumber: "",
-    payTerm: "",
-    openingBalance: "",
-    advanceBalance: "",
-    addedOn: "",
+    tax_number: "",
+    pay_term: "",
+    opening_balance: "",
+    advance_balance: "",
+    added_on: "",
     address: "",
     mobile: "",
+    active_status:true,
   });
   const API_URL = "http://localhost:5000/suppliers"; // Update with your backend URL
 
@@ -89,7 +90,6 @@ const Supplier = () => {
           supplier.business_name?.toLowerCase().includes(query) ||
           supplier.name?.toLowerCase().includes(query) ||
           supplier.email?.toLowerCase().includes(query) ||
-          supplier.supplier_group?.toLowerCase().includes(query) ||
           supplier.address?.toLowerCase().includes(query) ||
           supplier.mobile?.toLowerCase().includes(query)
         );
@@ -145,8 +145,10 @@ const Supplier = () => {
       opening_balance: supplier.opening_balance || "0",
       advance_balance: supplier.advance_balance || "0",
       added_on: supplier.added_on || "",
+      supplier_group: supplier.supplier_group || "",
       address: supplier.address || "",
       mobile: supplier.mobile || "",
+      active_status: supplier.active_status ?? true,
     });
     setIsEditFormVisible(true);
   };
@@ -202,6 +204,7 @@ const Supplier = () => {
           added_on: "",
           address: "",
           mobile: "",
+          active_status:true
         });
 
         setIsFormVisible(false);
@@ -254,6 +257,7 @@ const Supplier = () => {
           added_on: "",
           address: "",
           mobile: "",
+          active_status:true
         });
 
         setIsEditFormVisible(false); // Hide the edit form
