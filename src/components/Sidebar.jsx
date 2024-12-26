@@ -16,7 +16,6 @@ import {
   FaUsers,
   FaUserFriends,
   FaPeopleCarry,
-  FaRegAddressBook,
   FaSave,
 } from 'react-icons/fa';
 import logo from '../images/logo.png';
