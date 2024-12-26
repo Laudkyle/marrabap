@@ -30,6 +30,15 @@ const Sidebar = ({ isExpanded }) => {
 
   const dropdownMenus = [
     {
+      name: 'Shop',
+      icon: <FaStore />,
+      dropdown: 'shop',
+      links: [
+        { path: '/pos', label: 'POS', icon: <FaCashRegister /> },
+        { path: '/sale-return', label: 'Sale Return', icon: <FaWarehouse /> },
+      ],
+    },
+    {
       name: 'Products',
       icon: <FaBox />,
       dropdown: 'products',
@@ -119,25 +128,6 @@ const Sidebar = ({ isExpanded }) => {
             }`}
           >
             Dashboard
-          </span>
-        </NavLink>
-        <NavLink
-          to="/shop"
-          className={({ isActive }) =>
-            `flex items-center px-4 py-3 hover:bg-gray-700 ${
-              isActive ? 'bg-gray-700' : ''
-            }`
-          }
-        >
-          <span className="text-xl w-5 h-5 flex items-center justify-center">
-            <FaStore />
-          </span>
-          <span
-            className={`ml-3 transition-all duration-300 ${
-              isExpanded ? 'block' : 'hidden'
-            }`}
-          >
-            Shop
           </span>
         </NavLink>
 

@@ -170,9 +170,9 @@ const Customer = () => {
             : c
         )
       );
-      toast.success("Customer status updated successfully!");
+      toast.success("Customer Toggled Successfully!!!");
     } catch (error) {
-      toast.error("Error toggling customer status.");
+      toast.error("Error Activating Customer, Please Try Again");
       console.error("Error toggling customer status:", error);
     }
   };

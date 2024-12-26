@@ -33,7 +33,7 @@ const Supplier = () => {
     added_on: "",
     address: "",
     mobile: "",
-    active_status:true,
+    active_status: true,
   });
   const API_URL = "http://localhost:5000/suppliers"; // Update with your backend URL
 
@@ -155,9 +155,18 @@ const Supplier = () => {
 
   const toggleActiveStatus = async (supplier) => {
     try {
-      await axios.patch(`${API_URL}/${supplier.contact_id}`, {
-        active_status: !supplier.active_status,
-      });
+      const newStatus = supplier.active_status ? 0 : 1; // SQL typically uses 0 and 1 for boolean values.
+
+      if (supplier.active_status) {
+        await axios.patch(`${API_URL}/${supplier.contact_id}`, {
+          active_status: 0, // Setting to inactive.
+        });
+      } else {
+        await axios.patch(`${API_URL}/${supplier.contact_id}`, {
+          active_status: 1, // Setting to active.
+        });
+      }
+
       setSuppliers(
         Suppliers.map((c) =>
           c.contact_id === supplier.contact_id
@@ -165,9 +174,9 @@ const Supplier = () => {
             : c
         )
       );
-      toast.success("supplier status updated successfully!");
+      toast.success("Supplier Toggled Successfully");
     } catch (error) {
-      toast.error("Error toggling supplier status.");
+      toast.error("Error Toggling Supplier, Please Try Again!!!");
       console.error("Error toggling supplier status:", error);
     }
   };
@@ -204,7 +213,7 @@ const Supplier = () => {
           added_on: "",
           address: "",
           mobile: "",
-          active_status:true
+          active_status: true,
         });
 
         setIsFormVisible(false);
@@ -257,7 +266,7 @@ const Supplier = () => {
           added_on: "",
           address: "",
           mobile: "",
-          active_status:true
+          active_status: true,
         });
 
         setIsEditFormVisible(false); // Hide the edit form
@@ -687,7 +696,6 @@ const Supplier = () => {
                   className="border border-gray-300 p-2 rounded w-full"
                 />
               </div>
-              
             </form>
 
             <div className="mt-4 flex justify-end">

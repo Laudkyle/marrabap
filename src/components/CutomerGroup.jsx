@@ -1,5 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { FaEdit, FaCheck, FaTimes, FaTrash } from 'react-icons/fa';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+const ConfirmModal = ({ isVisible, onClose, onConfirm, message }) => {
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+      <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <h2 className="text-gray-800 text-lg font-medium mb-4">{message}</h2>
+        <div className="flex justify-end space-x-4">
+          <button
+            onClick={onClose}
+            className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition duration-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition duration-200"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CustomerGroup = () => {
   const [formData, setFormData] = useState({
@@ -10,13 +38,14 @@ const CustomerGroup = () => {
     tax_rate: 0,
     tax_type_details: '',
     description: '',
-    activeStatus: true,
+    active_status: true,
   });
 
   const [customerGroups, setCustomerGroups] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null);
 
+  
   const API_URL = "http://localhost:5000/customer_groups"; // Correct URL
 
   // Fetch customer groups from the backend
@@ -39,27 +68,7 @@ const CustomerGroup = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  // Handle toggling the active status
-  const handleToggleActiveStatus = async (groupId) => {
-    const group = customerGroups.find((group) => group.id === groupId);
-    const newActiveStatus = !group.activeStatus;
-
-    try {
-      await fetch(`${API_URL}/${groupId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active_status: newActiveStatus }),
-      });
-
-      setCustomerGroups(
-        customerGroups.map((group) =>
-          group.id === groupId ? { ...group, activeStatus: newActiveStatus } : group
-        )
-      );
-    } catch (error) {
-      console.error('Error toggling active status:', error);
-    }
-  };
+  
 
   // Handle adding a new customer group
   const handleAddGroup = async () => {
@@ -69,11 +78,10 @@ const CustomerGroup = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-
+  
       const newGroup = await response.json();
       setCustomerGroups([...customerGroups, newGroup]);
-
-      // Reset form and hide it
+  
       setFormData({
         group_name: '',
         discount: 0,
@@ -82,14 +90,17 @@ const CustomerGroup = () => {
         tax_type: 'VAT',
         tax_type_details: '',
         description: '',
-        activeStatus: true,
+        active_status: true,
       });
       setIsFormVisible(false);
+  
+      toast.success('Customer group added successfully!');
     } catch (error) {
       console.error('Error adding customer group:', error);
+      toast.error('Failed to add customer group.');
     }
   };
-
+  
   // Handle editing an existing group
   const handleEditCustomerGroup = (group) => {
     setFormData({
@@ -100,7 +111,7 @@ const CustomerGroup = () => {
       tax_type: group.tax_type,
       tax_type_details: group.tax_type_details,
       description: group.description,
-      activeStatus: group.activeStatus,
+      active_status: group.active_status,
     });
     setEditingGroupId(group.id);
     setIsFormVisible(true);
@@ -132,34 +143,36 @@ const CustomerGroup = () => {
         tax_type: 'VAT',
         tax_type_details: '',
         description: '',
-        activeStatus: true,
+        active_status: true,
       });
       setIsFormVisible(false);
       setEditingGroupId(null);
+  
+      toast.success('Customer group updated successfully!');
     } catch (error) {
       console.error('Error updating customer group:', error);
+      toast.error('Failed to update customer group.');
     }
   };
-
-  // Handle deleting a customer group
   const handleDeleteGroup = async (groupId) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this customer group?');
-    if (confirmDelete) {
+   
       try {
         await fetch(`${API_URL}/${groupId}`, {
           method: 'DELETE',
         });
-
+  
         setCustomerGroups(customerGroups.filter((group) => group.id !== groupId));
+        toast.success('Customer group deleted successfully!');
       } catch (error) {
         console.error('Error deleting customer group:', error);
+        toast.error('Failed to delete customer group.');
       }
-    }
+    
   };
-
+  
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-        
+          <ToastContainer />
       <button
         onClick={() => setIsFormVisible(true)}
         className="bg-indigo-500 text-white px-6 py-2 rounded-full shadow-md hover:bg-indigo-600 mb-6 transition-all duration-300 text-sm"
@@ -269,9 +282,9 @@ const CustomerGroup = () => {
               <div className="col-span-3 flex items-center space-x-3">
                 <input
                   type="checkbox"
-                  name="activeStatus"
-                  checked={formData.activeStatus}
-                  onChange={(e) => setFormData({ ...formData, activeStatus: e.target.checked })}
+                  name="active_status"
+                  checked={formData.active_status}
+                  onChange={(e) => setFormData({ ...formData, active_status: e.target.checked })}
                   className="h-5 w-5"
                 />
                 <label className="text-gray-700 text-sm">Active Status</label>
@@ -321,7 +334,7 @@ const CustomerGroup = () => {
                   {group.tax_rate} {group.tax_type === 'percentage' ? '%' : ''}
                 </td>
                 <td className="border border-gray-200 px-6 py-3">
-                  {group.activeStatus ? 'Active' : 'Not Active'}
+                  {group.active_status ? 'Active' : 'Not Active'}
                 </td>
                 <td className="border border-gray-200 px-6 py-3">
                   <button

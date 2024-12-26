@@ -288,7 +288,7 @@ app.get("/suppliers", (req, res) => {
 // Get a specific supplier by ID
 app.get("/suppliers/:id", (req, res) => {
   const { id } = req.params;
-  db.get("SELECT * FROM suppliers WHERE id = ?", [id], (err, row) => {
+  db.get("SELECT * FROM suppliers WHERE contact_id = ?", [id], (err, row) => {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error fetching supplier");
@@ -318,8 +318,8 @@ app.post("/suppliers", (req, res) => {
 
   const stmt = db.prepare(
     `INSERT INTO suppliers 
-    (type, contact_id, business_name, name, email, tax_number, pay_term, opening_balance, advance_balance, added_on, address, mobile, total_purchase_due, total_purchase_return_due,active_status) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0,?)`
+    (type, contact_id, business_name, name, email, tax_number, pay_term, opening_balance, advance_balance, added_on, address, mobile, total_purchase_due, total_purchase_return_due) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
   );
 
   stmt.run(
@@ -435,7 +435,7 @@ app.put("/suppliers/:id", (req, res) => {
 // Delete a supplier
 app.delete("/suppliers/:id", (req, res) => {
   const { id } = req.params;
-  db.run("DELETE FROM suppliers WHERE id = ?", [id], function (err) {
+  db.run("DELETE FROM suppliers WHERE contact_id = ?", [id], function (err) {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error deleting supplier");
@@ -443,6 +443,25 @@ app.delete("/suppliers/:id", (req, res) => {
       res.status(404).send("Supplier not found");
     } else {
       res.status(204).send();
+    }
+  });
+});
+// Update supplier active status
+app.patch("/suppliers/:id", (req, res) => {
+  const { id } = req.params;
+  const { active_status } = req.body;
+
+  // Update the active_status field for the customer
+  const query = "UPDATE suppliers SET active_status = ? WHERE contact_id = ?";
+
+  db.run(query, [active_status, id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating active status");
+    } else if (this.changes === 0) {
+      res.status(404).send("Supplier not found");
+    } else {
+      res.json({ id, active_status });
     }
   });
 });
@@ -463,7 +482,7 @@ app.get("/customers", (req, res) => {
 // Get a specific customer by ID
 app.get("/customers/:id", (req, res) => {
   const { id } = req.params;
-  db.get("SELECT * FROM customers WHERE id = ?", [id], (err, row) => {
+  db.get("SELECT * FROM customers WHERE contact_id = ?", [id], (err, row) => {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error fetching customer");
@@ -635,19 +654,19 @@ app.delete("/customers/:id", (req, res) => {
 // Update customer active status
 app.patch("/customers/:id", (req, res) => {
   const { id } = req.params;
-  const { activeStatus } = req.body;
+  const { active_status } = req.body;
 
-  // Update the activeStatus field for the customer
+  // Update the active_status field for the customer
   const query = "UPDATE customers SET active_status = ? WHERE contact_id = ?";
 
-  db.run(query, [activeStatus, id], function (err) {
+  db.run(query, [active_status, id], function (err) {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error updating active status");
     } else if (this.changes === 0) {
       res.status(404).send("Customer not found");
     } else {
-      res.json({ id, activeStatus });
+      res.json({ id, active_status });
     }
   });
 });
