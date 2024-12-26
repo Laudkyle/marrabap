@@ -346,7 +346,7 @@ const Supplier = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
-              Add New supplier
+              Add New Supplier
             </h2>
             <form
               className="grid grid-cols-1 md:grid-cols-3 gap-4"
@@ -528,7 +528,7 @@ const Supplier = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
-              Add New supplier
+              Update Supplier
             </h2>
             <form
               className="grid grid-cols-1 md:grid-cols-3 gap-4"

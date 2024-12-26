@@ -43,7 +43,9 @@ db.run(`CREATE TABLE IF NOT EXISTS suppliers (
   address TEXT,
   mobile TEXT UNIQUE,
   total_purchase_due REAL DEFAULT 0,
-  total_purchase_return_due REAL DEFAULT 0
+  total_purchase_return_due REAL DEFAULT 0,
+  active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
+
 )`);
 // Create the 'customers' table if it doesn't exist
 db.run(`CREATE TABLE IF NOT EXISTS customers (
