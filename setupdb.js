@@ -11,75 +11,73 @@ const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY,
-    name TEXT,
-    cp TEXT,
-    sp TEXT,
-    stock INTEGER,
-    image TEXT
-  )`);
+    name TEXT NOT NULL,
+    cp REAL CHECK(cp >= 0), -- Cost Price with non-negative constraint
+    sp REAL CHECK(sp >= 0), -- Selling Price with non-negative constraint
+    stock INTEGER DEFAULT 0 CHECK(stock >= 0), -- Non-negative stock
+    image TEXT -- Optional, for product image URL or file path
+)`);
 
-  // Create the 'sales' table if it doesn't exist
-  db.run(`CREATE TABLE IF NOT EXISTS sales (
+db.run(`CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY,
     reference_number TEXT NOT NULL,
-    product_id INTEGER,
-    quantity INTEGER,
-    total_price REAL,
-    date TEXT,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER CHECK(quantity > 0), -- Quantity must be positive
+    total_price REAL CHECK(total_price >= 0), -- Ensure total is non-negative
+    date TEXT NOT NULL, -- ISO 8601 format recommended (YYYY-MM-DD)
     FOREIGN KEY (product_id) REFERENCES products (id)
-  )`);
-// Create the 'suppliers' table if it doesn't exist
-db.run(`CREATE TABLE IF NOT EXISTS suppliers (
-  id INTEGER PRIMARY KEY,
-  type TEXT, -- "Individual" or "Business"
-  contact_id TEXT UNIQUE,
-  business_name TEXT, -- Null for individuals
-  name TEXT,
-  email TEXT,
-  tax_number TEXT,
-  pay_term TEXT,
-  opening_balance REAL,
-  advance_balance REAL,
-  added_on TEXT,
-  address TEXT,
-  mobile TEXT UNIQUE,
-  total_purchase_due REAL DEFAULT 0,
-  total_purchase_return_due REAL DEFAULT 0,
-  active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
+)`);
 
+db.run(`CREATE TABLE IF NOT EXISTS suppliers (
+    id INTEGER PRIMARY KEY,
+    type TEXT NOT NULL, -- "Individual" or "Business"
+    contact_id TEXT UNIQUE NOT NULL,
+    business_name TEXT, -- Null for individuals
+    name TEXT NOT NULL,
+    email TEXT UNIQUE, -- Optional, can be NULL
+    tax_number TEXT, -- Optional
+    pay_term TEXT, -- Payment terms
+    opening_balance REAL DEFAULT 0 CHECK(opening_balance >= 0),
+    advance_balance REAL DEFAULT 0 CHECK(advance_balance >= 0),
+    added_on TEXT NOT NULL, -- Date of addition
+    address TEXT,
+    mobile TEXT UNIQUE, -- Must be unique
+    total_purchase_due REAL DEFAULT 0 CHECK(total_purchase_due >= 0),
+    total_purchase_return_due REAL DEFAULT 0 CHECK(total_purchase_return_due >= 0),
+    active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
-// Create the 'customers' table if it doesn't exist
+
 db.run(`CREATE TABLE IF NOT EXISTS customers (
-  id INTEGER PRIMARY KEY,
-  contact_id TEXT UNIQUE NOT NULL,
-  customer_type TEXT NOT NULL, 
-  business_name TEXT, -- Null for individuals
-  name TEXT NOT NULL,
-  email TEXT UNIQUE, -- Can be NULL, but you can add NOT NULL if desired
-  tax_number TEXT, -- Optional for individuals
-  credit_limit REAL DEFAULT 0,
-  pay_term TEXT,
-  opening_balance REAL DEFAULT 0,
-  advance_balance REAL DEFAULT 0,
-  added_on TEXT, -- Date or timestamp can be added here
-  address TEXT,
-  mobile TEXT,
-  customer_group TEXT,
-  total_sale_due REAL DEFAULT 0,
-  total_sell_return_due REAL DEFAULT 0,
-  active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
+    id INTEGER PRIMARY KEY,
+    contact_id TEXT UNIQUE NOT NULL,
+    customer_type TEXT NOT NULL, -- "Individual" or "Business"
+    business_name TEXT, -- Null for individuals
+    name TEXT NOT NULL,
+    email TEXT UNIQUE, -- Optional, can be NULL
+    tax_number TEXT, -- Optional
+    credit_limit REAL DEFAULT 0 CHECK(credit_limit >= 0),
+    pay_term TEXT,
+    opening_balance REAL DEFAULT 0 CHECK(opening_balance >= 0),
+    advance_balance REAL DEFAULT 0 CHECK(advance_balance >= 0),
+    added_on TEXT NOT NULL,
+    address TEXT,
+    mobile TEXT,
+    customer_group TEXT,
+    total_sale_due REAL DEFAULT 0 CHECK(total_sale_due >= 0),
+    total_sell_return_due REAL DEFAULT 0 CHECK(total_sell_return_due >= 0),
+    active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
-// Create the 'customer_groups' table if it doesn't exist
+
 db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
-  id INTEGER PRIMARY KEY,
-  group_name TEXT NOT NULL UNIQUE, 
-  discount REAL DEFAULT 0, 
-  discount_type TEXT DEFAULT 'percentage', -- 'percentage' or 'amount'
-  tax_type TEXT DEFAULT 'VAT', -- 'VAT', 'Sales Tax', 'GST', etc.
-  tax_rate REAL DEFAULT 0, -- Tax rate or amount
-  tax_type_details TEXT, -- Optional, for any custom tax-related details
-  description TEXT, -- Optional
-  active_status INTEGER DEFAULT 1 -- 1 for TRUE, 0 for FALSE
+    id INTEGER PRIMARY KEY,
+    group_name TEXT NOT NULL UNIQUE,
+    discount REAL DEFAULT 0 CHECK(discount >= 0),
+    discount_type TEXT DEFAULT 'percentage' CHECK(discount_type IN ('percentage', 'amount')), -- Discount type
+    tax_type TEXT DEFAULT 'VAT', -- Tax type
+    tax_rate REAL DEFAULT 0 CHECK(tax_rate >= 0), -- Tax rate must be non-negative
+    tax_type_details TEXT, -- Optional, extra details about the tax type
+    description TEXT, -- Optional description
+    active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
 
   // Insert product data

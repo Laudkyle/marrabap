@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import ProductCard from "./ProductCard";
-import { FiSearch } from "react-icons/fi";
-import { FaShoppingCart } from "react-icons/fa";
+import { FiSearch} from "react-icons/fi";
+import { FaShoppingCart,FaTrash } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-function Shop({ companyName, companyAddress, email, phone}) {
+function Shop({ companyName, companyAddress, email, phone }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,7 +17,7 @@ function Shop({ companyName, companyAddress, email, phone}) {
   const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [refNum, setRefNum] = useState("");
-  const { cart, addToCart, clearCart, processSale, makeSale } = useCart();
+  const { cart, addToCart,setCart, clearCart, processSale, makeSale } = useCart();
 
   const fetchProducts = async () => {
     try {
@@ -42,6 +42,12 @@ function Shop({ companyName, companyAddress, email, phone}) {
       product.name &&
       product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const handleRemoveFromCart = (itemToRemove) => {
+    setCart((prevCart) =>
+      prevCart.filter((item) => item.product.id !== itemToRemove.product.id)
+    );
+    toast.info(`${itemToRemove.product.name} removed from cart`);
+  };
 
   const handleProductClick = (product) => {
     setSelectedProduct(product);
@@ -204,9 +210,11 @@ function Shop({ companyName, companyAddress, email, phone}) {
       )}
 
       {/* Invoice Modal */}
+      {/* Invoice Modal */}
       {showInvoice && (
         <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg p-6 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%] shadow-2xl">
+            {/* Header */}
             <div className="border-b pb-4 mb-4">
               <h1 className="text-2xl font-bold text-blue-600 mb-1">
                 {companyName || "Company Name"}
@@ -220,11 +228,13 @@ function Shop({ companyName, companyAddress, email, phone}) {
               </p>
               <h2 className="text-lg font-semibold mt-4">Invoice</h2>
               <p className="text-sm text-gray-600">
-                Reference Number:{" "}
-                <span className="font-medium">{refNum}</span>
+                Reference Number: <span className="font-medium">{refNum}</span>
               </p>
               <p className="text-sm text-gray-600">
-                Date: <span className="font-medium">{new Date().toLocaleDateString()}</span>
+                Date:{" "}
+                <span className="font-medium">
+                  {new Date().toLocaleDateString()}
+                </span>
               </p>
             </div>
 
@@ -236,13 +246,21 @@ function Shop({ companyName, companyAddress, email, phone}) {
                     key={index}
                     className="flex justify-between items-center border-b pb-2"
                   >
-                    <span className="font-medium">{item.product.name}</span>
-                    <span className="text-sm text-gray-600">
-                      {item.quantity} x ₵{item.product.sp}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{item.product.name}</span>
+                      <span className="text-sm text-gray-600">
+                        {item.quantity} x ₵{item.product.sp}
+                      </span>
+                    </div>
                     <span className="text-right font-medium">
-                    ₵{item.quantity * item.product.sp}
+                      ₵{item.quantity * item.product.sp}
                     </span>
+                    <button
+                      onClick={() => handleRemoveFromCart(item)}
+                      className="text-red-500 hover:underline ml-4"
+                    >
+                      <FaTrash />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -261,7 +279,7 @@ function Shop({ companyName, companyAddress, email, phone}) {
               <div className="flex justify-between mt-2 border-t pt-2">
                 <span className="font-semibold text-lg">Grand Total:</span>
                 <span className="text-xl font-bold">
-                ₵{(calculateTotal() * 1.1).toFixed(2)}
+                  ₵{(calculateTotal() * 1.1).toFixed(2)}
                 </span>
               </div>
             </div>
