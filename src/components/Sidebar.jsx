@@ -16,6 +16,8 @@ import {
   FaUsers,
   FaUserFriends,
   FaPeopleCarry,
+  FaRegAddressBook,
+  FaSave,
 } from 'react-icons/fa';
 import logo from '../images/logo.png';
 
@@ -35,6 +37,7 @@ const Sidebar = ({ isExpanded,companyName }) => {
       dropdown: 'shop',
       links: [
         { path: '/pos', label: 'POS', icon: <FaCashRegister /> },
+        { path: '/draft', label: 'Draft', icon: <FaSave /> },
         { path: '/sale-return', label: 'Sale Return', icon: <FaWarehouse /> },
       ],
     },

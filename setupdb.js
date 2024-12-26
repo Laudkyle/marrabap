@@ -79,6 +79,16 @@ db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
     description TEXT, -- Optional description
     active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
+db.run(`CREATE TABLE IF NOT EXISTS drafts (
+  id INTEGER PRIMARY KEY,
+  reference_number TEXT NOT NULL,
+  product_id INTEGER NOT NULL,
+  quantity INTEGER CHECK(quantity > 0), -- Quantity must be positive
+  date TEXT NOT NULL, -- Date the draft was created (ISO 8601 format YYYY-MM-DD)
+  status TEXT DEFAULT 'pending', -- Can be 'pending', 'saved', 'completed', etc.
+  FOREIGN KEY (product_id) REFERENCES products (id)
+)`);
+
 
   // Insert product data
   const insertStmt =

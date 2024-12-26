@@ -22,7 +22,7 @@ const ProductCard = ({ product }) => {
         {/* Product Name and Price */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-md font-semibold text-gray-800">{product.name}</span>
-          <span className="text-sm font-semibold text-gray-700">₵{product.sp}</span>
+          <span className="text-sm font-semibold text-gray-700">₵{parseFloat(product.sp).toFixed(2)}</span>
         </div>
 
         {/* Stock Status */}

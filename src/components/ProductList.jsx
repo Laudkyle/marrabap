@@ -203,7 +203,7 @@ const ProductList = () => {
     );
     products.forEach((product) => {
       printWindow.document.write(
-        `<tr><td>${product.name}</td><td>${product.cp}</td><td>${product.sp}</td><td>${product.stock}</td></tr>`
+        `<tr><td>${product.name}</td><td>${parseFloat(product.cp).toFixed(2)}</td><td>${parseFloat(product.sp).toFixed(2)}</td><td>${product.stock}</td></tr>`
       );
     });
     printWindow.document.write("</tbody></table>");
@@ -351,8 +351,8 @@ const ProductList = () => {
                   )}
                 </td>
                 <td className="py-3 px-6">{product.name}</td>
-                <td className="py-3 px-6">{product.cp}</td>
-                <td className="py-3 px-6">{product.sp}</td>
+                <td className="py-3 px-6">{parseFloat(product.cp).toFixed(2)}</td>
+                <td className="py-3 px-6">{parseFloat(product.sp).toFixed(2)}</td>
                 <td className="py-3 px-6">{product.stock}</td>
                 <td className="py-3 px-6">
                   <div className="flex space-x-4">

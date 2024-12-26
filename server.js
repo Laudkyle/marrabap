@@ -188,6 +188,131 @@ app.delete("/products/:id", (req, res) => {
     }
   });
 });
+// ===================== Drafts Endpoints =====================
+
+// Get all drafts
+app.get("/drafts", (req, res) => {
+  db.all("SELECT * FROM drafts", (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send("Error fetching drafts");
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// Get a specific draft by ID
+app.get("/drafts/:id", (req, res) => {
+  const { id } = req.params;
+  db.get("SELECT * FROM drafts WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error fetching draft");
+    } else if (!row) {
+      res.status(404).send("Draft not found");
+    } else {
+      res.json(row);
+    }
+  });
+});
+
+// Add a new draft
+app.post("/drafts", (req, res) => {
+  const { reference_number, product_id, quantity } = req.body;
+
+  // Ensure quantity is a positive number
+  if (quantity <= 0) {
+    return res.status(400).send("Quantity must be a positive number");
+  }
+
+  const date = new Date().toISOString().split('T')[0]; // Get the current date in YYYY-MM-DD format
+
+  const stmt = db.prepare(
+    "INSERT INTO drafts (reference_number, product_id, quantity, date) VALUES (?, ?, ?, ?)"
+  );
+  stmt.run(reference_number, product_id, quantity, date, function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error adding draft");
+    } else {
+      res.status(201).json({
+        id: this.lastID,
+        reference_number,
+        product_id,
+        quantity,
+        date,
+      });
+    }
+  });
+});
+
+// Update a draft
+app.put("/drafts/:id", (req, res) => {
+  const { id } = req.params;
+  const { reference_number, product_id, quantity, status } = req.body;
+
+  // Ensure quantity is a positive number
+  if (quantity <= 0) {
+    return res.status(400).send("Quantity must be a positive number");
+  }
+
+  const fields = [];
+  const values = [];
+
+  if (reference_number) {
+    fields.push("reference_number = ?");
+    values.push(reference_number);
+  }
+  if (product_id) {
+    fields.push("product_id = ?");
+    values.push(product_id);
+  }
+  if (quantity) {
+    fields.push("quantity = ?");
+    values.push(quantity);
+  }
+  if (status) {
+    fields.push("status = ?");
+    values.push(status);
+  }
+
+  values.push(id);
+
+  const query = `UPDATE drafts SET ${fields.join(", ")} WHERE id = ?`;
+
+  db.run(query, values, function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating draft");
+    } else if (this.changes === 0) {
+      res.status(404).send("Draft not found");
+    } else {
+      res.json({
+        id,
+        reference_number,
+        product_id,
+        quantity,
+        status,
+      });
+    }
+  });
+});
+
+// Delete a draft
+app.delete("/drafts/:id", (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM drafts WHERE id = ?", [id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error deleting draft");
+    } else if (this.changes === 0) {
+      res.status(404).send("Draft not found");
+    } else {
+      res.status(204).send();
+    }
+  });
+});
 
 // ===================== Sales Endpoints =====================
 
