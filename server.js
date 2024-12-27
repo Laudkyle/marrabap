@@ -188,6 +188,126 @@ app.delete("/products/:id", (req, res) => {
     }
   });
 });
+// ===================== Draft Endpoints =====================
+
+// Get all drafts
+app.get("/drafts", (req, res) => {
+  db.all("SELECT * FROM drafts", (err, rows) => {
+    if (err) {
+      console.error("Error fetching drafts:", err.message);
+      res.status(500).send("Error fetching drafts");
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// Get a specific draft by ID
+app.get("/drafts/:id", (req, res) => {
+  const { id } = req.params;
+  db.get("SELECT * FROM drafts WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      console.error("Error fetching draft:", err.message);
+      res.status(500).send("Error fetching draft");
+    } else if (!row) {
+      res.status(404).send("Draft not found");
+    } else {
+      res.json(row);
+    }
+  });
+});
+
+// Add a new draft
+app.post("/drafts", (req, res) => {
+  const { referenceNumber, details, date, status } = req.body;
+
+  if (!referenceNumber || !details || !date) {
+    return res
+      .status(400)
+      .send("Missing required fields: referenceNumber, details, or date");
+  }
+
+  const detailsJSON = JSON.stringify(details);
+
+  db.run(
+    `INSERT INTO drafts (reference_number, details, date, status) VALUES (?, ?, ?, ?)`,
+    [referenceNumber, detailsJSON, date, status || "pending"],
+    function (err) {
+      if (err) {
+        console.error("Error adding draft:", err.message);
+        res.status(500).send("Error adding draft");
+      } else {
+        res.status(201).json({
+          id: this.lastID,
+          referenceNumber,
+          details,
+          date,
+          status: status || "pending",
+        });
+      }
+    }
+  );
+});
+
+// Update a draft
+app.put("/drafts/:id", (req, res) => {
+  const { id } = req.params;
+  const { referenceNumber, details, date, status } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (referenceNumber) {
+    fields.push("reference_number = ?");
+    values.push(referenceNumber);
+  }
+  if (details) {
+    fields.push("details = ?");
+    values.push(JSON.stringify(details));
+  }
+  if (date) {
+    fields.push("date = ?");
+    values.push(date);
+  }
+  if (status) {
+    fields.push("status = ?");
+    values.push(status);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).send("No fields to update");
+  }
+
+  values.push(id);
+
+  const query = `UPDATE drafts SET ${fields.join(", ")} WHERE id = ?`;
+
+  db.run(query, values, function (err) {
+    if (err) {
+      console.error("Error updating draft:", err.message);
+      res.status(500).send("Error updating draft");
+    } else if (this.changes === 0) {
+      res.status(404).send("Draft not found");
+    } else {
+      res.json({ id, referenceNumber, details, date, status });
+    }
+  });
+});
+
+// Delete a draft
+app.delete("/drafts/:id", (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM drafts WHERE id = ?", [id], function (err) {
+    if (err) {
+      console.error("Error deleting draft:", err.message);
+      res.status(500).send("Error deleting draft");
+    } else if (this.changes === 0) {
+      res.status(404).send("Draft not found");
+    } else {
+      res.status(204).send();
+    }
+  });
+});
 
 // ===================== Sales Endpoints =====================
 
@@ -222,7 +342,13 @@ app.post("/sales", (req, res) => {
 
           db.run(
             "INSERT INTO sales (product_id,reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?)",
-            [product_id,reference_number, quantity, total_price, new Date().toISOString()],
+            [
+              product_id,
+              reference_number,
+              quantity,
+              total_price,
+              new Date().toISOString(),
+            ],
             (err) => {
               if (err) {
                 errorOccurred = true;
@@ -418,7 +544,9 @@ app.put("/suppliers/:id", (req, res) => {
 
   values.push(id);
 
-  const query = `UPDATE suppliers SET ${fields.join(", ")} WHERE contact_id = ?`;
+  const query = `UPDATE suppliers SET ${fields.join(
+    ", "
+  )} WHERE contact_id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {

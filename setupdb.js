@@ -82,24 +82,14 @@ db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
 db.run(`CREATE TABLE IF NOT EXISTS drafts (
   id INTEGER PRIMARY KEY,
   reference_number TEXT NOT NULL,
-  product_id INTEGER NOT NULL,
-  quantity INTEGER CHECK(quantity > 0), -- Quantity must be positive
+  details JSON NOT NULL, -- Stores product_id and quantity as a JSON object
   date TEXT NOT NULL, -- Date the draft was created (ISO 8601 format YYYY-MM-DD)
-  dateTime TEXT NOT NULL, -- Date the draft was created (ISO 8601 format YYYY-MM-DD)
   status TEXT DEFAULT 'pending', -- Can be 'pending', 'saved', 'completed', etc.
-  FOREIGN KEY (product_id) REFERENCES products (id)
+  FOREIGN KEY (id) REFERENCES products (id)
 )`);
 
-db.run(`CREATE TABLE IF NOT EXISTS draft_items (
-    id INTEGER PRIMARY KEY,
-    draft_id INTEGER,
-    product_id INTEGER,
-    product_name TEXT,
-    quantity INTEGER CHECK(quantity > 0),
-    price REAL CHECK(price >= 0),
-    FOREIGN KEY (draft_id) REFERENCES drafts (id)
-);
-`);
+
+
   // Insert product data
   const insertStmt =
     db.prepare(`INSERT INTO products (id, name, cp, sp, stock, image)
