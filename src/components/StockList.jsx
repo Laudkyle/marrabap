@@ -392,10 +392,10 @@ const StockList = () => {
                   {product.name}
                 </td>
                 <td className="py-2 px-4 text-sm text-gray-800">
-                  {product.cp}
+                  {parseFloat(product.cp).toFixed(2)}
                 </td>
                 <td className="py-2 px-4 text-sm text-gray-800">
-                  {product.sp}
+                  {parseFloat(product.sp).toFixed(2)}
                 </td>
                 <td className="py-2 px-4 text-sm text-gray-800">
                   {product.stock}
