@@ -111,16 +111,23 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const handleCompleteSale = async () => {
     try {
       const referenceNumber = refNum; // Generate unique reference number
-      await processSale(referenceNumber); // Pass cart and reference number to processSale
-      setSaleComplete(!saleComplete); // Trigger product list refresh
-      setShowInvoice(false); // Close the invoice modal
-      clearCart();
-      toast.success("Sale completed successfully!");
+      const response = await processSale(referenceNumber); // Await the response from processSale
+
+      if (response.status === 200 || response.status === 201) {
+        // Check for 200 or 201 status
+        setSaleComplete(!saleComplete); // Trigger product list refresh
+        setShowInvoice(false); // Close the invoice modal
+        clearCart();
+        toast.success("Sale completed successfully!");
+      } else {
+        throw new Error(`Unexpected response status: ${response.status}`);
+      }
     } catch (error) {
       console.error("Error completing sale:", error);
       toast.error("An error occurred while processing the sale.");
     }
   };
+
   const handleSaveDraft = async () => {
     const draft = {
       referenceNumber: refNum, // Unique reference number for the draft
@@ -171,7 +178,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       </div>
     );
   }
-  
+
   return (
     <div className="relative">
       <ToastContainer />

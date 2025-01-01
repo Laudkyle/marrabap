@@ -121,10 +121,22 @@ const Draft = () => {
   const handleCompleteSale = async (draftId) => {
     try {
       const referenceNumber = refNum; // Generate unique reference number
-      await processSale(referenceNumber); // Pass cart and reference number to processSale
+      
+      // Process sale and check server response
+      const saleResponse = await processSale(referenceNumber);
+      if (saleResponse.status !== 200 && saleResponse.status !== 201) {
+        throw new Error(`Unexpected response status from sale process: ${saleResponse.status}`);
+      }
+  
+      // If sale was successful, proceed with updating draft
+      const draftResponse = await handleCompleteSalePut(draftId);
+      if (draftResponse.status !== 200 && draftResponse.status !== 201) {
+        throw new Error(`Unexpected response status from draft update: ${draftResponse.status}`);
+      }
+  
+      // If everything went well
       setSaleComplete(!saleComplete); // Trigger product list refresh
       setShowInvoice(false); // Close the invoice modal
-      handleCompleteSalePut(draftId);
       clearCart();
       toast.success("Sale completed successfully!");
     } catch (error) {
@@ -132,6 +144,7 @@ const Draft = () => {
       toast.error("An error occurred while processing the sale.");
     }
   };
+  
 
   const handleEditDraft = async (draftId) => {
     setShowDraft(true);

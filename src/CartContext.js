@@ -46,38 +46,41 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem("cart");
   };
 
-  const processSale = (referenceNumber) => {
-    // Include reference number in each sale data
-    const salesData = cart.map((item) => ({
-      product_id: item.product.id,
-      quantity: item.quantity,
-      reference_number: referenceNumber, 
-    }));
-  
-    fetch("http://localhost:5000/sales", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(salesData),
-    })
-      .then((res) => {
-        if (!res.ok) {
-          return res.text().then((error) => {
-            throw new Error(error);
-          });
-        }
-        return res.json();
-      })
-      .then((response) => {
-        console.log("Sales logged:", response);
-        clearCart(); // Clear the cart after successful sale
-      })
-      .catch((error) => {
-        console.error("Error logging sales:", error.message);
+  const processSale = async (referenceNumber) => {
+    try {
+      // Include reference number in each sale data
+      const salesData = cart.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+        reference_number: referenceNumber,
+      }));
+
+      // Sending the request
+      const response = await fetch("http://localhost:5000/sales", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(salesData),
       });
+
+      // Check if the response is successful
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to process sale: ${errorText}`);
+      }
+
+      // Parse the response if successful
+      const responseData = await response.json();
+      console.log("Sales logged:", responseData);
+
+      return response; // Return the response for further handling
+    } catch (error) {
+      console.error("Error logging sales:", error.message);
+      throw error; // Rethrow to propagate the error for higher-level handling
+    }
   };
-  
+
   const makeSale = async (selectedProduct, quantity, referenceNumber) => {
     try {
       // Log the sale with the reference number
@@ -93,18 +96,25 @@ export const CartProvider = ({ children }) => {
         }),
       });
   
+      // Check if the response is OK (200 or 201)
       if (!saleResponse.ok) {
         const errorMessage = await saleResponse.text();
-        throw new Error(errorMessage);
+        throw new Error(`Failed to log sale: ${errorMessage}`);
       }
   
+      // Parse the response if the request is successful
       const saleDetails = await saleResponse.json();
       console.log("Sale logged successfully:", saleDetails);
+  
+      return saleResponse; // Return the saleResponse for further validation if needed
+  
     } catch (error) {
       console.error("Error processing sale:", error.message);
+      throw error; // Rethrow the error to be handled at a higher level
     }
   };
   
+
   return (
     <CartContext.Provider
       value={{ cart, setCart, addToCart, processSale, makeSale, clearCart }}
