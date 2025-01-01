@@ -291,11 +291,11 @@ const StockList = () => {
 
   return (
     <div className="relative h-[85vh] overflow-scroll">
-      <div className="sticky top-0 z-10 p-4 h-16 bg-gray-800 flex mb-2 justify-center">
-        <div className="flex justify-between items-center w-full">
-          {/* <h2 className="text-3xl font-semibold text-gray-800 mb-6">Stock</h2> */}
-          {/* Export Options */}
-          <div className="flex justify-start space-x-6 ">
+  
+
+      <div className="overflow-x-auto shadow-md rounded-lg p-4">
+        <div className="mb-4 flex justify-between">
+        <div className="flex justify-start space-x-6 ">
             <button
               onClick={exportToExcel}
               className="flex items-center bg-green-500 text-xs text-white py-2 px-4 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -318,19 +318,10 @@ const StockList = () => {
               Print
             </button>
           </div>
-
-
-         
-         
-        </div>
-      </div>
-
-      <div className="overflow-x-auto shadow-md rounded-lg p-4">
-        <div className="mb-4">
           <input
             type="text"
             placeholder="Search products"
-            className="p-2 border border-gray-300 rounded-md w-full"
+            className="p-2 border border-gray-300 rounded-md"
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
           />
