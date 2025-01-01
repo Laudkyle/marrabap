@@ -1,24 +1,45 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import printInvoice from "./PrintInvoice";
 import { useCart } from "../CartContext";
 import { FaTrash } from "react-icons/fa";
+import { toast, ToastContainer } from "react-toastify";
+
 function Invoice({
   showInvoice,
   showDraft,
   setShowInvoice,
-  handleCompleteSale,
-  showCompleteSale,
   handleQuantityChangeNew,
   handleRemoveFromCart,
   handleSaveDraft,
   companyAddress,
+  handleAddNewItem,
   companyName,
+  refNum,
   email,
   phone,
 }) {
-  const [refNum, setRefNum] = useState("");
   const { cart } = useCart();
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  const fetchProducts = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/products", {
+        timeout: 5000,
+      });
+      setProducts(response.data);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      toast.error("Failed to fetch products. Please try again.");
+    }
+  };
+  useEffect(() => {
+    fetchProducts();
+  }, []);
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
   return (
@@ -49,7 +70,84 @@ function Invoice({
                 </span>
               </p>
             </div>
+           {showDraft && (
+            <div className="flex justify-between print-only">
+              <div className="flex space-x-2 mb-4">
+                <select
+                  value={selectedProduct?.id || ""}
+                  onChange={(e) => {
+                    const productId = e.target.value;
+                    console.log("Selected Product ID:", productId);
 
+                    // Fetch product details or use a product list to find selected product
+                    const product = products.find((p) => p.id == productId);
+
+                    if (product) {
+                      setSelectedProduct(product); // Update the state with the selected product
+                      setNewItemQuantity(1); // Reset quantity to 1
+                    } else {
+                      console.error("Product not found for ID:", productId);
+                    }
+                  }}
+                  className="p-2 border rounded"
+                >
+                  <option value="">Select Product</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={newItemQuantity}
+                  onChange={(e) => {
+                    const quantity = Number(e.target.value);
+
+                    if (selectedProduct) {
+                      // Check if the item is already in the draft
+                      const draftItem = cart.find(
+                        (item) => item.product.id === selectedProduct.id
+                      );
+                      const existingQuantity = draftItem
+                        ? draftItem.quantity
+                        : 0;
+
+                      // Validate against stock
+                      if (existingQuantity + quantity > selectedProduct.stock) {
+                        alert(
+                          `You can only add up to ${
+                            selectedProduct.stock - existingQuantity
+                          } more of this item.`
+                        );
+                        setNewItemQuantity(
+                          selectedProduct.stock - existingQuantity
+                        );
+                      } else {
+                        setNewItemQuantity(quantity);
+                      }
+                    }
+                  }}
+                  className="p-2 border rounded w-20"
+                />
+              </div>
+              <div>
+              <button
+                onClick={() => {
+                  if (selectedProduct) {
+                    handleAddNewItem(selectedProduct, newItemQuantity);
+                    setSelectedProduct(null);
+                    setNewItemQuantity(1);
+                  }
+                }}
+                className="p-2 bg-blue-600 text-white rounded"
+              >
+                Add Item
+              </button>
+            </div>
+            </div>)}
             {/* Invoice Items - Tabular with Editable Quantity */}
             <div className="max-h-[30vh] overflow-auto">
               <table className="w-full table-auto border-collapse border border-gray-200 text-sm">

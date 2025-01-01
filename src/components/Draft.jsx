@@ -35,70 +35,65 @@ const Draft = () => {
   };
 
   const handleSaveDraft = async () => {
-    // Build the draft details payload based on the cart items
     const draftDetails = cart.map((item) => ({
-      product_id: item.product.id, // Using item.product.id for the product ID
+      product_id: item.product.id,
       quantity: item.quantity,
     }));
-
+  
     const draftPayload = {
       reference_number: refNum,
       details: draftDetails,
       date: new Date().toISOString(),
       status: "pending",
     };
-
+  
     try {
       if (editDraftId) {
-        // Update existing draft
+
         const response = await axios.put(
           `http://localhost:5000/drafts/${editDraftId}`,
           draftPayload
         );
-
         setDrafts(
           drafts.map((draft) =>
             draft.id === editDraftId ? response.data : draft
           )
         );
-        setShowInvoice(false)
-        // Success notification for updating the draft
         toast.success("Draft updated successfully!");
       } else {
-        // Add a new draft
         const response = await axios.post(
           "http://localhost:5000/drafts",
           draftPayload
         );
-
-        if (response.status === 201) {
-          // Successfully saved draft
-          setShowInvoice(false); // Close the invoice modal
-          clearCart();
-          toast.success("Draft saved successfully!"); // Success notification
-          setDrafts([...drafts, response.data]);
-        }
+        setDrafts([...drafts, response.data]);
+        toast.success("Draft saved successfully!");
       }
+      clearCart();
+      setShowInvoice(false);
     } catch (error) {
-      // Error notification
       toast.error("Error saving draft. Please try again.");
-      console.error("Error saving draft:", error);
+      console.error(error);
     }
   };
-
+  
   const handleRemoveFromCart = (itemToRemove) => {
     setCart((prevCart) =>
       prevCart.filter((item) => item.product.id !== itemToRemove.product.id)
     );
     toast.info(`${itemToRemove.product.name} removed from cart`);
   };
-  // Filtered drafts based on the search text
-  const filteredDrafts = drafts.filter(
-    (draft) =>
-      draft.reference_number.toLowerCase().includes(filterText.toLowerCase()) ||
-      draft.status.toLowerCase().includes(filterText.toLowerCase()) ||
-      new Date(draft.date).toLocaleDateString().includes(filterText)
-  );
+  const filteredDrafts = drafts.filter((draft) => {
+    const referenceNumber = draft.reference_number || ""; // Handle undefined reference_number
+    const status = draft.status || ""; // Handle undefined status
+    const date = draft.date ? new Date(draft.date).toLocaleDateString() : ""; // Handle undefined date
+  
+    return (
+      referenceNumber.toLowerCase().includes(filterText.toLowerCase()) ||
+      status.toLowerCase().includes(filterText.toLowerCase()) ||
+      date.includes(filterText)
+    );
+  });
+  
 
   // Delete a draft
   const handleDeleteDraft = async (draftId) => {
@@ -176,9 +171,6 @@ const Draft = () => {
       console.error("Error fetching draft details:", error);
     }
   };
-  useEffect(() => {
-    fetchDrafts();
-  }, [handleCompleteSalePut]);
 
   const handleViewDraft = async (draftId) => {
     setEditDraftId(draftId);
@@ -215,7 +207,23 @@ const Draft = () => {
       console.error("Error fetching draft details:", error);
     }
   };
-
+  const handleAddNewItem = (product, quantity) => {
+    setCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.product.id === product.id);
+      if (existingItem) {
+        // Update quantity if product already exists
+        return prevCart.map((item) =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      }
+      // Add new item to the cart
+      return [...prevCart, { product, quantity }];
+    });
+    toast.success(`${product.name} added to cart`);
+  };
+  
   const handleQuantityChangeNew = (e, item, index) => {
     const updatedQuantity = Math.min(
       Number(e.target.value),
@@ -288,6 +296,7 @@ const Draft = () => {
       <ToastContainer />
       {/* Invoice Modal */}
       <Invoice
+      refNum={refNum}
         showInvoice={showInvoice}
         setShowInvoice={setShowInvoice}
         showDraft={showDraft}
@@ -297,6 +306,7 @@ const Draft = () => {
         handleQuantityChangeNew={handleQuantityChangeNew}
         handleRemoveFromCart={handleRemoveFromCart}
         handleSaveDraft={handleSaveDraft}
+        handleAddNewItem={handleAddNewItem} 
       />
       
       <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
