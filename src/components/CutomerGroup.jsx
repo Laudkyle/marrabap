@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { FaEdit, FaCheck, FaTimes, FaTrash } from 'react-icons/fa';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import React, { useState, useEffect, useMemo } from "react";
+import { FaEdit, FaCheck, FaTimes, FaTrash } from "react-icons/fa";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import DataTable from "react-data-table-component";
 
 const ConfirmModal = ({ isVisible, onClose, onConfirm, message }) => {
   if (!isVisible) return null;
@@ -31,76 +32,134 @@ const ConfirmModal = ({ isVisible, onClose, onConfirm, message }) => {
 
 const CustomerGroup = () => {
   const [formData, setFormData] = useState({
-    group_name: '',
+    group_name: "",
     discount: 0,
-    discount_type: 'percentage',
-    tax_type: 'VAT',
+    discount_type: "percentage",
+    tax_type: "VAT",
     tax_rate: 0,
-    tax_type_details: '',
-    description: '',
+    tax_type_details: "",
+    description: "",
     active_status: true,
   });
 
   const [customerGroups, setCustomerGroups] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null);
+  const [filterText, setFilterText] = useState("");
 
-  
   const API_URL = "http://localhost:5000/customer_groups"; // Correct URL
 
   // Fetch customer groups from the backend
   useEffect(() => {
     const fetchCustomerGroups = async () => {
       try {
-        const response = await fetch(API_URL);  // Use API_URL here
+        const response = await fetch(API_URL); // Use API_URL here
         const data = await response.json();
         setCustomerGroups(data);
       } catch (error) {
-        console.error('Error fetching customer groups:', error);
+        console.error("Error fetching customer groups:", error);
       }
     };
     fetchCustomerGroups();
   }, []);
-
+  // Filter customer groups based on the search text
+  const filteredGroups = useMemo(() => {
+    return customerGroups.filter((group) =>
+      ["group_name", "discount", "tax_type", "tax_rate", "active_status"].some(
+        (key) =>
+          (group[key] || "")
+            .toString()
+            .toLowerCase()
+            .includes(filterText.toLowerCase())
+      )
+    );
+  }, [filterText, customerGroups]);
   // Handle form input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  
-
+  // Define columns for the data table
+  const columns = [
+    {
+      name: "Group Name",
+      selector: (row) => row.group_name,
+      sortable: true,
+    },
+    {
+      name: "Discount",
+      selector: (row) =>
+        `${row.discount}${row.discount_type === "percentage" ? "%" : ""}`,
+      sortable: true,
+    },
+    {
+      name: "Tax Type",
+      selector: (row) => row.tax_type,
+      sortable: true,
+    },
+    {
+      name: "Tax Rate",
+      selector: (row) =>
+        `${row.tax_rate}${row.tax_type === "percentage" ? "%" : ""}`,
+      sortable: true,
+    },
+    {
+      name: "Active Status",
+      selector: (row) => (row.active_status ? "Active" : "Not Active"),
+      sortable: true,
+    },
+    {
+      name: "Actions",
+      cell: (row) => (
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => handleEditCustomerGroup(row)}
+            className="text-indigo-600 hover:text-indigo-800"
+          >
+            <FaEdit />
+          </button>
+          <button
+            onClick={() => handleDeleteGroup(row.id)}
+            className="text-red-600 hover:text-red-800"
+          >
+            <FaTrash />
+          </button>
+        </div>
+      ),
+    },
+  ];
   // Handle adding a new customer group
   const handleAddGroup = async () => {
     try {
       const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-  
+
       const newGroup = await response.json();
       setCustomerGroups([...customerGroups, newGroup]);
-  
+
       setFormData({
-        group_name: '',
+        group_name: "",
         discount: 0,
-        discount_type: 'percentage',
+        discount_type: "percentage",
         tax_rate: 0,
-        tax_type: 'VAT',
-        tax_type_details: '',
-        description: '',
+        tax_type: "VAT",
+        tax_type_details: "",
+        description: "",
         active_status: true,
       });
       setIsFormVisible(false);
-  
-      toast.success('Customer group added successfully!');
+
+      toast.success("Customer group added successfully!");
     } catch (error) {
-      console.error('Error adding customer group:', error);
-      toast.error('Failed to add customer group.');
+      console.error("Error adding customer group:", error);
+      toast.error("Failed to add customer group.");
     }
   };
-  
+
   // Handle editing an existing group
   const handleEditCustomerGroup = (group) => {
     setFormData({
@@ -121,8 +180,8 @@ const CustomerGroup = () => {
   const handleUpdateGroup = async () => {
     try {
       const response = await fetch(`${API_URL}/${editingGroupId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
@@ -136,43 +195,41 @@ const CustomerGroup = () => {
 
       // Reset form and hide it
       setFormData({
-        group_name: '',
+        group_name: "",
         discount: 0,
-        discount_type: 'percentage',
+        discount_type: "percentage",
         tax_rate: 0,
-        tax_type: 'VAT',
-        tax_type_details: '',
-        description: '',
+        tax_type: "VAT",
+        tax_type_details: "",
+        description: "",
         active_status: true,
       });
       setIsFormVisible(false);
       setEditingGroupId(null);
-  
-      toast.success('Customer group updated successfully!');
+
+      toast.success("Customer group updated successfully!");
     } catch (error) {
-      console.error('Error updating customer group:', error);
-      toast.error('Failed to update customer group.');
+      console.error("Error updating customer group:", error);
+      toast.error("Failed to update customer group.");
     }
   };
   const handleDeleteGroup = async (groupId) => {
-   
-      try {
-        await fetch(`${API_URL}/${groupId}`, {
-          method: 'DELETE',
-        });
-  
-        setCustomerGroups(customerGroups.filter((group) => group.id !== groupId));
-        toast.success('Customer group deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting customer group:', error);
-        toast.error('Failed to delete customer group.');
-      }
-    
+    try {
+      await fetch(`${API_URL}/${groupId}`, {
+        method: "DELETE",
+      });
+
+      setCustomerGroups(customerGroups.filter((group) => group.id !== groupId));
+      toast.success("Customer group deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting customer group:", error);
+      toast.error("Failed to delete customer group.");
+    }
   };
-  
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-          <ToastContainer />
+      <ToastContainer />
       <button
         onClick={() => setIsFormVisible(true)}
         className="bg-indigo-500 text-white px-6 py-2 rounded-full shadow-md hover:bg-indigo-600 mb-6 transition-all duration-300 text-sm"
@@ -181,17 +238,19 @@ const CustomerGroup = () => {
       </button>
 
       {isFormVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
             <h2 className="text-2xl font-medium text-gray-800 mb-6 text-center">
-              {editingGroupId ? 'Edit Customer Group' : 'Create Customer Group'}
+              {editingGroupId ? "Edit Customer Group" : "Create Customer Group"}
             </h2>
             <form
               className="grid grid-cols-1 md:grid-cols-3 gap-4"
               onSubmit={(e) => e.preventDefault()}
             >
               <div className="col-span-3">
-                <label className="block text-gray-700 font-medium mb-2">Group Name *</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Group Name *
+                </label>
                 <input
                   type="text"
                   name="group_name"
@@ -203,7 +262,9 @@ const CustomerGroup = () => {
               </div>
 
               <div className="col-span-1">
-                <label className="block text-gray-700 font-medium mb-2">Discount</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Discount
+                </label>
                 <div className="flex space-x-3">
                   <input
                     type="number"
@@ -227,7 +288,9 @@ const CustomerGroup = () => {
               </div>
 
               <div className="col-span-1">
-                <label className="block text-gray-700 font-medium mb-2">Tax Type</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Tax Type
+                </label>
                 <select
                   name="tax_type"
                   value={formData.tax_type}
@@ -243,7 +306,9 @@ const CustomerGroup = () => {
               </div>
 
               <div className="col-span-1">
-                <label className="block text-gray-700 font-medium mb-2">Tax Rate</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Tax Rate
+                </label>
                 <input
                   type="number"
                   name="tax_rate"
@@ -256,7 +321,9 @@ const CustomerGroup = () => {
               </div>
 
               <div className="col-span-3">
-                <label className="block text-gray-700 font-medium mb-2">Tax Details</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Tax Details
+                </label>
                 <input
                   type="text"
                   name="tax_type_details"
@@ -268,7 +335,9 @@ const CustomerGroup = () => {
               </div>
 
               <div className="col-span-3">
-                <label className="block text-gray-700 font-medium mb-2">Description</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Description
+                </label>
                 <textarea
                   name="description"
                   value={formData.description}
@@ -284,7 +353,12 @@ const CustomerGroup = () => {
                   type="checkbox"
                   name="active_status"
                   checked={formData.active_status}
-                  onChange={(e) => setFormData({ ...formData, active_status: e.target.checked })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      active_status: e.target.checked,
+                    })
+                  }
                   className="h-5 w-5"
                 />
                 <label className="text-gray-700 text-sm">Active Status</label>
@@ -302,7 +376,7 @@ const CustomerGroup = () => {
                 onClick={editingGroupId ? handleUpdateGroup : handleAddGroup}
                 className="bg-indigo-500 text-white px-5 py-2 rounded-xl hover:bg-indigo-600 transition duration-200 text-sm"
               >
-                {editingGroupId ? 'Update Group' : 'Add Group'}
+                {editingGroupId ? "Update Group" : "Add Group"}
               </button>
             </div>
           </div>
@@ -310,50 +384,27 @@ const CustomerGroup = () => {
       )}
 
       <div className="mt-8 overflow-x-auto bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-medium text-gray-800 mb-4">Customer Groups</h2>
-        <table className="min-w-full table-auto border-collapse border border-gray-200">
-          <thead>
-            <tr className="text-left bg-gray-100">
-              <th className="border border-gray-200 px-6 py-3">Group Name</th>
-              <th className="border border-gray-200 px-6 py-3">Discount</th>
-              <th className="border border-gray-200 px-6 py-3">Tax Type</th>
-              <th className="border border-gray-200 px-6 py-3">Tax Rate</th>
-              <th className="border border-gray-200 px-6 py-3">Active Status</th>
-              <th className="border border-gray-200 px-6 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {customerGroups.map((group) => (
-              <tr key={group.id} className="hover:bg-gray-50">
-                <td className="border border-gray-200 px-6 py-3">{group.group_name}</td>
-                <td className="border border-gray-200 px-6 py-3">
-                  {group.discount} {group.discount_type === 'percentage' ? '%' : ''}
-                </td>
-                <td className="border border-gray-200 px-6 py-3">{group.tax_type}</td>
-                <td className="border border-gray-200 px-6 py-3">
-                  {group.tax_rate} {group.tax_type === 'percentage' ? '%' : ''}
-                </td>
-                <td className="border border-gray-200 px-6 py-3">
-                  {group.active_status ? 'Active' : 'Not Active'}
-                </td>
-                <td className="border border-gray-200 px-6 py-3">
-                  <button
-                    onClick={() => handleEditCustomerGroup(group)}
-                    className="text-indigo-600 hover:text-indigo-800"
-                  >
-                    <FaEdit className="inline-block" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteGroup(group.id)}
-                    className="text-red-600 hover:text-red-800 ml-4"
-                  >
-                    <FaTrash className="inline-block" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h2 className="text-xl font-medium text-gray-800 mb-4">
+          Customer Groups
+        </h2>
+        <div className="mb-4 flex justify-end">
+          <input
+            type="text"
+            placeholder="Search customer groups"
+            className="p-2 border border-gray-300 rounded-md"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+        </div>
+        <DataTable
+        className="z-0"
+          columns={columns}
+          data={filteredGroups}
+          pagination
+          highlightOnHover
+          responsive
+          striped
+        />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import DataTable from "react-data-table-component";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -10,7 +11,6 @@ import {
   FaToggleOff,
   FaEye,
 } from "react-icons/fa";
-import { FiSearch } from "react-icons/fi";
 
 import { Tooltip } from "react-tooltip";
 
@@ -19,7 +19,6 @@ const Customer = () => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isEditFormVisible, setIsEditFormVisible] = useState(false);
   const [customerGroups, setCustomerGroups] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
     customer_type: "business", // Default to Business
@@ -63,42 +62,78 @@ const Customer = () => {
   }, []);
   const [filteredCustomers, setFilteredCustomers] = useState(customers);
 
-  const handleFilterChange = (filter) => {
-    let updatedList = customers;
-    if (filter === "active") {
-      updatedList = customers.filter((customer) => customer.active_status);
-    } else if (filter === "inactive") {
-      updatedList = customers.filter((customer) => !customer.active_status);
-    } else if (filter === "business") {
-      updatedList = customers.filter((customer) => customer.customer_type==='business');
-    } else if (filter === "individual") {
-      updatedList = customers.filter((customer) => customer.customer_type==='individual');
-    }
-    setFilteredCustomers(updatedList);
-  };
+  const [filterText, setFilterText] = useState("");
 
-  // Handle live search
-  const handleSearchChange = (e) => {
-    const query = e.target.value.toLowerCase(); // Convert query to lowercase for case-insensitive comparison
-    setSearchQuery(query);
-
-    if (query === "") {
-      setFilteredCustomers(customers); // Show all customers if search is empty
-    } else {
-      const filtered = customers.filter((customer) => {
-        // Check if any of the specified fields contain the query
-        return (
-          customer.business_name?.toLowerCase().includes(query) ||
-          customer.name?.toLowerCase().includes(query) ||
-          customer.email?.toLowerCase().includes(query) ||
-          customer.customer_group?.toLowerCase().includes(query) ||
-          customer.address?.toLowerCase().includes(query) ||
-          customer.mobile?.toLowerCase().includes(query)
-        );
-      });
-      setFilteredCustomers(filtered);
-    }
-  };
+  // Filter customers based on the search text
+  const filteredCustomersd = useMemo(() => {
+    return customers.filter((customer) =>
+      Object.keys(formData).some((key) =>
+        (customer[key] || "")
+          .toString()
+          .toLowerCase()
+          .includes(filterText.toLowerCase())
+      )
+    );
+  }, [filterText, customers, formData]);
+  // Define columns for the data table
+  const columns = [
+    {
+      name: "Action",
+      cell: (row) => (
+        <div className="flex items-center space-x-2">
+          <ActionButton
+            id={`payment-${row.contact_id}`}
+            icon={<FaMoneyBillWave />}
+            tooltip="Pay"
+            onClick={() => {}}
+            color="green-500"
+          />
+          <ActionButton
+            id={`status-${row.contact_id}`}
+            icon={row.active_status ? <FaToggleOn /> : <FaToggleOff />}
+            tooltip={`${
+              row.active_status ? "Deactivate" : "Activate"
+            } Customer`}
+            onClick={() => toggleActiveStatus(row)}
+            color="blue-500"
+          />
+          <ActionButton
+            id={`edit-${row.contact_id}`}
+            icon={<FaEdit />}
+            tooltip="Edit"
+            onClick={() => handleEditClick(row)}
+            color="yellow-500"
+          />
+          <ActionButton
+            id={`delete-${row.contact_id}`}
+            icon={<FaTrash />}
+            tooltip="Delete"
+            onClick={() => handleDeleteCustomer(row.contact_id)}
+            color="red-500"
+          />
+          <ActionButton
+            id={`cart-${row.contact_id}`}
+            icon={<FaEye />}
+            tooltip="View"
+            onClick={() => {}}
+            color="purple-500"
+          />
+        </div>
+      ),
+    },
+    ...Object.keys(formData).map((field) => ({
+      name: field
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase()),
+      selector: (row) =>
+        field === "active_status"
+          ? row[field]
+            ? "Active"
+            : "Not Active"
+          : row[field],
+      sortable: true,
+    })),
+  ];
 
   useEffect(() => {
     setFilteredCustomers(customers);
@@ -326,47 +361,18 @@ const Customer = () => {
   return (
     <div className=" bg-gray-100  max-w-[80vw] h-[70vh] overflow-scroll">
       <ToastContainer />
-      <div className="sticky top-0 z-2 p-4 h-16 bg-gray-800 flex mb-2 justify-center">
-        <div className="flex justify-between items-center w-full">
-          <div className="flex w-full items-center justify-end space-x-3">
-            {/* Filter Dropdown */}
-            <select
-              className="border border-gray-300 w-64  text-sm rounded px-3 py-2 focus:outline-none "
-              onChange={(e) => handleFilterChange(e.target.value)}
-            >
-              <option value=""> Filter By</option>
-              <option value="active"> Active</option>
-              <option value="inactive"> Inactive</option>
-              <option value="business"> Business</option>
-              <option value="individual"> Individual</option>
-            </select>
 
-            <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <FiSearch className="h-5 w-5" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search for customers..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full p-2 pl-10 pr-4 outline-none text-black rounded-3xl"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
       <div className="px-6 flex justify-between items-center">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">
-        Manage Customers
-      </h1>
+        <h1 className="text-2xl font-bold mb-6 text-gray-800">
+          Manage Customers
+        </h1>
 
-      <button
-        onClick={() => setIsFormVisible(true)}
-        className="mb-6 bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700"
-      >
-        Add Customer
-      </button>
+        <button
+          onClick={() => setIsFormVisible(true)}
+          className="mb-6 bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700"
+        >
+          Add Customer
+        </button>
       </div>
 
       {isFormVisible && (
@@ -612,7 +618,7 @@ const Customer = () => {
         </div>
       )}
       {isEditFormVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+        <div className="fixed inset-0 bg-black z-50 bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
               Add New Customer
@@ -854,113 +860,28 @@ const Customer = () => {
         </div>
       )}
 
-      {/* Customer Table */}
-      <div className="bg-white mx-6 shadow-sm rounded-md p-6">
-      <h2 className="text-xl font-semibold text-gray-700 mb-4">
+      <div className="bg-white mx-6 shadow-sm rounded-md p-6 ">
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">
           Customer List
         </h2>
-        <div className="overflow-x-auto">
-          <table className="table-auto w-full border-collapse">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                  Action
-                </th>
-                {Object.keys(formData).map((field) => (
-                  <th
-                    key={field}
-                    className="text-left text-sm font-medium text-gray-600 px-4 py-2"
-                  >
-                    {field
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (char) => char.toUpperCase())}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.length > 0 ? (
-                filteredCustomers.map((customer) => (
-                  <tr
-                    key={customer.contact_id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-2">
-                      <div className="flex items-center space-x-2">
-                        <ActionButton
-                          id={`payment-${customer.contact_id}`}
-                          icon={<FaMoneyBillWave />}
-                          tooltip="Pay"
-                          onClick={() => {}}
-                          color="green-500"
-                        />
-                        <ActionButton
-                          id={`status-${customer.contact_id}`}
-                          icon={
-                            customer.active_status ? (
-                              <FaToggleOn />
-                            ) : (
-                              <FaToggleOff />
-                            )
-                          }
-                          tooltip={`${
-                            customer.active_status ? "Deactivate" : "Activate"
-                          } Customer`}
-                          onClick={() => toggleActiveStatus(customer)}
-                          color="blue-500"
-                        />
-                        <ActionButton
-                          id={`edit-${customer.contact_id}`}
-                          icon={<FaEdit />}
-                          tooltip="Edit"
-                          onClick={() => handleEditClick(customer)}
-                          color="yellow-500"
-                        />
-                        <ActionButton
-                          id={`delete-${customer.contact_id}`}
-                          icon={<FaTrash />}
-                          tooltip="Delete"
-                          onClick={() =>
-                            handleDeleteCustomer(customer.contact_id)
-                          }
-                          color="red-500"
-                        />
-                        <ActionButton
-                          id={`cart-${customer.contact_id}`}
-                          icon={<FaEye />}
-                          tooltip="View"
-                          onClick={() => {}}
-                          color="purple-500"
-                        />
-                      </div>
-                    </td>
-                    {Object.keys(formData).map((field) => (
-                      <td
-                        key={field}
-                        className="text-sm text-gray-700 px-4 py-2 border-b border-gray-200"
-                      >
-                        {field === "active_status"
-                          ? customer[field]
-                            ? "Active"
-                            : "Not Active"
-                          : customer[field]}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={Object.keys(formData).length + 1}
-                    className="text-center text-sm text-gray-500 px-4 py-2"
-                  >
-                    No customers found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="mb-4 flex justify-end">
+          <input
+            type="text"
+            placeholder="Search customers"
+            className="p-2 border border-gray-300 rounded-md"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
         </div>
+        <DataTable
+          className="z-0"
+          columns={columns}
+          data={filteredCustomers}
+          pagination
+          highlightOnHover
+          responsive
+          striped
+        />
       </div>
 
       <Tooltip />

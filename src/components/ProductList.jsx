@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect,useMemo } from "react";
 import axios from "axios";
+import DataTable from "react-data-table-component";
+
 import {
   FaEdit,
   FaTrashAlt,
   FaFileExcel,
   FaFilePdf,
   FaPrint,
-  FaSort,
-  FaSortUp,
   FaImage,
-  FaSortDown,
 } from "react-icons/fa";
 import ReactModal from "react-modal";
 import { toast, ToastContainer } from "react-toastify";
@@ -39,6 +38,21 @@ const ProductList = () => {
         console.error("There was an error fetching the products:", error);
       });
   }, []);
+
+  const [filterText, setFilterText] = useState("");
+
+  // Filter products based on the search text
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) =>
+      ["name", "cp", "sp", "stock"]
+        .some((key) =>
+          (product[key] || "")
+            .toString()
+            .toLowerCase()
+            .includes(filterText.toLowerCase())
+        )
+    );
+  }, [filterText, products]);
   // Handle image file change
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -56,26 +70,67 @@ const ProductList = () => {
       reader.readAsDataURL(file);
     }
   };
-  // Handle sorting
-  const requestSort = (key) => {
-    let direction = "ascending";
-    if (sortConfig.key === key && sortConfig.direction === "ascending") {
-      direction = "descending";
-    }
-
-    const sortedProducts = [...products].sort((a, b) => {
-      if (a[key] < b[key]) {
-        return direction === "ascending" ? -1 : 1;
-      }
-      if (a[key] > b[key]) {
-        return direction === "ascending" ? 1 : -1;
-      }
-      return 0;
-    });
-
-    setProducts(sortedProducts);
-    setSortConfig({ key, direction });
-  };
+  
+  // Define columns for the data table
+  const columns = [
+    {
+      name: "Product Image",
+      cell: (row) =>
+        row.image ? (
+          <img
+            src={row.image}
+            alt={row.name}
+            className="w-16 h-16 object-cover rounded-lg"
+          />
+        ) : (
+          <div className="w-16 h-16 bg-gray-200 flex items-center justify-center rounded-lg">
+            <FaImage className="text-gray-500" />
+          </div>
+        ),
+      sortable: false,
+      ignoreRowClick: true,
+    },
+    {
+      name: "Product Name",
+      selector: (row) => row.name,
+      sortable: true,
+    },
+    {
+      name: "Cost Price",
+      selector: (row) => parseFloat(row.cp).toFixed(2),
+      sortable: true,
+    },
+    {
+      name: "Selling Price",
+      selector: (row) => parseFloat(row.sp).toFixed(2),
+      sortable: true,
+    },
+    {
+      name: "Stock",
+      selector: (row) => row.stock,
+      sortable: true,
+    },
+    {
+      name: "Actions",
+      cell: (row) => (
+        <div className="flex space-x-4">
+          <button
+            onClick={() => handleEdit(row)}
+            className="text-blue-500 hover:text-blue-700 transition duration-300"
+          >
+            <FaEdit />
+          </button>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="text-red-500 hover:text-red-700 transition duration-300"
+          >
+            <FaTrashAlt />
+          </button>
+        </div>
+      ),
+      ignoreRowClick: true,
+    },
+  ];
 
   // Handle edit
   const handleEdit = (product) => {
@@ -218,8 +273,12 @@ const ProductList = () => {
         Product List
       </h2>
 
-      {/* Export Options */}
-      <div className="flex justify-start space-x-6 mb-6">
+     
+      <div className="mt-8 overflow-x-auto bg-white rounded-lg shadow-lg p-6">
+      <h2 className="text-xl font-medium text-gray-800 mb-4">Products</h2>
+      <div className="mb-4 flex justify-between">
+         {/* Export Options */}
+      <div className="flex justify-start space-x-6">
         <button
           onClick={exportToExcel}
           className="flex items-center bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -243,138 +302,24 @@ const ProductList = () => {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto shadow-md rounded-lg">
-        <table className="min-w-full bg-gray-100">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="py-2 px-4 text-left text-sm font-medium text-gray-700">
-                Product Image
-              </th>
-              <th
-                onClick={() => requestSort("name")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Product Name</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "name" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th
-                onClick={() => requestSort("cp")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Cost Price</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "cp" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th
-                onClick={() => requestSort("sp")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Selling Price</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "sp" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th
-                onClick={() => requestSort("stock")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Stock</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "stock" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-
-              <th className="py-3 px-6 text-left text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((product) => (
-              <tr
-                key={product.id}
-                className="border-b hover:bg-gray-50 transition duration-300"
-              >
-                <td className="py-3 px-6">
-                  {product.image ? (
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gray-200 flex items-center justify-center rounded-lg">
-                      <FaImage className="text-gray-500" />
-                    </div>
-                  )}
-                </td>
-                <td className="py-3 px-6">{product.name}</td>
-                <td className="py-3 px-6">{parseFloat(product.cp).toFixed(2)}</td>
-                <td className="py-3 px-6">{parseFloat(product.sp).toFixed(2)}</td>
-                <td className="py-3 px-6">{product.stock}</td>
-                <td className="py-3 px-6">
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="text-blue-500 hover:text-blue-700 transition duration-300"
-                    >
-                      <FaEdit />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      className="text-red-500 hover:text-red-700 transition duration-300"
-                    >
-                      <FaTrashAlt />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <input
+          type="text"
+          placeholder="Search products"
+          className="p-2 border border-gray-300 rounded-md"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
       </div>
+      <DataTable
+      className="z-0"
+        columns={columns}
+        data={filteredProducts}
+        pagination
+        highlightOnHover
+        responsive
+        striped
+      />
+    </div>
 
       {/* Delete Confirmation Modal */}
       <ReactModal

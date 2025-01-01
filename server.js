@@ -192,7 +192,7 @@ app.delete("/products/:id", (req, res) => {
 
 // Get all drafts
 app.get("/drafts", (req, res) => {
-  db.all("SELECT * FROM drafts", (err, rows) => {
+  db.all("SELECT * FROM drafts ORDER BY date DESC", (err, rows) => {
     if (err) {
       console.error("Error fetching drafts:", err.message);
       res.status(500).send("Error fetching drafts");
