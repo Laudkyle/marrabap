@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import {
   FaEdit,
@@ -6,10 +6,7 @@ import {
   FaFileExcel,
   FaFilePdf,
   FaPrint,
-  FaSort,
-  FaSortUp,
   FaImage,
-  FaSortDown,
 } from "react-icons/fa";
 import { FiSearch } from "react-icons/fi";
 import ReactModal from "react-modal";
@@ -17,21 +14,21 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
-
+import DataTable from "react-data-table-component";
 // Set the app element for accessibility
 ReactModal.setAppElement("#root");
 
 const StockList = () => {
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [filteredProducts, setFilteredProducts] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "" });
   const [imagePreview, setImagePreview] = useState(null);
-
+  const [filterText, setFilterText] = useState("");
   // Fetch products from the backend
   useEffect(() => {
     axios
@@ -45,19 +42,69 @@ const StockList = () => {
       });
   }, [isEditing, setIsEditing]);
 
-  // Handle live search
-  const handleSearchChange = (e) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    if (query === "") {
-      setFilteredProducts(products); // Show all products if search is empty
-    } else {
-      const filtered = products.filter((product) =>
-        product.name.toLowerCase().includes(query.toLowerCase())
-      );
-      setFilteredProducts(filtered);
-    }
-  };
+
+  const columns = [
+    {
+      name: "Product Image",
+      cell: (row) => (
+        <img
+          src={row.image || "default-image.jpg"}
+          alt="Product"
+          className="w-16 h-16 object-cover rounded-md"
+        />
+      ),
+    },
+    {
+      name: "Product Name",
+      selector: (row) => row.name,
+      sortable: true,
+    },
+    {
+      name: "Cost Price",
+      selector: (row) => parseFloat(row.cp).toFixed(2),
+      sortable: true,
+    },
+    {
+      name: "Selling Price",
+      selector: (row) => parseFloat(row.sp).toFixed(2),
+      sortable: true,
+    },
+    {
+      name: "Stock",
+      selector: (row) => row.stock,
+      sortable: true,
+    },
+    {
+      name: "Actions",
+      cell: (row) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleEdit(row)}
+            className="text-blue-500 hover:text-blue-700"
+          >
+            <FaEdit />
+          </button>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="text-red-500 hover:text-red-700 ml-2"
+          >
+            <FaTrashAlt />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  // Filter products based on search text
+  const filteredProductsd = useMemo(() => {
+    return products.filter(
+      (product) =>
+        product.name.toLowerCase().includes(filterText.toLowerCase()) ||
+        product.cp.toString().includes(filterText) ||
+        product.sp.toString().includes(filterText) ||
+        product.stock.toString().includes(filterText)
+    );
+  }, [filterText, products]);
 
   // Handle image file change
   const handleImageChange = (e) => {
@@ -272,152 +319,30 @@ const StockList = () => {
             </button>
           </div>
 
-          {/* Search Bar */}
 
-          <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-              <FiSearch className="h-5 w-5" />
-            </span>
-            <input
-              type="text"
-              placeholder="Search for products..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full p-2 pl-10 pr-4 outline-none text-black rounded-3xl"
-            />
-          </div>
+         
+         
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto shadow-md rounded-lg">
-        <table className="min-w-full bg-gray-100">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="py-2 px-4 text-left text-sm font-medium text-gray-700">
-                Product Image
-              </th>
-              <th
-                onClick={() => requestSort("name")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Product Name</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "name" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th
-                onClick={() => requestSort("cp")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Cost Price</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "cp" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th
-                onClick={() => requestSort("sp")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Selling Price</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "sp" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th
-                onClick={() => requestSort("stock")}
-                className="cursor-pointer py-2 px-4 text-left text-sm font-medium text-gray-700"
-              >
-                <div className="flex items-center">
-                  <span>Stock</span>
-                  <span className="ml-2">
-                    {sortConfig.key === "stock" ? (
-                      sortConfig.direction === "ascending" ? (
-                        <FaSortUp />
-                      ) : (
-                        <FaSortDown />
-                      )
-                    ) : (
-                      <FaSort />
-                    )}
-                  </span>
-                </div>
-              </th>
-              <th className="py-2 px-4 text-left text-sm font-medium text-gray-700">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50">
-                <td className="py-2 px-4">
-                  <img
-                    src={product.image || "default-image.jpg"}
-                    alt="Product"
-                    className="w-16 h-16 object-cover rounded-md"
-                  />
-                </td>
-                <td className="py-2 px-4 text-sm text-gray-800">
-                  {product.name}
-                </td>
-                <td className="py-2 px-4 text-sm text-gray-800">
-                  {parseFloat(product.cp).toFixed(2)}
-                </td>
-                <td className="py-2 px-4 text-sm text-gray-800">
-                  {parseFloat(product.sp).toFixed(2)}
-                </td>
-                <td className="py-2 px-4 text-sm text-gray-800">
-                  {product.stock}
-                </td>
-                <td className="py-2 px-4 text-sm text-gray-800">
-                  <button
-                    onClick={() => handleEdit(product)}
-                    className="text-blue-500 hover:text-blue-700"
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className="text-red-500 hover:text-red-700 ml-2"
-                  >
-                    <FaTrashAlt />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="overflow-x-auto shadow-md rounded-lg p-4">
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search products"
+            className="p-2 border border-gray-300 rounded-md w-full"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+        </div>
+        <DataTable
+          columns={columns}
+          data={filteredProductsd}
+          pagination
+          highlightOnHover
+          responsive
+          striped
+        />
       </div>
 
       {/* Product Edit Modal */}

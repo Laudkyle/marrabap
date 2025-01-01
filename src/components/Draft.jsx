@@ -4,22 +4,21 @@ import {
   FaEye,
   FaEdit,
   FaTrashAlt,
-  FaTrash,
   FaMoneyBillWave,
 } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import { toast, ToastContainer } from "react-toastify";
-import printInvoice from "./PrintInvoice";
 import Invoice from "./Invoice";
-
+import DataTable from "react-data-table-component";
 const Draft = () => {
   const [drafts, setDrafts] = useState([]);
   const [refNum, setRefNum] = useState("");
   const [editDraftId, setEditDraftId] = useState(null);
   const [showInvoice, setShowInvoice] = useState(null);
   const [showDraft, setShowDraft] = useState(true);
+  const [showCompleteSale, setShowCompleteSale] = useState(true);
   const [saleComplete, setSaleComplete] = useState(false);
-
+  const [filterText, setFilterText] = useState("");
   const { cart, setCart, clearCart, processSale } = useCart();
   useEffect(() => {
     fetchDrafts();
@@ -62,7 +61,7 @@ const Draft = () => {
             draft.id === editDraftId ? response.data : draft
           )
         );
-
+        setShowInvoice(false)
         // Success notification for updating the draft
         toast.success("Draft updated successfully!");
       } else {
@@ -93,6 +92,13 @@ const Draft = () => {
     );
     toast.info(`${itemToRemove.product.name} removed from cart`);
   };
+  // Filtered drafts based on the search text
+  const filteredDrafts = drafts.filter(
+    (draft) =>
+      draft.reference_number.toLowerCase().includes(filterText.toLowerCase()) ||
+      draft.status.toLowerCase().includes(filterText.toLowerCase()) ||
+      new Date(draft.date).toLocaleDateString().includes(filterText)
+  );
 
   // Delete a draft
   const handleDeleteDraft = async (draftId) => {
@@ -134,6 +140,7 @@ const Draft = () => {
 
   const handleEditDraft = async (draftId) => {
     setShowDraft(true);
+    setShowCompleteSale(true);
     setEditDraftId(draftId);
     try {
       // Fetch the draft details using the draft ID
@@ -169,6 +176,9 @@ const Draft = () => {
       console.error("Error fetching draft details:", error);
     }
   };
+  useEffect(() => {
+    fetchDrafts();
+  }, [handleCompleteSalePut]);
 
   const handleViewDraft = async (draftId) => {
     setEditDraftId(draftId);
@@ -178,7 +188,6 @@ const Draft = () => {
         `http://localhost:5000/drafts/${draftId}`
       );
       const draft = response.data;
-      console.log("This is the draft:", draft);
 
       // Populate the modal with the draft information
       setShowInvoice(true);
@@ -217,6 +226,62 @@ const Draft = () => {
     updatedCart[index].quantity = updatedQuantity;
     setCart(updatedCart);
   };
+  const columns = [
+    {
+      name: "Reference",
+      selector: (row) => row.reference_number,
+      sortable: true,
+    },
+    {
+      name: "Status",
+      selector: (row) => row.status,
+      sortable: true,
+    },
+    {
+      name: "Date",
+      selector: (row) => new Date(row.date).toLocaleDateString(),
+      sortable: true,
+    },
+    {
+      name: "Actions",
+      cell: (row) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleViewDraft(row.id)}
+            className="text-blue-600 hover:bg-blue-100 p-2 rounded"
+            title="View Draft"
+          >
+            <FaEye />
+          </button>
+          {row.status !== "completed" && (
+            <>
+              <button
+                onClick={() => handleEditDraft(row.id)}
+                className="text-blue-600 hover:bg-blue-100 p-2 rounded"
+                title="Edit Draft"
+              >
+                <FaEdit />
+              </button>
+              <button
+                onClick={() => handleDeleteDraft(row.id)}
+                className="text-red-600 hover:bg-red-100 p-2 rounded"
+                title="Delete Draft"
+              >
+                <FaTrashAlt />
+              </button>
+              <button
+                onClick={() => handleCompleteSale(row.id)}
+                className="text-green-600 hover:bg-green-100 p-2 rounded"
+                title="Complete Sale"
+              >
+                <FaMoneyBillWave />
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="p-6">
@@ -226,83 +291,35 @@ const Draft = () => {
         showInvoice={showInvoice}
         setShowInvoice={setShowInvoice}
         showDraft={showDraft}
+        showCompleteSale={showCompleteSale}
+        editDraftId={editDraftId}
         handleCompleteSale={handleCompleteSale}
         handleQuantityChangeNew={handleQuantityChangeNew}
         handleRemoveFromCart={handleRemoveFromCart}
         handleSaveDraft={handleSaveDraft}
       />
       
-      <div className="bg-white mx-6 shadow-sm rounded-md p-6">
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">Draft List</h2>
-        <table className="table-auto w-full border-collapse">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                Reference
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                Status
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                Date
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {drafts.map((draft) => (
-              <tr key={draft.id} className="hover:bg-gray-50">
-                <td className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                  {draft.reference_number}
-                </td>
-                <td className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                  {draft.status}
-                </td>
-                <td className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                  {new Date(draft.date).toLocaleDateString()}
-                </td>
-                <td className="text-left text-sm font-medium text-gray-600 px-4 py-2">
-                  <button
-                    onClick={() => handleViewDraft(draft.id)}
-                    className="text-blue-600 hover:bg-blue-100 p-2 rounded"
-                    title="View Draft"
-                  >
-                    <FaEye />
-                  </button>
-
-                  {draft.status !== "completed" && (
-                    <>
-                      <button
-                        onClick={() => handleEditDraft(draft.id)}
-                        className="text-blue-600 hover:bg-blue-100 p-2 rounded"
-                        title="Edit Draft"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDraft(draft.id)}
-                        className="text-red-600 hover:bg-red-100 p-2 rounded"
-                        title="Delete Draft"
-                      >
-                        <FaTrashAlt />
-                      </button>
-                      <button
-                        onClick={() => handleCompleteSale(draft.id)}
-                        className="text-green-600 hover:bg-green-100 p-2 rounded"
-                        title="Complete Sale"
-                      >
-                        <FaMoneyBillWave />
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
+      <h2 className="text-xl font-semibold text-gray-700 mb-4">Draft List</h2>
+      <DataTable
+      className="z-0"
+        columns={columns}
+        data={filteredDrafts}
+        pagination
+        highlightOnHover
+        responsive
+        striped
+        subHeader
+        subHeaderComponent={
+          <input
+            type="text"
+            placeholder="Search drafts"
+            className="p-2 border border-gray-300 rounded-md"
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+        }
+      />
+    </div>
     </div>
   );
 };
