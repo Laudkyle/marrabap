@@ -8,7 +8,6 @@ import {
   FaPrint,
   FaImage,
 } from "react-icons/fa";
-import { FiSearch } from "react-icons/fi";
 import ReactModal from "react-modal";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -20,13 +19,11 @@ ReactModal.setAppElement("#root");
 
 const StockList = () => {
   const [products, setProducts] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [filteredProducts, setFilteredProducts] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: "", direction: "" });
   const [imagePreview, setImagePreview] = useState(null);
   const [filterText, setFilterText] = useState("");
   // Fetch products from the backend
@@ -124,26 +121,6 @@ const StockList = () => {
     }
   };
 
-  // Handle sorting
-  const requestSort = (key) => {
-    let direction = "ascending";
-    if (sortConfig.key === key && sortConfig.direction === "ascending") {
-      direction = "descending";
-    }
-
-    const sortedProducts = [...filteredProducts].sort((a, b) => {
-      if (a[key] < b[key]) {
-        return direction === "ascending" ? -1 : 1;
-      }
-      if (a[key] > b[key]) {
-        return direction === "ascending" ? 1 : -1;
-      }
-      return 0;
-    });
-
-    setFilteredProducts(sortedProducts);
-    setSortConfig({ key, direction });
-  };
 
   // Handle edit
   const handleEdit = (product) => {
@@ -327,6 +304,7 @@ const StockList = () => {
           />
         </div>
         <DataTable
+        className="z-0"
           columns={columns}
           data={filteredProductsd}
           pagination
