@@ -310,76 +310,122 @@ app.delete("/drafts/:id", (req, res) => {
 });
 
 // ===================== Sales Endpoints =====================
-
 // Add a sale or bulk sales
-app.post("/sales", (req, res) => {
+app.post("/sales", async (req, res) => {
   const salesData = Array.isArray(req.body) ? req.body : [req.body];
 
-  db.serialize(() => {
-    db.run("BEGIN TRANSACTION");
+  const dbPromise = new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION", (err) => {
+        if (err) return reject(new Error("Failed to start transaction"));
 
-    let errorOccurred = false;
+        let errorOccurred = false;
+        const saleResponses = [];
 
-    salesData.forEach(({ product_id, quantity, reference_number }) => {
-      db.get(
-        "SELECT * FROM products WHERE id = ?",
-        [product_id],
-        (err, product) => {
-          if (err || !product) {
-            errorOccurred = true;
-            return console.error(err ? err.message : "Product not found");
-          }
-
-          if (product.stock < quantity) {
-            errorOccurred = true;
-            return console.error(
-              "Insufficient stock for product ID:",
-              product_id
-            );
-          }
-
-          const total_price = product.sp * quantity;
-
-          db.run(
-            "INSERT INTO sales (product_id,reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?)",
-            [
-              product_id,
-              reference_number,
-              quantity,
-              total_price,
-              new Date().toISOString(),
-            ],
-            (err) => {
-              if (err) {
+        const processSalePromises = salesData.map(({ product_id, quantity, reference_number }) => {
+          return new Promise((resolveSale, rejectSale) => {
+            db.get("SELECT * FROM products WHERE id = ?", [product_id], (err, product) => {
+              if (err || !product) {
                 errorOccurred = true;
-                console.error(err.message);
+                console.error(err ? err.message : "Product not found");
+                return rejectSale("Product not found");
               }
-            }
-          );
 
-          db.run(
-            "UPDATE products SET stock = stock - ? WHERE id = ?",
-            [quantity, product_id],
-            (err) => {
-              if (err) {
+              if (product.stock < quantity) {
                 errorOccurred = true;
-                console.error(err.message);
+                console.error("Insufficient stock for product ID:", product_id);
+                return rejectSale("Insufficient stock");
               }
+
+              const total_price = product.sp * quantity;
+
+              db.run(
+                "INSERT INTO sales (product_id, reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?)",
+                [product_id, reference_number, quantity, total_price, new Date().toISOString()],
+                (err) => {
+                  if (err) {
+                    errorOccurred = true;
+                    console.error(err.message);
+                    return rejectSale("Error inserting sale");
+                  }
+                  resolveSale({ product_id, quantity, total_price });
+                }
+              );
+
+              db.run(
+                "UPDATE products SET stock = stock - ? WHERE id = ?",
+                [quantity, product_id],
+                (err) => {
+                  if (err) {
+                    errorOccurred = true;
+                    console.error(err.message);
+                    return rejectSale("Error updating stock");
+                  }
+                }
+              );
+            });
+          });
+        });
+
+        // Wait for all sales to be processed
+        Promise.allSettled(processSalePromises)
+          .then((results) => {
+            results.forEach((result, index) => {
+              if (result.status === "fulfilled") {
+                saleResponses.push(result.value);
+              } else {
+                errorOccurred = true;
+                console.error(`Sale ${index + 1} failed:`, result.reason);
+              }
+            });
+
+            if (errorOccurred) {
+              db.run("ROLLBACK", (rollbackErr) => {
+                if (rollbackErr) {
+                  return reject(new Error("Failed to rollback transaction"));
+                }
+                reject(new Error("Error processing sales"));
+              });
+            } else {
+              db.run("COMMIT", (err) => {
+                if (err) {
+                  return reject(new Error("Failed to commit transaction"));
+                }
+                resolve(saleResponses); // Return successful sale data
+              });
             }
-          );
-        }
-      );
+          })
+          .catch((err) => {
+            db.run("ROLLBACK", (rollbackErr) => {
+              if (rollbackErr) {
+                return reject(new Error("Failed to rollback transaction"));
+              }
+              reject(new Error(err));
+            });
+          });
+      });
     });
-
-    if (errorOccurred) {
-      db.run("ROLLBACK");
-      res.status(400).send("Error processing sales");
-    } else {
-      db.run("COMMIT");
-      res.status(201).send("Sales processed successfully");
-    }
   });
+
+  try {
+    const result = await dbPromise;
+
+    // Respond with a JSON object containing the success data
+    res.status(201).json({
+      message: "Sales processed successfully",
+      sales: result, // Include details of each sale processed
+    });
+  } catch (error) {
+    console.error(error.message);
+    
+    // Respond with an error message and status code
+    res.status(400).json({
+      message: "Error processing sales",
+      error: error.message,
+    });
+  }
 });
+
 
 // Get all sales
 app.get("/sales", (req, res) => {

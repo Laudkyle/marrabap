@@ -129,10 +129,8 @@ const Draft = () => {
       }
   
       // If sale was successful, proceed with updating draft
-      const draftResponse = await handleCompleteSalePut(draftId);
-      if (draftResponse.status !== 200 && draftResponse.status !== 201) {
-        throw new Error(`Unexpected response status from draft update: ${draftResponse.status}`);
-      }
+      await handleCompleteSalePut(draftId);
+     
   
       // If everything went well
       setSaleComplete(!saleComplete); // Trigger product list refresh
