@@ -28,6 +28,14 @@ db.run(`CREATE TABLE IF NOT EXISTS sales (
     FOREIGN KEY (product_id) REFERENCES products (id)
 )`);
 
+db.run(`CREATE TABLE IF NOT EXISTS returns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id INTEGER NOT NULL,
+  return_quantity INTEGER NOT NULL,
+  action TEXT NOT NULL CHECK(action IN ('restock', 'dispose')),
+  return_date TEXT NOT NULL,
+  FOREIGN KEY (sale_id) REFERENCES sales(id)
+);`)
 db.run(`CREATE TABLE IF NOT EXISTS suppliers (
     id INTEGER PRIMARY KEY,
     type TEXT NOT NULL, -- "Individual" or "Business"

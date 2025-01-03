@@ -21,7 +21,7 @@ import {
   LineElement,
   ArcElement,
 } from "chart.js";
-import axios from "axios";
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -35,8 +35,9 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
+  // Filter out-of-stock products
   const [salesData, setSalesData] = useState([]);
-
+  const [productData, setProductData] = useState([]);
   // Fetch the sales data
   useEffect(() => {
     fetch("http://localhost:5000/sales")
@@ -98,31 +99,17 @@ const Dashboard = () => {
     ],
   };
 
-  // Prepare data for the pie chart (sales distribution by product)
-  const pieChartData = {
-    labels: Object.keys(totalSalesByProduct),
-    datasets: [
-      {
-        label: "Sales Distribution",
-        data: Object.values(totalSalesByProduct),
-        backgroundColor: [
-          "rgba(255, 99, 132, 0.2)",
-          "rgba(54, 162, 235, 0.2)",
-          "rgba(255, 206, 86, 0.2)",
-          "rgba(75, 192, 192, 0.2)",
-          "rgba(153, 102, 255, 0.2)",
-        ],
-        borderColor: [
-          "rgba(255, 99, 132, 1)",
-          "rgba(54, 162, 235, 1)",
-          "rgba(255, 206, 86, 1)",
-          "rgba(75, 192, 192, 1)",
-          "rgba(153, 102, 255, 1)",
-        ],
-        borderWidth: 1,
-      },
-    ],
-  };
+  // Fetch the product data
+  useEffect(() => {
+    fetch("http://localhost:5000/products")
+      .then((response) => response.json())
+      .then((data) => setProductData(data))
+      .catch((err) => console.error("Error fetching product data:", err));
+  }, []);
+
+  const outOfStockProducts = productData.filter(
+    (product) => product.stock === 0
+  );
 
   return (
     <div className="h-[85vh] overflow-scroll bg-gray-100 p-8">
@@ -192,6 +179,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-12">
         {/* Bar Chart */}
@@ -216,7 +204,51 @@ const Dashboard = () => {
           />
         </div>
       </div>
-
+      {/* Out of Stock Products Section */}
+      {outOfStockProducts.length > 0 && (<div className="bg-white shadow-lg rounded-lg p-6 mt-8 mb-6">
+          <h2 className="text-2sm font-light text-center text-gray-700">
+            Products out of stock
+          </h2>
+        <div className="bg-white rounded-lg p-6 mt-2 max-h-[300px] overflow-scroll">
+          {outOfStockProducts.length > 0 ? (
+            <table className="min-w-full bg-white text-gray-700">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="px-6 py-3 text-left border-b text-sm font-medium">
+                    Product Name
+                  </th>
+                  <th className="px-6 py-3 text-left border-b text-sm font-medium">
+                    Cost Price
+                  </th>
+                  <th className="px-6 py-3 text-left border-b text-sm font-medium">
+                    Selling Price
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {outOfStockProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 border-b text-sm">
+                      {product.name}
+                    </td>
+                    <td className="px-6 py-4 border-b text-sm">
+                      ₵{product.cp}
+                    </td>
+                    <td className="px-6 py-4 border-b text-sm">
+                      ₵{product.sp}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-gray-600">
+              No out-of-stock products currently.
+            </p>
+          )}
+        </div>
+      </div>
+)}
       {/* Recent Transactions Table */}
       <div className="bg-white shadow-lg rounded-lg p-6">
         <h2 className="text-2sm font-light text-center mb-4 text-gray-700">

@@ -430,9 +430,9 @@ app.post("/sales", async (req, res) => {
 // Get all sales
 app.get("/sales", (req, res) => {
   db.all(
-    `SELECT sales.id, products.name AS product_name, sales.quantity, sales.total_price, sales.date 
+    `SELECT sales.id,sales.reference_number, products.name AS product_name, sales.quantity, sales.total_price, sales.date 
      FROM sales 
-     JOIN products ON sales.product_id = products.id`,
+     JOIN products ON sales.product_id = products.id ORDER BY sales.date DESC`,
     (err, rows) => {
       if (err) {
         console.error(err);
@@ -443,6 +443,119 @@ app.get("/sales", (req, res) => {
     }
   );
 });
+
+// Sale Return Endpoint
+app.post("/sales/return", async (req, res) => {
+  const { sale_id, return_quantity, action } = req.body;
+
+  // Validate input
+  if (!sale_id || !return_quantity || !action) {
+    return res.status(400).json({
+      message: "Invalid input. Provide sale_id, return_quantity, and action.",
+    });
+  }
+
+  if (!["restock", "dispose"].includes(action)) {
+    return res.status(400).json({
+      message: "Invalid action. Action must be 'restock' or 'dispose'.",
+    });
+  }
+
+  try {
+    db.serialize(() => {
+      db.get("SELECT * FROM sales WHERE id = ?", [sale_id], (err, sale) => {
+        if (err) {
+          console.error("Error fetching sale:", err.message);
+          return res.status(500).json({ message: "Internal server error." });
+        }
+
+        if (!sale) {
+          return res.status(404).json({ message: "Sale not found." });
+        }
+
+        if (return_quantity > sale.quantity) {
+          return res.status(400).json({
+            message: "Return quantity exceeds the quantity sold.",
+          });
+        }
+
+        const updatedQuantity = sale.quantity - return_quantity;
+        const adjustmentAmount = sale.total_price * (return_quantity / sale.quantity);
+
+        // Update sales record
+        db.run(
+          "UPDATE sales SET quantity = ?, total_price = total_price - ? WHERE id = ?",
+          [updatedQuantity, adjustmentAmount, sale_id],
+          (err) => {
+            if (err) {
+              console.error("Error updating sale:", err.message);
+              return res.status(500).json({ message: "Error updating sale." });
+            }
+
+            // Insert return record
+            db.run(
+              "INSERT INTO returns (sale_id, return_quantity, action, return_date) VALUES (?, ?, ?, ?)",
+              [sale_id, return_quantity, action, new Date().toISOString()],
+              (err) => {
+                if (err) {
+                  console.error("Error logging return:", err.message);
+                  return res.status(500).json({ message: "Error logging return." });
+                }
+
+                if (action === "restock") {
+                  // Restock the product
+                  db.get(
+                    "SELECT product_id FROM sales WHERE id = ?",
+                    [sale_id],
+                    (err, saleData) => {
+                      if (err || !saleData) {
+                        console.error("Error fetching product for restock:", err ? err.message : "No product found");
+                        return res.status(500).json({ message: "Error fetching product for restock." });
+                      }
+
+                      db.run(
+                        "UPDATE products SET stock = stock + ? WHERE id = ?",
+                        [return_quantity, saleData.product_id],
+                        (err) => {
+                          if (err) {
+                            console.error("Error updating stock:", err.message);
+                            return res.status(500).json({ message: "Error updating stock." });
+                          }
+
+                          return res.status(200).json({
+                            message: "Return processed successfully.",
+                            sale_id,
+                            updated_sale_quantity: updatedQuantity,
+                            adjusted_total_price: sale.total_price - adjustmentAmount,
+                            return_quantity,
+                            action,
+                          });
+                        }
+                      );
+                    }
+                  );
+                } else {
+                  return res.status(200).json({
+                    message: "Return processed successfully.",
+                    sale_id,
+                    updated_sale_quantity: updatedQuantity,
+                    adjusted_total_price: sale.total_price - adjustmentAmount,
+                    return_quantity,
+                    action,
+                  });
+                }
+              }
+            );
+          }
+        );
+      });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 // ===================== Suppliers Endpoints =====================
 
 // Get all suppliers
