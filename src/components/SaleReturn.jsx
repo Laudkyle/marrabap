@@ -36,19 +36,19 @@ const SaleReturn = () => {
     );
     setFilteredSales(filtered);
   };
-
   const handleReturn = async () => {
     if (returnQuantity <= 0 || returnQuantity > selectedSale.quantity) {
       toast.error("Invalid return quantity!");
       return;
     }
-
+  
     const returnData = {
-      sale_id: selectedSale.id,
+      sale_id: selectedSale.id,          // Send sale_id
+      reference_number: selectedSale.reference_number, // Send reference_number
       return_quantity: returnQuantity,
       action: restockOption,
     };
-
+  
     try {
       const response = await axios.post(
         "http://localhost:5000/sales/return",
@@ -57,10 +57,10 @@ const SaleReturn = () => {
       if (response.status !== 200 && response.status !== 201) {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
-
+  
       toast.success("Return processed successfully!");
       setModalVisible(false);
-
+  
       // Update the sales list
       const updatedSales = sales.map((sale) =>
         sale.id === selectedSale.id
@@ -74,7 +74,7 @@ const SaleReturn = () => {
             }
           : sale
       );
-
+  
       // Update both states
       setSales(updatedSales);
       setFilteredSales(updatedSales.filter((sale) => sale.quantity > 0));
@@ -83,7 +83,7 @@ const SaleReturn = () => {
       toast.error("Error processing return. Please try again.");
     }
   };
-
+  
   const columns = [
     {
       name: "Reference Number",

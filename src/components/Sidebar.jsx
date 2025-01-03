@@ -11,6 +11,7 @@ import {
   FaList,
   FaEdit,
   FaWarehouse,
+  FaArrowLeft,
   FaCashRegister,
   FaChevronDown,
   FaUsers,
@@ -37,7 +38,8 @@ const Sidebar = ({ isExpanded,companyName }) => {
       links: [
         { path: '/pos', label: 'POS', icon: <FaCashRegister /> },
         { path: '/draft', label: 'Draft', icon: <FaSave /> },
-        { path: '/sale-return', label: 'Sale Return', icon: <FaWarehouse /> },
+        { path: '/sale-return', label: 'Make Sale Return', icon: <FaWarehouse /> },
+        { path: '/sale-return-list', label: 'Sale Return List', icon: <FaArrowLeft /> },
       ],
     },
     {
@@ -163,7 +165,7 @@ const Sidebar = ({ isExpanded,companyName }) => {
             {/* Dropdown Items */}
             <div
               className={`overflow-hidden transition-all duration-300 ${
-                openDropdown === dropdown ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'
+                openDropdown === dropdown ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
               }`}
             >
               <div className="flex flex-col mt-2 bg-gray-700 text-sm rounded-md shadow-lg">

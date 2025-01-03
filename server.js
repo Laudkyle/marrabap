@@ -444,14 +444,13 @@ app.get("/sales", (req, res) => {
   );
 });
 
-// Sale Return Endpoint
 app.post("/sales/return", async (req, res) => {
-  const { sale_id, return_quantity, action } = req.body;
+  const { sale_id, reference_number, return_quantity, action } = req.body;
 
   // Validate input
-  if (!sale_id || !return_quantity || !action) {
+  if (!sale_id || !reference_number || !return_quantity || !action) {
     return res.status(400).json({
-      message: "Invalid input. Provide sale_id, return_quantity, and action.",
+      message: "Invalid input. Provide sale_id, reference_number, return_quantity, and action.",
     });
   }
 
@@ -494,8 +493,8 @@ app.post("/sales/return", async (req, res) => {
 
             // Insert return record
             db.run(
-              "INSERT INTO returns (sale_id, return_quantity, action, return_date) VALUES (?, ?, ?, ?)",
-              [sale_id, return_quantity, action, new Date().toISOString()],
+              "INSERT INTO returns (sale_id, reference_number, return_quantity, action, return_date) VALUES (?, ?, ?, ?, ?)",
+              [sale_id, reference_number, return_quantity, action, new Date().toISOString()],
               (err) => {
                 if (err) {
                   console.error("Error logging return:", err.message);
@@ -509,7 +508,10 @@ app.post("/sales/return", async (req, res) => {
                     [sale_id],
                     (err, saleData) => {
                       if (err || !saleData) {
-                        console.error("Error fetching product for restock:", err ? err.message : "No product found");
+                        console.error(
+                          "Error fetching product for restock:",
+                          err ? err.message : "No product found"
+                        );
                         return res.status(500).json({ message: "Error fetching product for restock." });
                       }
 
@@ -525,6 +527,7 @@ app.post("/sales/return", async (req, res) => {
                           return res.status(200).json({
                             message: "Return processed successfully.",
                             sale_id,
+                            reference_number,
                             updated_sale_quantity: updatedQuantity,
                             adjusted_total_price: sale.total_price - adjustmentAmount,
                             return_quantity,
@@ -538,6 +541,7 @@ app.post("/sales/return", async (req, res) => {
                   return res.status(200).json({
                     message: "Return processed successfully.",
                     sale_id,
+                    reference_number,
                     updated_sale_quantity: updatedQuantity,
                     adjusted_total_price: sale.total_price - adjustmentAmount,
                     return_quantity,
@@ -555,6 +559,7 @@ app.post("/sales/return", async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 // Get All Returns
 app.get("/sales/returns", async (req, res) => {
   try {

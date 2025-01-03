@@ -17,6 +17,7 @@ import Customer from './components/Customer';
 import CustomerGroup from './components/CutomerGroup';
 import SaleReturn from './components/SaleReturn';
 import Draft from './components/Draft';
+import SaleReturnList from './components/SaleReturnList';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName="Essential Anchor";
@@ -34,6 +35,7 @@ const App = () => {
             <Route path="/pos" element={<Shop companyName={companyName} email={email} phone={phone} companyAddress={companyAddress} />} />
             <Route path="/draft" element={<Draft companyName={companyName} email={email} phone={phone} companyAddress={companyAddress}  />} />
             <Route path="/sale-return" element={<SaleReturn />} />
+            <Route path="/sale-return-list" element={<SaleReturnList />} />
             <Route path="/list-expenses" element={<ExpenseList />} />
             <Route path="/add-product" element={<Edit />} />
             <Route path="/add-stock" element={<AddStock />} />

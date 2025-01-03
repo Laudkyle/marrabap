@@ -18,25 +18,26 @@ db.serialize(() => {
     image TEXT -- Optional, for product image URL or file path
 )`);
 
-db.run(`CREATE TABLE IF NOT EXISTS sales (
+  db.run(`CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY,
     reference_number TEXT NOT NULL,
     product_id INTEGER NOT NULL,
-    quantity INTEGER CHECK(quantity > 0), -- Quantity must be positive
+    quantity INTEGER CHECK(quantity >= 0), -- Quantity must be positive
     total_price REAL CHECK(total_price >= 0), -- Ensure total is non-negative
     date TEXT NOT NULL, -- ISO 8601 format recommended (YYYY-MM-DD)
     FOREIGN KEY (product_id) REFERENCES products (id)
 )`);
 
-db.run(`CREATE TABLE IF NOT EXISTS returns (
+  db.run(`CREATE TABLE IF NOT EXISTS returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL,
+  reference_number TEXT NOT NULL,
   return_quantity INTEGER NOT NULL,
   action TEXT NOT NULL CHECK(action IN ('restock', 'dispose')),
   return_date TEXT NOT NULL,
   FOREIGN KEY (sale_id) REFERENCES sales(id)
-);`)
-db.run(`CREATE TABLE IF NOT EXISTS suppliers (
+);`);
+  db.run(`CREATE TABLE IF NOT EXISTS suppliers (
     id INTEGER PRIMARY KEY,
     type TEXT NOT NULL, -- "Individual" or "Business"
     contact_id TEXT UNIQUE NOT NULL,
@@ -55,7 +56,7 @@ db.run(`CREATE TABLE IF NOT EXISTS suppliers (
     active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
 
-db.run(`CREATE TABLE IF NOT EXISTS customers (
+  db.run(`CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY,
     contact_id TEXT UNIQUE NOT NULL,
     customer_type TEXT NOT NULL, -- "Individual" or "Business"
@@ -76,7 +77,7 @@ db.run(`CREATE TABLE IF NOT EXISTS customers (
     active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
 
-db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
+  db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
     id INTEGER PRIMARY KEY,
     group_name TEXT NOT NULL UNIQUE,
     discount REAL DEFAULT 0 CHECK(discount >= 0),
@@ -87,7 +88,7 @@ db.run(`CREATE TABLE IF NOT EXISTS customer_groups (
     description TEXT, -- Optional description
     active_status INTEGER DEFAULT 1 CHECK(active_status IN (0, 1)) -- Active or inactive
 )`);
-db.run(`CREATE TABLE IF NOT EXISTS drafts (
+  db.run(`CREATE TABLE IF NOT EXISTS drafts (
   id INTEGER PRIMARY KEY,
   reference_number TEXT NOT NULL,
   details JSON NOT NULL, -- Stores product_id and quantity as a JSON object
@@ -95,8 +96,6 @@ db.run(`CREATE TABLE IF NOT EXISTS drafts (
   status TEXT DEFAULT 'pending', -- Can be 'pending', 'saved', 'completed', etc.
   FOREIGN KEY (id) REFERENCES products (id)
 )`);
-
-
 
   // Insert product data
   const insertStmt =
