@@ -555,6 +555,45 @@ app.post("/sales/return", async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+// Get All Returns
+app.get("/sales/returns", async (req, res) => {
+  try {
+    db.all("SELECT * FROM returns", (err, rows) => {
+      if (err) {
+        console.error("Error fetching returns:", err.message);
+        return res.status(500).json({ message: "Internal server error." });
+      }
+
+      return res.status(200).json(rows);
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+// Get Single Return by ID
+app.get("/sales/returns/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    db.get("SELECT * FROM returns WHERE id = ?", [id], (err, row) => {
+      if (err) {
+        console.error("Error fetching return:", err.message);
+        return res.status(500).json({ message: "Internal server error." });
+      }
+
+      if (!row) {
+        return res.status(404).json({ message: "Return not found." });
+      }
+
+      return res.status(200).json(row);
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
 
 // ===================== Suppliers Endpoints =====================
 

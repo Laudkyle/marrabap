@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import DataTable from "react-data-table-component";
 import { toast, ToastContainer } from "react-toastify";
-
+import { FaArrowLeft } from "react-icons/fa";
 const SaleReturn = () => {
   const [sales, setSales] = useState([]);
   const [filteredSales, setFilteredSales] = useState([]);
@@ -122,7 +122,13 @@ const SaleReturn = () => {
             }}
             className="text-blue-600 hover:bg-blue-100 p-2 rounded"
           >
-            Return
+            <div className="relative group">
+              <FaArrowLeft
+                className="cursor-pointer text-gray-500 hover:text-blue-500"
+                title="Return"
+              />
+              
+            </div>
           </button>
         </div>
       ),
@@ -131,6 +137,9 @@ const SaleReturn = () => {
 
   return (
     <div className="p-6">
+      <h2 className="text-xl px-6 font-semibold text-gray-700 mb-4">
+        Make Sales Return
+      </h2>
       <ToastContainer />
       {modalVisible && (
         <div className="fixed inset-0 flex z-50 items-center justify-center bg-black bg-opacity-50">
@@ -139,7 +148,6 @@ const SaleReturn = () => {
             {selectedSale && (
               <>
                 <div className="mb-6">
-                
                   <p className="text-sm text-gray-500">
                     Process a return for the selected product.
                   </p>
@@ -162,10 +170,22 @@ const SaleReturn = () => {
                     type="number"
                     value={returnQuantity}
                     onChange={(e) => setReturnQuantity(Number(e.target.value))}
+                    onInput={(e) => {
+                      const value = Math.min(
+                        Number(e.target.value),
+                        selectedSale.quantity
+                      );
+                      e.target.value = value; // Enforce max value in the input field
+                      setReturnQuantity(value);
+                    }}
                     className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-300"
-                    placeholder="Enter quantity to return"
+                    placeholder={`Max: ${selectedSale.quantity}`}
                   />
+                  <p className="text-sm text-gray-500 mt-1">
+                    You can return up to {selectedSale.quantity} items.
+                  </p>
                 </div>
+
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Action
@@ -213,9 +233,6 @@ const SaleReturn = () => {
         </div>
       )}
       <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">
-          Sales Return
-        </h2>
         <DataTable
           className="z-0"
           columns={columns}
