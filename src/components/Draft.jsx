@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import {
-  FaEye,
-  FaEdit,
-  FaTrashAlt,
-  FaMoneyBillWave,
-} from "react-icons/fa";
+import { FaEye, FaEdit, FaTrashAlt, FaMoneyBillWave } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import { toast, ToastContainer } from "react-toastify";
 import Invoice from "./Invoice";
@@ -39,17 +34,16 @@ const Draft = () => {
       product_id: item.product.id,
       quantity: item.quantity,
     }));
-  
+
     const draftPayload = {
       reference_number: refNum,
       details: draftDetails,
       date: new Date().toISOString(),
       status: "pending",
     };
-  
+
     try {
       if (editDraftId) {
-
         const response = await axios.put(
           `http://localhost:5000/drafts/${editDraftId}`,
           draftPayload
@@ -75,7 +69,7 @@ const Draft = () => {
       console.error(error);
     }
   };
-  
+
   const handleRemoveFromCart = (itemToRemove) => {
     setCart((prevCart) =>
       prevCart.filter((item) => item.product.id !== itemToRemove.product.id)
@@ -86,14 +80,13 @@ const Draft = () => {
     const referenceNumber = draft.reference_number || ""; // Handle undefined reference_number
     const status = draft.status || ""; // Handle undefined status
     const date = draft.date ? new Date(draft.date).toLocaleDateString() : ""; // Handle undefined date
-  
+
     return (
       referenceNumber.toLowerCase().includes(filterText.toLowerCase()) ||
       status.toLowerCase().includes(filterText.toLowerCase()) ||
       date.includes(filterText)
     );
   });
-  
 
   // Delete a draft
   const handleDeleteDraft = async (draftId) => {
@@ -120,18 +113,25 @@ const Draft = () => {
   // Updated handleCompleteSale function
   const handleCompleteSale = async (draftId) => {
     try {
+      const response = await axios.get(
+        `http://localhost:5000/drafts/${draftId}`
+      );
+      const draft = response.data;
+      setCart(draft);
+      console.log(cart)
       const referenceNumber = refNum; // Generate unique reference number
-      
+
       // Process sale and check server response
       const saleResponse = await processSale(referenceNumber);
       if (saleResponse.status !== 200 && saleResponse.status !== 201) {
-        throw new Error(`Unexpected response status from sale process: ${saleResponse.status}`);
+        throw new Error(
+          `Unexpected response status from sale process: ${saleResponse}`
+        );
       }
-  
+
       // If sale was successful, proceed with updating draft
       await handleCompleteSalePut(draftId);
-     
-  
+
       // If everything went well
       setSaleComplete(!saleComplete); // Trigger product list refresh
       setShowInvoice(false); // Close the invoice modal
@@ -142,7 +142,6 @@ const Draft = () => {
       toast.error("An error occurred while processing the sale.");
     }
   };
-  
 
   const handleEditDraft = async (draftId) => {
     setShowDraft(true);
@@ -220,7 +219,9 @@ const Draft = () => {
   };
   const handleAddNewItem = (product, quantity) => {
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.product.id === product.id);
+      const existingItem = prevCart.find(
+        (item) => item.product.id === product.id
+      );
       if (existingItem) {
         // Update quantity if product already exists
         return prevCart.map((item) =>
@@ -234,7 +235,7 @@ const Draft = () => {
     });
     toast.success(`${product.name} added to cart`);
   };
-  
+
   const handleQuantityChangeNew = (e, item, index) => {
     const updatedQuantity = Math.min(
       Number(e.target.value),
@@ -307,7 +308,7 @@ const Draft = () => {
       <ToastContainer />
       {/* Invoice Modal */}
       <Invoice
-      refNum={refNum}
+        refNum={refNum}
         showInvoice={showInvoice}
         setShowInvoice={setShowInvoice}
         showDraft={showDraft}
@@ -317,30 +318,30 @@ const Draft = () => {
         handleQuantityChangeNew={handleQuantityChangeNew}
         handleRemoveFromCart={handleRemoveFromCart}
         handleSaveDraft={handleSaveDraft}
-        handleAddNewItem={handleAddNewItem} 
+        handleAddNewItem={handleAddNewItem}
       />
-      
+
       <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
-      <h2 className="text-xl font-semibold text-gray-700 mb-4">Draft List</h2>
-      <DataTable
-      className="z-0"
-        columns={columns}
-        data={filteredDrafts}
-        pagination
-        highlightOnHover
-        responsive
-        striped
-        subHeader
-        subHeaderComponent={
-          <input
-            type="text"
-            placeholder="Search drafts"
-            className="p-2 border border-gray-300 rounded-md"
-            onChange={(e) => setFilterText(e.target.value)}
-          />
-        }
-      />
-    </div>
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">Draft List</h2>
+        <DataTable
+          className="z-0"
+          columns={columns}
+          data={filteredDrafts}
+          pagination
+          highlightOnHover
+          responsive
+          striped
+          subHeader
+          subHeaderComponent={
+            <input
+              type="text"
+              placeholder="Search drafts"
+              className="p-2 border border-gray-300 rounded-md"
+              onChange={(e) => setFilterText(e.target.value)}
+            />
+          }
+        />
+      </div>
     </div>
   );
 };

@@ -73,8 +73,9 @@ export const CartProvider = ({ children }) => {
       // Attempt to parse the response if successful
       const responseData = await response.json();
       console.log("Sales logged:", responseData);
-  
+      
       return response; // Return the response for further handling
+
     } catch (error) {
       console.error("Error logging sales:", error.message);
       throw error; // Rethrow to propagate the error for higher-level handling
