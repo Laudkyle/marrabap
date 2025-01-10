@@ -117,11 +117,48 @@ const Draft = () => {
       console.error(error);
     }
   };
+  const handleUpdateCart = async () => {
+    const updatedDraftDetails = cart.map((item) => ({
+      product_id: item.product.id,
+      quantity: item.quantity,
+    }));
+  
+    const updatedDraftPayload = {
+      reference_number: refNum,
+      details: updatedDraftDetails,
+    };
+  
+    try {
+      if (editDraftId) {
+        // Update only the draft's cart details
+        const response = await axios.put(
+          `http://localhost:5000/drafts/${editDraftId}`,
+          updatedDraftPayload
+        );
+  
+        // Update local state with the modified draft
+        setDrafts(
+          drafts.map((draft) =>
+            draft.id === editDraftId ? response.data : draft
+          )
+        );
+  
+        toast.success("Draft cart updated successfully!");
+      } else {
+        toast.error("No draft selected to update.");
+      }
+    } catch (error) {
+      toast.error("Error updating draft cart. Please try again.");
+      console.error(error);
+    }
+  };
+  
   
   const handleRemoveFromCart = (itemToRemove) => {
     setCart((prevCart) =>
       prevCart.filter((item) => item.product.id !== itemToRemove.product.id)
     );
+   
     toast.info(`${itemToRemove.product.name} removed from cart`);
   };
   const filteredDrafts = drafts.filter((draft) => {
