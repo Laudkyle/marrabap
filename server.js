@@ -10,11 +10,16 @@ const app = express();
 const port = 5000;
 
 // Ensure `uploads` directory exists
-const uploadsDir = path.join(__dirname, "uploads");
+const uploadsDir = path.join(__dirname,"public", "uploads","images");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
+// Ensure `uploads/documents` directory exists
+const documentsDir = path.join(__dirname,"public", "uploads", "documents");
+if (!fs.existsSync(documentsDir)) {
+  fs.mkdirSync(documentsDir);
+}
 // Open SQLite database
 const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
   if (err) {
@@ -47,6 +52,18 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Configure Multer for file uploads specifically for documents
+const documentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, documentsDir); // Save documents to the 'uploads/documents' folder
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename with extension
+  },
+});
+
+const documentUpload = multer({ storage: documentStorage });
+app.use("/uploads/documents", express.static(documentsDir));
 // ===================== Products Endpoints =====================
 
 // Get all products
@@ -132,7 +149,7 @@ app.post("/products/bulk", (req, res) => {
 app.put("/products/:id", upload.single("image"), (req, res) => {
   const { id } = req.params;
   const { name, cp, sp, stock } = req.body;
-  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
 
   const fields = [];
   const values = [];
@@ -794,6 +811,76 @@ app.patch("/suppliers/:id", (req, res) => {
     } else {
       res.json({ id, active_status });
     }
+  });
+});
+
+
+// ===================== Documents Endpoints =====================
+
+
+// CREATE: Add a new document
+app.post('/documents', documentUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+
+  const { transaction_type, reference_number } = req.body;
+  const filePath = `/uploads/documents/${req.file.filename}`; // Relative path to the uploaded document
+
+  // Insert document details into the database
+  const query = `INSERT INTO documents (transaction_type, reference_number, document_name, file_path) VALUES (?, ?, ?, ?)`;
+  db.run(query, [transaction_type, reference_number, req.file.originalname, filePath], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({
+      id: this.lastID,
+      transaction_type,
+      reference_number,
+      document_name: req.file.originalname,
+      file_path: filePath
+    });
+  });
+});
+// READ: Get all documents
+app.get('/documents', (req, res) => {
+  const query = `SELECT * FROM documents`;
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(200).json(rows);
+  });
+});
+
+// READ: Get a document by ID
+app.get('/documents/:id', (req, res) => {
+  const { id } = req.params;
+  const query = `SELECT * FROM documents WHERE id = ?`;
+  db.get(query, [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    res.status(200).json(row);
+  });
+});
+
+
+// DELETE: Delete a document by ID
+app.delete('/documents/:id', (req, res) => {
+  const { id } = req.params;
+  const query = `DELETE FROM documents WHERE id = ?`;
+  db.run(query, [id], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    res.status(200).json({ message: "Document deleted successfully" });
   });
 });
 // ===================== Customers Endpoints =====================

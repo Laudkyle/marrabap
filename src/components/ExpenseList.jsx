@@ -1,12 +1,11 @@
 import React from "react";
-import logo from "../images/logo.png";
 import { FaStar } from "react-icons/fa";
 function ExpenseList() {
   return (
     <div className="w-[50vw]">
       <div className="border w-full h-40 m-2 rounded-lg flex">
             <div className="min-w-40 h-full">
-            <img className="w-full h-full" src={logo} alt="" />
+            <img className="w-full h-full" src={"/images/logo.png"} alt="" />
             </div>
             <div className="flex-col mx-2 w-32 space-y-1 ">
 

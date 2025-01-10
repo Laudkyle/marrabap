@@ -29,6 +29,15 @@ db.serialize(() => {
     FOREIGN KEY (product_id) REFERENCES products(id),
     FOREIGN KEY (customer_id) REFERENCES customers(id)
 )`);
+db.run(`CREATE TABLE IF NOT EXISTS payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reference_number TEXT NOT NULL, -- Links payment to an invoice
+  payment_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Date and time of payment
+  amount_paid REAL NOT NULL CHECK(amount_paid > 0), -- Payment amount must be positive
+  payment_method TEXT, -- Optional (e.g., cash, credit card, etc.)
+  payment_reference TEXT -- Optional payment reference number
+)`);
+
 
   db.run(`CREATE TABLE IF NOT EXISTS returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

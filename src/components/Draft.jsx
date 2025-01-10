@@ -14,6 +14,9 @@ const Draft = () => {
   const [showCompleteSale, setShowCompleteSale] = useState(true);
   const [saleComplete, setSaleComplete] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const [documents, setDocuments] = useState([]); // State to handle documents
+  const [newDocument, setNewDocument] = useState(""); // State for new document input
+
   const { cart, setCart, clearCart, processSale } = useCart();
   useEffect(() => {
     fetchDrafts();
@@ -28,21 +31,54 @@ const Draft = () => {
       console.error("Error fetching drafts:", error);
     }
   };
-
   const handleSaveDraft = async () => {
     const draftDetails = cart.map((item) => ({
       product_id: item.product.id,
       quantity: item.quantity,
     }));
 
+    // Prepare draftPayload
     const draftPayload = {
       reference_number: refNum,
       details: draftDetails,
       date: new Date().toISOString(),
       status: "pending",
     };
-
     try {
+      // Upload documents if they are present
+      const uploadedDocuments = [];
+      for (const document of documents) {
+        const formData = new FormData();
+        formData.append("file", document);
+        formData.append("transaction_type", "sale"); // Assuming 'sale' as the transaction type
+        formData.append("reference_number", refNum);
+        console.log(formData)
+        // Send the document to the server
+        const response = await axios.post(
+          "http://localhost:5000/documents",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        uploadedDocuments.push({
+          document_name: document.name,
+          file_path: response.data.file_path, // Assuming the response returns the file path
+          transaction_type: "sale",
+          reference_number: refNum,
+        });
+      }
+      console.log('reached')
+
+      // Include the uploaded documents in the draftPayload
+      if (uploadedDocuments.length > 0) {
+        draftPayload.documents = uploadedDocuments;
+      }
+console.log(draftPayload)
+      // Save or update the draft
       if (editDraftId) {
         const response = await axios.put(
           `http://localhost:5000/drafts/${editDraftId}`,
@@ -62,7 +98,10 @@ const Draft = () => {
         setDrafts([...drafts, response.data]);
         toast.success("Draft saved successfully!");
       }
+
+      // Clear cart and documents after saving
       clearCart();
+      setDocuments([]);
       setShowInvoice(false);
     } catch (error) {
       toast.error("Error saving draft. Please try again.");
@@ -118,7 +157,7 @@ const Draft = () => {
       );
       const draft = response.data;
       setCart(draft);
-      console.log(cart)
+      console.log(cart);
       const referenceNumber = refNum; // Generate unique reference number
 
       // Process sale and check server response
@@ -319,6 +358,10 @@ const Draft = () => {
         handleRemoveFromCart={handleRemoveFromCart}
         handleSaveDraft={handleSaveDraft}
         handleAddNewItem={handleAddNewItem}
+        documents={documents}
+        setDocuments={setDocuments}
+        newDocument={newDocument}
+        setNewDocument={setDocuments}
       />
 
       <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">

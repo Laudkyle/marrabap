@@ -19,7 +19,6 @@ import {
   FaPeopleCarry,
   FaSave,
 } from 'react-icons/fa';
-import logo from '../images/logo.png';
 
 const Sidebar = ({ isExpanded,companyName }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -105,7 +104,7 @@ const Sidebar = ({ isExpanded,companyName }) => {
         }`}
       >
         <img
-          src={logo}
+          src={"/images/logo.png"}
           alt="Marrabap Ventures"
           className={`w-12 h-12 ${isExpanded ? 'mr-3' : 'mb-2'}`}
         />
