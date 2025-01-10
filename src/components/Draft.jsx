@@ -161,23 +161,44 @@ const Draft = () => {
   // Updated handleCompleteSale function
   const handleCompleteSaleDraft = async () => {
     try {
+      // Fetch draft details
       const response = await axios.get(
         `http://localhost:5000/drafts/${editDraftId}`
       );
       const draft = response.data;
-      const referenceNumber = draft.reference_number; // Generate unique reference number
-
-      // Process sale and check server response
+      const referenceNumber = draft.reference_number; // Extract reference number
+  
+      // Parse draft items
+      const draftItems = JSON.parse(draft.details);
+  
+      // Validate stock availability for each item
+      const stockCheckPromises = draftItems.map(async (item) => {
+        const productResponse = await axios.get(
+          `http://localhost:5000/products/${item.product_id}`
+        );
+        const product = productResponse.data;
+  
+        if (item.quantity > product.stock) {
+          throw new Error(
+            `Insufficient stock for product "${product.name}". Required: ${item.quantity}, Available: ${product.stock}`
+          );
+        }
+      });
+  
+      // Wait for all stock checks to complete
+      await Promise.all(stockCheckPromises);
+  
+      // Process the sale if all items pass the stock check
       const saleResponse = await processSale(referenceNumber);
       if (saleResponse.status !== 200 && saleResponse.status !== 201) {
         throw new Error(
           `Unexpected response status from sale process: ${saleResponse}`
         );
       }
-
-      // If sale was successful, proceed with updating draft
+  
+      // Update draft to mark as completed
       await handleCompleteSalePut(editDraftId);
-
+  
       // If everything went well
       setSaleComplete(!saleComplete); // Trigger product list refresh
       setShowInvoice(false); // Close the invoice modal
@@ -185,9 +206,12 @@ const Draft = () => {
       toast.success("Sale completed successfully!");
     } catch (error) {
       console.error("Error completing sale:", error);
-      toast.error("An error occurred while processing the sale.");
+      toast.error(
+        error.message || "An error occurred while processing the sale."
+      );
     }
   };
+  
 
   const handleEditDraft = async (draftId) => {
     setShowDraft(true);
