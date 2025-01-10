@@ -20,7 +20,7 @@ import {
   FaSave,
 } from 'react-icons/fa';
 
-const Sidebar = ({ isExpanded,companyName }) => {
+const Sidebar = ({ isExpanded, companyName }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
 
   const toggleDropdown = (dropdown) => {
@@ -122,7 +122,7 @@ const Sidebar = ({ isExpanded,companyName }) => {
             }`
           }
         >
-          <span className="text-xl w-5 h-5 flex items-center justify-center">
+          <span className="text-xl w-5 h-5 flex items-center justify-center" title="Dashboard">
             <FaTachometerAlt />
           </span>
           <span
@@ -143,7 +143,9 @@ const Sidebar = ({ isExpanded,companyName }) => {
               className="flex items-center w-full px-4 py-3 hover:bg-gray-700 justify-between"
             >
               <div className="flex items-center">
-                <span className="text-xl w-5 h-5 flex items-center justify-center">{icon}</span>
+                <span className="text-xl w-5 h-5 flex items-center justify-center" title={name}>
+                  {icon}
+                </span>
                 <span
                   className={`ml-3 transition-all duration-300 ${
                     isExpanded ? 'block' : 'hidden'
@@ -174,7 +176,10 @@ const Sidebar = ({ isExpanded,companyName }) => {
                     className={dropdownItemClass}
                     key={path}
                   >
-                    <span className="w-5 h-5 flex items-center justify-center mr-3">
+                    <span
+                      className="w-5 h-5 flex items-center justify-center mr-3"
+                      title={label}
+                    >
                       {icon}
                     </span>
                     {isExpanded && label}

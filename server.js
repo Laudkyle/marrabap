@@ -36,9 +36,15 @@ app.use(
     origin: "http://localhost:3000",
   })
 );
-
+app.use((req, res, next) => {
+  res.setTimeout(60000, () => { // Set timeout to 60 seconds
+    res.status(408).send('Request timeout');
+  });
+  next();
+});
 // Serve static files from the `uploads` directory
 app.use("/uploads", express.static(uploadsDir));
+app.use("/uploads/documents", express.static(documentsDir));
 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
@@ -63,7 +69,9 @@ const documentStorage = multer.diskStorage({
 });
 
 const documentUpload = multer({ storage: documentStorage });
-app.use("/uploads/documents", express.static(documentsDir));
+
+
+
 // ===================== Products Endpoints =====================
 
 // Get all products
@@ -817,31 +825,43 @@ app.patch("/suppliers/:id", (req, res) => {
 
 // ===================== Documents Endpoints =====================
 
-
-// CREATE: Add a new document
-app.post('/documents', documentUpload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
+// CREATE: Add multiple or single documents
+app.post('/documents', documentUpload.array('files'), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: 'No files uploaded' });
   }
 
   const { transaction_type, reference_number } = req.body;
-  const filePath = `/uploads/documents/${req.file.filename}`; // Relative path to the uploaded document
+  const uploadedDocuments = [];
 
-  // Insert document details into the database
-  const query = `INSERT INTO documents (transaction_type, reference_number, document_name, file_path) VALUES (?, ?, ?, ?)`;
-  db.run(query, [transaction_type, reference_number, req.file.originalname, filePath], function (err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(201).json({
-      id: this.lastID,
-      transaction_type,
-      reference_number,
-      document_name: req.file.originalname,
-      file_path: filePath
-    });
-  });
+  try {
+    await Promise.all(
+      req.files.map((file) => {
+        return new Promise((resolve, reject) => {
+          const filePath = `/uploads/documents/${file.filename}`;
+          const query = `INSERT INTO documents (transaction_type, reference_number, document_name, file_path) VALUES (?, ?, ?, ?)`;
+          db.run(query, [transaction_type, reference_number, file.originalname, filePath], function (err) {
+            if (err) return reject(err);
+            uploadedDocuments.push({
+              id: this.lastID,
+              transaction_type,
+              reference_number,
+              document_name: file.originalname,
+              file_path: filePath,
+            });
+            resolve();
+          });
+        });
+      })
+    );
+
+    return res.status(201).json(uploadedDocuments);
+  } catch (error) {
+    console.error("Error during document upload:", error.message);
+    return res.status(500).json({ message: 'Error during document upload' });
+  }
 });
+
 // READ: Get all documents
 app.get('/documents', (req, res) => {
   const query = `SELECT * FROM documents`;
@@ -883,6 +903,19 @@ app.delete('/documents/:id', (req, res) => {
     res.status(200).json({ message: "Document deleted successfully" });
   });
 });
+
+app.get('/documents/by-reference/:referenceNumber', (req, res) => {
+  const { referenceNumber } = req.params;
+  const query = `SELECT * FROM documents WHERE reference_number = ?`;
+  
+  db.all(query, [referenceNumber], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(200).json(rows);
+  });
+});
+
 // ===================== Customers Endpoints =====================
 
 // Get all customers

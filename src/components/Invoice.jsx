@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import printInvoice from "./PrintInvoice";
 import { useCart } from "../CartContext";
-import { FaTrash } from "react-icons/fa";
+import { FaEye, FaTrash } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 
 function Invoice({
@@ -20,8 +20,6 @@ function Invoice({
   phone,
   documents,
   setDocuments,
-  newDocument,
-  setNewDocument,
 }) {
   const { cart } = useCart();
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -49,10 +47,37 @@ function Invoice({
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
-
-  const removeDocument = (index) => {
+  const removeDocument = async (index, documentId) => {
+    // Remove the document from the UI first
     const updatedDocuments = documents.filter((_, i) => i !== index);
     setDocuments(updatedDocuments);
+
+    // If the document has an ID, attempt to remove it from the database
+    if (documentId) {
+      try {
+        const response = await axios.delete(
+          `http://localhost:5000/documents/${documentId}`
+        );
+        toast.success(response.data.message, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        toast.error("Failed to delete document. Please try again.", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
+    }
   };
 
   return (
@@ -226,44 +251,103 @@ function Invoice({
                     </span>
                   </div>
                 </div>
-                <div className="mt-6">
-                  <h2 className="text-lg font-semibold text-blue-600 mb-4">
-                    Documents
-                  </h2>
-                  <div>
-                    <input
-                      type="file"
-                      onChange={(e) => {
-                        const selectedFiles = e.target.files;
-                        if (selectedFiles) {
-                          setDocuments([
-                            ...documents,
-                            ...Array.from(selectedFiles),
-                          ]);
-                        }
-                      }}
-                      className="p-2 border rounded w-full mb-2"
-                      multiple // Allow selecting multiple files at once
-                    />
-                  </div>
+                {showDraft && (
+                  <div className="mt-6">
+                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                      Documents
+                    </h2>
+                    <div>
+                      <input
+                        type="file"
+                        onChange={(e) => {
+                          const selectedFiles = e.target.files;
+                          const maxFileSize = 4 * 1024 * 1024; // 4MB in bytes
 
-                  <ul className="mt-4 space-y-2">
-                    {documents.map((doc, index) => (
-                      <li
-                        key={index}
-                        className="flex justify-between items-center border p-2 rounded"
-                      >
-                        <span>{doc.name}</span> {/* Display the file name */}
-                        <button
-                          onClick={() => removeDocument(index)}
-                          className="text-red-500 hover:underline"
+                          if (selectedFiles) {
+                            const validFiles = [];
+                            const rejectedFiles = [];
+
+                            Array.from(selectedFiles).forEach((file) => {
+                              if (file.size <= maxFileSize) {
+                                validFiles.push(file);
+                              } else {
+                                rejectedFiles.push(file.name);
+                              }
+                            });
+
+                            // Update state with valid files
+                            setDocuments([...documents, ...validFiles]);
+
+                            // Toast notification for rejected files
+                            if (rejectedFiles.length > 0) {
+                              toast.error(
+                                `The following files exceed the 4MB limit and were not added: ${rejectedFiles.join(
+                                  ", "
+                                )}`,
+                                {
+                                  position: "top-right",
+                                  autoClose: 5000,
+                                  hideProgressBar: false,
+                                  closeOnClick: true,
+                                  pauseOnHover: true,
+                                  draggable: true,
+                                }
+                              );
+                            }
+                          }
+                        }}
+                        className="p-2 border rounded w-full mb-2"
+                        multiple // Allow selecting multiple files at once
+                      />
+                    </div>
+
+                    <ul className="mt-4 space-y-2">
+                      {documents.map((doc, index) => (
+                        <li
+                          key={index}
+                          className="flex justify-between items-center border p-2 rounded"
                         >
-                          <FaTrash />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                          <span>{doc.name || doc.document_name}</span>{" "}
+                          <button
+                            onClick={() => removeDocument(index, doc.id)} // Pass the document's ID to the function
+                            className="text-red-500 hover:underline"
+                          >
+                            <FaTrash />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {!showDraft && (
+                  <div className="mt-6">
+                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                      Documents
+                    </h2>
+                    {documents.length > 0 ? (
+                      <ul className="mt-4 space-y-2">
+                        {documents.map((doc) => (
+                          <li
+                            key={doc.id}
+                            className="flex justify-between items-center border p-2 rounded"
+                          >
+                            <span>{doc.document_name}</span>
+                            <a
+                              href={doc.file_path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline"
+                            >
+                              <FaEye />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500">No documents attached.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
