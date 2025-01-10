@@ -159,15 +159,13 @@ const Draft = () => {
   };
 
   // Updated handleCompleteSale function
-  const handleCompleteSale = async (draftId) => {
+  const handleCompleteSaleDraft = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/drafts/${draftId}`
+        `http://localhost:5000/drafts/${editDraftId}`
       );
       const draft = response.data;
-      setCart(draft);
-      console.log(cart);
-      const referenceNumber = refNum; // Generate unique reference number
+      const referenceNumber = draft.reference_number; // Generate unique reference number
 
       // Process sale and check server response
       const saleResponse = await processSale(referenceNumber);
@@ -178,7 +176,7 @@ const Draft = () => {
       }
 
       // If sale was successful, proceed with updating draft
-      await handleCompleteSalePut(draftId);
+      await handleCompleteSalePut(editDraftId);
 
       // If everything went well
       setSaleComplete(!saleComplete); // Trigger product list refresh
@@ -195,6 +193,7 @@ const Draft = () => {
     setShowDraft(true);
     setShowCompleteSale(true);
     setEditDraftId(draftId);
+    console.log("draft di:",draftId)
   
     try {
       // Fetch draft details
@@ -218,6 +217,7 @@ const Draft = () => {
           };
         })
       );
+      console.log("this is draft items :",draftItems)
       setCart(draftItems);
   
       // Fetch documents
@@ -230,6 +230,8 @@ const Draft = () => {
     } catch (error) {
       console.error("Error fetching draft details:", error);
     }
+    console.log("this is cart after:",cart)
+
   };
   
   const handleViewDraft = async (draftId) => {
@@ -343,13 +345,7 @@ const Draft = () => {
               >
                 <FaTrashAlt />
               </button>
-              <button
-                onClick={() => handleCompleteSale(row.id)}
-                className="text-green-600 hover:bg-green-100 p-2 rounded"
-                title="Complete Sale"
-              >
-                <FaMoneyBillWave />
-              </button>
+           
             </>
           )}
         </div>
@@ -371,7 +367,7 @@ const Draft = () => {
         showDraft={showDraft}
         showCompleteSale={showCompleteSale}
         editDraftId={editDraftId}
-        handleCompleteSale={handleCompleteSale}
+        handleCompleteSale={handleCompleteSaleDraft}
         handleQuantityChangeNew={handleQuantityChangeNew}
         handleRemoveFromCart={handleRemoveFromCart}
         handleSaveDraft={handleSaveDraft}
