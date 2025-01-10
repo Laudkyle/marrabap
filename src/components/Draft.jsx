@@ -154,13 +154,53 @@ const Draft = () => {
   };
   
   
-  const handleRemoveFromCart = (itemToRemove) => {
+  const handleRemoveFromCart = async (itemToRemove) => {
+    // Update the cart locally
     setCart((prevCart) =>
       prevCart.filter((item) => item.product.id !== itemToRemove.product.id)
     );
-   
+  
     toast.info(`${itemToRemove.product.name} removed from cart`);
+  
+    try {
+      // Prepare updated cart details
+      const updatedCartDetails = cart
+        .filter((item) => item.product.id !== itemToRemove.product.id) // Exclude the removed item
+        .map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+        }));
+  
+      // Prepare the payload for updating the draft
+      const updatedDraftPayload = {
+        reference_number: refNum,
+        details: updatedCartDetails,
+      };
+  
+      // Sync the updated cart with the backend draft
+      if (editDraftId) {
+        const response = await axios.put(
+          `http://localhost:5000/drafts/${editDraftId}`,
+          updatedDraftPayload
+        );
+  
+        // Update drafts state with the modified draft
+        setDrafts(
+          drafts.map((draft) =>
+            draft.id === editDraftId ? response.data : draft
+          )
+        );
+  
+        console.log("Draft cart updated successfully!");
+      } else {
+        console.error("No draft selected to update.");
+      }
+    } catch (error) {
+      toast.error("Error updating draft cart. Please try again.");
+      console.error("Error syncing cart with draft:", error);
+    }
   };
+  
   const filteredDrafts = drafts.filter((draft) => {
     const referenceNumber = draft.reference_number || ""; // Handle undefined reference_number
     const status = draft.status || ""; // Handle undefined status
