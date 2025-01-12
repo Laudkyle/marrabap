@@ -376,7 +376,7 @@ const Customer = () => {
       </div>
 
       {isFormVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
               Add New Customer

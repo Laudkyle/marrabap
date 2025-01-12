@@ -31,20 +31,37 @@ const Draft = () => {
     }
   };
   const handleSaveDraft = async () => {
-    const draftDetails = cart.map((item) => ({
-      product_id: item.product.id,
-      quantity: item.quantity,
-    }));
-
-    // Prepare draftPayload
-    const draftPayload = {
-      reference_number: refNum,
-      details: draftDetails,
-      date: new Date().toISOString(),
-      status: "pending",
-    };
-
     try {
+      const draftDetails = cart.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      }));
+
+      // Prepare draftPayload
+      const draftPayload = {
+        reference_number: refNum,
+        details: draftDetails,
+        date: new Date().toISOString(),
+        status: "pending",
+      };
+
+      // Validate stock availability for each item
+      const stockCheckPromises = draftDetails.map(async (item) => {
+        const productResponse = await axios.get(
+          `http://localhost:5000/products/${item.product_id}`
+        );
+        const product = productResponse.data;
+
+        if (item.quantity > product.stock) {
+          throw new Error(
+            `Insufficient stock for product "${product.name}". Required: ${item.quantity}, Available: ${product.stock}`
+          );
+        }
+      });
+
+      // Wait for all stock checks to complete
+      await Promise.all(stockCheckPromises);
+
       // Separate new documents from existing ones
       const newDocuments = documents.filter((doc) => !doc.id); // Documents without `id` are new
       const uploadedDocuments = [];
@@ -115,42 +132,65 @@ const Draft = () => {
       setDocuments([]);
       setShowInvoice(false);
     } catch (error) {
-      toast.error("Error saving draft. Please try again.");
+      toast.error(error.message);
       console.error(error);
     }
   };
   const handleSaleDraft = async () => {
-    const draftDetails = cart.map((item) => ({
-      product_id: item.product.id,
-      quantity: item.quantity,
-    }));
+    try {
+      const draftDetails = cart.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      }));
 
-    // Prepare draftPayload
-    const draftPayload = {
-      reference_number: refNum,
-      details: draftDetails,
-      date: new Date().toISOString(),
-      status: "pending",
-    };
+      // Prepare draftPayload
+      const draftPayload = {
+        reference_number: refNum,
+        details: draftDetails,
+        date: new Date().toISOString(),
+        status: "pending",
+      };
+      // Validate stock availability for each item
+      const stockCheckPromises = draftDetails.map(async (item) => {
+        const productResponse = await axios.get(
+          `http://localhost:5000/products/${item.product_id}`
+        );
+        const product = productResponse.data;
 
-    // Save or update the draft
-    if (editDraftId) {
-      const response = await axios.put(
-        `http://localhost:5000/drafts/${editDraftId}`,
-        draftPayload
-      );
-      setDrafts(
-        drafts.map((draft) =>
-          draft.id === editDraftId ? response.data : draft
-        )
-      );
-    } else {
-      const response = await axios.post(
-        "http://localhost:5000/drafts",
-        draftPayload
-      );
-      setDrafts([...drafts, response.data]);
-      toast.success("Draft saved successfully!");
+        if (item.quantity > product.stock) {
+          throw new Error(
+            `Insufficient stock for product "${product.name}". Required: ${item.quantity}, Available: ${product.stock}`
+          );
+        }
+      });
+
+      // Wait for all stock checks to complete
+      await Promise.all(stockCheckPromises);
+      // Save or update the draft
+      if (editDraftId) {
+        const response = await axios.put(
+          `http://localhost:5000/drafts/${editDraftId}`,
+          draftPayload
+        );
+        setDrafts(
+          drafts.map((draft) =>
+            draft.id === editDraftId ? response.data : draft
+          )
+        );
+        setShowInvoice(false);
+        setShowProcessSaleModal(true);
+      } else {
+        const response = await axios.post(
+          "http://localhost:5000/drafts",
+          draftPayload
+        );
+        setDrafts([...drafts, response.data]);
+        toast.success("Draft saved successfully!");
+        setShowInvoice(false);
+        setShowProcessSaleModal(true);
+      }
+    } catch (error) {
+      toast.error(error.message);
     }
   };
 
@@ -526,7 +566,6 @@ const Draft = () => {
         setNewDocument={setDocuments}
         setShowProcessSaleModal={setShowProcessSaleModal}
         handleSaleDraft={handleSaleDraft}
-
       />
       <ProcessSaleModal
         refNum={refNum}

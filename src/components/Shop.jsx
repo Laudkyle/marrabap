@@ -7,17 +7,18 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import Invoice from "./Invoice";
 import "react-toastify/dist/ReactToastify.css";
-import printInvoice from "./PrintInvoice";
+
 function Shop({ companyName, companyAddress, email, phone }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-    const [showDraft, setShowDraft] = useState(true);
-  
+  const [showDraft, setShowDraft] = useState(true);
+  const [showProcessSaleModal, setShowProcessSaleModal] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
-    const [showCompleteSale, setShowCompleteSale] = useState(true);
-  
+  const [showCompleteSale, setShowCompleteSale] = useState(true);
+
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
@@ -72,7 +73,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       toast.success(`${selectedProduct.name} added to cart`);
     }
   };
-const handleAddNewItem = (product, quantity) => {
+  const handleAddNewItem = (product, quantity) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find(
         (item) => item.product.id === product.id
@@ -90,8 +91,8 @@ const handleAddNewItem = (product, quantity) => {
     });
     toast.success(`${product.name} added to cart`);
   };
-    const [editDraftId, setEditDraftId] = useState(null);
-  
+  const [editDraftId, setEditDraftId] = useState(null);
+
   const calculateTotal = () =>
     cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
