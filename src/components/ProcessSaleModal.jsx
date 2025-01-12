@@ -9,7 +9,6 @@ function ProcessSaleModal({
   showDraft,
   setShowProcessSaleModal,
   handleQuantityChangeNew,
-  handleSaveDraft,
   companyAddress,
   companyName,
   refNum,
@@ -23,7 +22,7 @@ function ProcessSaleModal({
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(1);
   // Fetch customers from the database
   const fetchCustomers = async () => {
     try {
@@ -133,7 +132,7 @@ function ProcessSaleModal({
                     Select Customer:
                   </label>
                   <select
-                    value={selectedCustomer?.id || ""}
+                    value={selectedCustomer?.id || "1"}
                     onChange={(e) =>
                       setSelectedCustomer(
                         customers.find((c) => c.id === parseInt(e.target.value))
@@ -341,7 +340,10 @@ function ProcessSaleModal({
                 Close
               </button>
                 <button
-                  onClick={handleCompleteSale}
+                  onClick={()=>{
+                    
+                    handleCompleteSale(selectedCustomer.id|| 1)
+                  }}
                   className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
                   Complete Sale

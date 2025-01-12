@@ -46,14 +46,15 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem("cart");
   };
 
-  const processSale = async (referenceNumber) => {
+  const processSale = async (referenceNumber,customer_id) => {
     try {
       const salesData = cart.map((item) => ({
         product_id: item.product.id,
         quantity: item.quantity,
         reference_number: referenceNumber,
+        customer_id:customer_id
       }));
-  
+  console.log("this is sales data:", salesData)
       // Sending the request
       const response = await fetch("http://localhost:5000/sales", {
         method: "POST",

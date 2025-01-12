@@ -347,7 +347,7 @@ app.post("/sales", async (req, res) => {
         let errorOccurred = false;
         const saleResponses = [];
 
-        const processSalePromises = salesData.map(({ product_id, quantity, reference_number }) => {
+        const processSalePromises = salesData.map(({ product_id, quantity, reference_number,customer_id }) => {
           return new Promise((resolveSale, rejectSale) => {
             db.get("SELECT * FROM products WHERE id = ?", [product_id], (err, product) => {
               if (err || !product) {
@@ -365,15 +365,15 @@ app.post("/sales", async (req, res) => {
               const total_price = product.sp * quantity;
 
               db.run(
-                "INSERT INTO sales (product_id, reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?)",
-                [product_id, reference_number, quantity, total_price, new Date().toISOString()],
+                "INSERT INTO sales (customer_id,product_id, reference_number, quantity, total_price, date) VALUES (?,?, ?, ?, ?, ?)",
+                [customer_id,product_id, reference_number, quantity, total_price, new Date().toISOString()],
                 (err) => {
                   if (err) {
                     errorOccurred = true;
                     console.error(err.message);
                     return rejectSale("Error inserting sale");
                   }
-                  resolveSale({ product_id, quantity, total_price });
+                  resolveSale({customer_id, product_id, quantity, total_price });
                 }
               );
 
@@ -391,7 +391,6 @@ app.post("/sales", async (req, res) => {
             });
           });
         });
-
         // Wait for all sales to be processed
         Promise.allSettled(processSalePromises)
           .then((results) => {
