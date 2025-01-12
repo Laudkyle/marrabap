@@ -4,12 +4,14 @@ import { FaEye, FaEdit, FaTrashAlt, FaMoneyBillWave } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import { toast, ToastContainer } from "react-toastify";
 import Invoice from "./Invoice";
+import ProcessSaleModal from "./ProcessSaleModal";
 import DataTable from "react-data-table-component";
 const Draft = () => {
   const [drafts, setDrafts] = useState([]);
   const [refNum, setRefNum] = useState("");
   const [editDraftId, setEditDraftId] = useState(null);
   const [showInvoice, setShowInvoice] = useState(null);
+  const [showProcessSaleModal, setShowProcessSaleModal] = useState(null);
   const [showDraft, setShowDraft] = useState(true);
   const [showCompleteSale, setShowCompleteSale] = useState(true);
   const [saleComplete, setSaleComplete] = useState(false);
@@ -33,7 +35,7 @@ const Draft = () => {
       product_id: item.product.id,
       quantity: item.quantity,
     }));
-  
+
     // Prepare draftPayload
     const draftPayload = {
       reference_number: refNum,
@@ -41,12 +43,12 @@ const Draft = () => {
       date: new Date().toISOString(),
       status: "pending",
     };
-  
+
     try {
       // Separate new documents from existing ones
       const newDocuments = documents.filter((doc) => !doc.id); // Documents without `id` are new
       const uploadedDocuments = [];
-  
+
       // Upload new documents if they exist
       if (newDocuments.length > 0) {
         const formData = new FormData();
@@ -55,7 +57,7 @@ const Draft = () => {
         });
         formData.append("transaction_type", "sale");
         formData.append("reference_number", refNum);
-  
+
         const response = await axios.post(
           "http://localhost:5000/documents",
           formData,
@@ -64,13 +66,13 @@ const Draft = () => {
             timeout: 120000,
           }
         );
-  
+
         if (!response || !response.data || response.data.length === 0) {
           throw new Error(
             "Document upload failed or returned an empty response."
           );
         }
-  
+
         response.data.forEach((doc) => {
           uploadedDocuments.push({
             document_name: doc.document_name,
@@ -80,13 +82,13 @@ const Draft = () => {
           });
         });
       }
-  
+
       // Include the uploaded documents and existing documents in the draftPayload
       draftPayload.documents = [
         ...documents.filter((doc) => doc.id), // Existing documents
         ...uploadedDocuments, // Newly uploaded documents
       ];
-  
+
       // Save or update the draft
       if (editDraftId) {
         const response = await axios.put(
@@ -107,7 +109,7 @@ const Draft = () => {
         setDrafts([...drafts, response.data]);
         toast.success("Draft saved successfully!");
       }
-  
+
       // Clear cart and documents after saving
       clearCart();
       setDocuments([]);
@@ -117,17 +119,49 @@ const Draft = () => {
       console.error(error);
     }
   };
+  const handleSaleDraft = async () => {
+    const draftDetails = cart.map((item) => ({
+      product_id: item.product.id,
+      quantity: item.quantity,
+    }));
 
-  
-  
+    // Prepare draftPayload
+    const draftPayload = {
+      reference_number: refNum,
+      details: draftDetails,
+      date: new Date().toISOString(),
+      status: "pending",
+    };
+
+    // Save or update the draft
+    if (editDraftId) {
+      const response = await axios.put(
+        `http://localhost:5000/drafts/${editDraftId}`,
+        draftPayload
+      );
+      setDrafts(
+        drafts.map((draft) =>
+          draft.id === editDraftId ? response.data : draft
+        )
+      );
+    } else {
+      const response = await axios.post(
+        "http://localhost:5000/drafts",
+        draftPayload
+      );
+      setDrafts([...drafts, response.data]);
+      toast.success("Draft saved successfully!");
+    }
+  };
+
   const handleRemoveFromCart = async (itemToRemove) => {
     // Update the cart locally
     setCart((prevCart) =>
       prevCart.filter((item) => item.product.id !== itemToRemove.product.id)
     );
-  
+
     toast.info(`${itemToRemove.product.name} removed from cart`);
-  
+
     try {
       // Prepare updated cart details
       const updatedCartDetails = cart
@@ -136,27 +170,27 @@ const Draft = () => {
           product_id: item.product.id,
           quantity: item.quantity,
         }));
-  
+
       // Prepare the payload for updating the draft
       const updatedDraftPayload = {
         reference_number: refNum,
         details: updatedCartDetails,
       };
-  
+
       // Sync the updated cart with the backend draft
       if (editDraftId) {
         const response = await axios.put(
           `http://localhost:5000/drafts/${editDraftId}`,
           updatedDraftPayload
         );
-  
+
         // Update drafts state with the modified draft
         setDrafts(
           drafts.map((draft) =>
             draft.id === editDraftId ? response.data : draft
           )
         );
-  
+
         console.log("Draft cart updated successfully!");
       } else {
         console.error("No draft selected to update.");
@@ -166,7 +200,7 @@ const Draft = () => {
       console.error("Error syncing cart with draft:", error);
     }
   };
-  
+
   const filteredDrafts = drafts.filter((draft) => {
     const referenceNumber = draft.reference_number || ""; // Handle undefined reference_number
     const status = draft.status || ""; // Handle undefined status
@@ -210,27 +244,27 @@ const Draft = () => {
       );
       const draft = response.data;
       const referenceNumber = draft.reference_number; // Extract reference number
-  
+
       // Parse draft items
       const draftItems = JSON.parse(draft.details);
-  
+
       // Validate stock availability for each item
       const stockCheckPromises = draftItems.map(async (item) => {
         const productResponse = await axios.get(
           `http://localhost:5000/products/${item.product_id}`
         );
         const product = productResponse.data;
-  
+
         if (item.quantity > product.stock) {
           throw new Error(
             `Insufficient stock for product "${product.name}". Required: ${item.quantity}, Available: ${product.stock}`
           );
         }
       });
-  
+
       // Wait for all stock checks to complete
       await Promise.all(stockCheckPromises);
-  
+
       // Process the sale if all items pass the stock check
       const saleResponse = await processSale(referenceNumber);
       if (saleResponse.status !== 200 && saleResponse.status !== 201) {
@@ -238,13 +272,13 @@ const Draft = () => {
           `Unexpected response status from sale process: ${saleResponse}`
         );
       }
-  
+
       // Update draft to mark as completed
       await handleCompleteSalePut(editDraftId);
-  
+
       // If everything went well
       setSaleComplete(!saleComplete); // Trigger product list refresh
-      setShowInvoice(false); // Close the invoice modal
+      setShowProcessSaleModal(false); // Close the invoice modal
       clearCart();
       toast.success("Sale completed successfully!");
     } catch (error) {
@@ -254,23 +288,24 @@ const Draft = () => {
       );
     }
   };
-  
 
   const handleEditDraft = async (draftId) => {
     setShowDraft(true);
     setShowCompleteSale(true);
     setEditDraftId(draftId);
-    console.log("draft di:",draftId)
-  
+    console.log("draft di:", draftId);
+
     try {
       // Fetch draft details
-      const response = await axios.get(`http://localhost:5000/drafts/${draftId}`);
+      const response = await axios.get(
+        `http://localhost:5000/drafts/${draftId}`
+      );
       const draft = response.data;
-  
+
       // Populate draft details
       setShowInvoice(true);
       setRefNum(draft.reference_number);
-  
+
       // Fetch product details and populate the cart
       const draftItems = await Promise.all(
         JSON.parse(draft.details).map(async (item) => {
@@ -284,62 +319,102 @@ const Draft = () => {
           };
         })
       );
-      console.log("this is draft items :",draftItems)
+      console.log("this is draft items :", draftItems);
       setCart(draftItems);
-  
-      // Fetch documents
-      const documentsResponse = await axios.get(
-        `http://localhost:5000/documents/by-reference/${draft.reference_number}`
-      );
-      setDocuments(documentsResponse.data); 
-      console.log("documents : ", documents)
 
-    } catch (error) {
-      console.error("Error fetching draft details:", error);
-    }
-    console.log("this is cart after:",cart)
-
-  };
-  
-  const handleViewDraft = async (draftId) => {
-    setEditDraftId(draftId);
-  
-    try {
-      // Fetch draft details
-      const response = await axios.get(`http://localhost:5000/drafts/${draftId}`);
-      const draft = response.data;
-  
-      // Populate draft details
-      setShowInvoice(true);
-      setRefNum(draft.reference_number);
-      setShowDraft(false);
-  
-      // Fetch product details and populate the cart
-      const draftItems = await Promise.all(
-        JSON.parse(draft.details).map(async (item) => {
-          const productResponse = await axios.get(
-            `http://localhost:5000/products/${item.product_id}`
-          );
-          const product = productResponse.data;
-          return {
-            product,
-            quantity: item.quantity,
-          };
-        })
-      );
-      setCart(draftItems);
-  
       // Fetch documents
       const documentsResponse = await axios.get(
         `http://localhost:5000/documents/by-reference/${draft.reference_number}`
       );
       setDocuments(documentsResponse.data);
-      console.log("documents : ", documents)
+      console.log("documents : ", documents);
+    } catch (error) {
+      console.error("Error fetching draft details:", error);
+    }
+    console.log("this is cart after:", cart);
+  };
+
+  const handleViewDraft = async (draftId) => {
+    setEditDraftId(draftId);
+
+    try {
+      // Fetch draft details
+      const response = await axios.get(
+        `http://localhost:5000/drafts/${draftId}`
+      );
+      const draft = response.data;
+
+      // Populate draft details
+      setShowInvoice(true);
+      setRefNum(draft.reference_number);
+      setShowDraft(false);
+
+      // Fetch product details and populate the cart
+      const draftItems = await Promise.all(
+        JSON.parse(draft.details).map(async (item) => {
+          const productResponse = await axios.get(
+            `http://localhost:5000/products/${item.product_id}`
+          );
+          const product = productResponse.data;
+          return {
+            product,
+            quantity: item.quantity,
+          };
+        })
+      );
+      setCart(draftItems);
+
+      // Fetch documents
+      const documentsResponse = await axios.get(
+        `http://localhost:5000/documents/by-reference/${draft.reference_number}`
+      );
+      setDocuments(documentsResponse.data);
+      console.log("documents : ", documents);
     } catch (error) {
       console.error("Error fetching draft details:", error);
     }
   };
-  
+  const handleDraft = async (draftId) => {
+    setEditDraftId(draftId);
+
+    try {
+      // Fetch draft details
+      const response = await axios.get(
+        `http://localhost:5000/drafts/${draftId}`
+      );
+      const draft = response.data;
+
+      // Populate draft details
+      setShowProcessSaleModal(true);
+      setRefNum(draft.reference_number);
+      setShowDraft(false);
+
+      // Fetch product details and populate the cart
+      const draftItems = await Promise.all(
+        JSON.parse(draft.details).map(async (item) => {
+          const productResponse = await axios.get(
+            `http://localhost:5000/products/${item.product_id}`
+          );
+          const product = productResponse.data;
+          return {
+            product,
+            quantity: item.quantity,
+          };
+        })
+      );
+      setCart(draftItems);
+
+      // Fetch documents
+      const documentsResponse = await axios.get(
+        `http://localhost:5000/documents/by-reference/${draft.reference_number}`
+      );
+      setDocuments(documentsResponse.data);
+      console.log("documents : ", documents);
+    } catch (error) {
+      console.error("Error fetching draft details:", error);
+    }
+  };
+
   const handleAddNewItem = (product, quantity) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find(
@@ -412,7 +487,13 @@ const Draft = () => {
               >
                 <FaTrashAlt />
               </button>
-           
+              <button
+                onClick={() => handleDraft(row.id)}
+                className="text-green-600 hover:bg-red-100 p-2 rounded"
+                title="Delete Draft"
+              >
+                <FaMoneyBillWave />
+              </button>
             </>
           )}
         </div>
@@ -431,6 +512,26 @@ const Draft = () => {
         refNum={refNum}
         showInvoice={showInvoice}
         setShowInvoice={setShowInvoice}
+        showDraft={showDraft}
+        showCompleteSale={showCompleteSale}
+        editDraftId={editDraftId}
+        handleCompleteSale={handleCompleteSaleDraft}
+        handleQuantityChangeNew={handleQuantityChangeNew}
+        handleRemoveFromCart={handleRemoveFromCart}
+        handleSaveDraft={handleSaveDraft}
+        handleAddNewItem={handleAddNewItem}
+        documents={documents}
+        setDocuments={setDocuments}
+        newDocument={newDocument}
+        setNewDocument={setDocuments}
+        setShowProcessSaleModal={setShowProcessSaleModal}
+        handleSaleDraft={handleSaleDraft}
+
+      />
+      <ProcessSaleModal
+        refNum={refNum}
+        showProcessSaleModal={showProcessSaleModal}
+        setShowProcessSaleModal={setShowProcessSaleModal}
         showDraft={showDraft}
         showCompleteSale={showCompleteSale}
         editDraftId={editDraftId}

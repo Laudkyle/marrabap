@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useCart } from "../CartContext";
+import { FaEye, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 function ProcessSaleModal({
-  showModal,
-  setShowModal,
+  showProcessSaleModal,
+  showDraft,
+  setShowProcessSaleModal,
+  handleQuantityChangeNew,
+  handleSaveDraft,
+  companyAddress,
+  companyName,
   refNum,
-  handleProcessSale,
+  email,
+  phone,
+  documents,
+  setDocuments,
+  handleCompleteSale,
 }) {
+
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(false);
-
   // Fetch customers from the database
   const fetchCustomers = async () => {
     try {
@@ -26,139 +37,320 @@ function ProcessSaleModal({
   };
 
   useEffect(() => {
-    if (showModal) {
-      fetchCustomers();
-    }
-  }, [showModal]);
-
-  // Handle file uploads
-  const handleFileUpload = (event) => {
-    const files = Array.from(event.target.files);
-    if (documents.length + files.length > 3) {
-      toast.error("You can attach up to 3 documents only.");
-    } else {
-      setDocuments([...documents, ...files]);
-    }
-  };
-
-  const handleRemoveDocument = (index) => {
-    const updatedDocuments = [...documents];
-    updatedDocuments.splice(index, 1);
-    setDocuments(updatedDocuments);
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedCustomer) {
-      toast.error("Please select a customer.");
-      return;
-    }
-
-    if (documents.length > 3) {
-      toast.error("You can attach up to 3 documents only.");
-      return;
-    }
-
-    setLoading(true);
+    fetchCustomers();
+  }, []);
+  const { cart } = useCart();
+  const fetchProducts = async () => {
     try {
-      const formData = new FormData();
-      formData.append("refNum", refNum);
-      formData.append("customerId", selectedCustomer.id);
-      documents.forEach((file, index) => {
-        formData.append(`document${index + 1}`, file);
+      const response = await axios.get("http://localhost:5000/products", {
+        timeout: 5000,
       });
-
-      // Make the API call to process the sale
-      await axios.post("http://localhost:5000/process-sale", formData);
-      toast.success("Sale processed successfully!");
-      setShowModal(false);
-      handleProcessSale(); // Call callback to update the parent state if needed
-    } catch (error) {
-      toast.error("Failed to process the sale. Please try again.");
-    } finally {
+      setProducts(response.data);
       setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      toast.error("Failed to fetch products. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const calculateTotal = () =>
+    cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
+
+  const removeDocument = async (index, documentId) => {
+    // Remove the document from the UI first
+    const updatedDocuments = documents.filter((_, i) => i !== index);
+    setDocuments(updatedDocuments);
+
+    // If the document has an ID, attempt to remove it from the database
+    if (documentId) {
+      try {
+        const response = await axios.delete(
+          `http://localhost:5000/documents/${documentId}`
+        );
+        toast.success(response.data.message, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        toast.error("Failed to delete document. Please try again.", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
     }
   };
 
   return (
-    showModal && (
-      <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg p-6 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%] shadow-2xl">
-          <h2 className="text-2xl font-bold text-blue-600 mb-4">
-            Process Sale
-          </h2>
-          <div className="mb-4">
-            <label className="block font-medium text-gray-700 mb-2">
-              Select Customer:
-            </label>
-            <select
-              value={selectedCustomer?.id || ""}
-              onChange={(e) =>
-                setSelectedCustomer(
-                  customers.find((c) => c.id === parseInt(e.target.value))
-                )
-              }
-              className="w-full p-2 border rounded"
-            >
-              <option value="">Select Customer</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name} ({customer.customer_type})
-                </option>
-              ))}
-            </select>
-          </div>
+    <div>
+      {showProcessSaleModal && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-[95%] lg:w-[70%] shadow-2xl">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left Column - Sales */}
+              <div className="w-full lg:w-1/2">
+                {/* Header */}
+                <div className="border-b pb-4 mb-4">
+                  <h1 className="text-2xl font-bold text-blue-600 mb-1">
+                    {companyName || "Company Name"}
+                  </h1>
+                  <p className="text-sm text-gray-600">
+                    {companyAddress || "123 Business St, City, Country"}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Email: {email || "support@company.com"} | Phone:{" "}
+                    {phone || "(123) 456-7890"}
+                  </p>
+                  <h2 className="text-lg font-semibold mt-4">
+                    Process Sale
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    Reference Number:{" "}
+                    <span className="font-medium">{refNum}</span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Date:{" "}
+                    <span className="font-medium">
+                      {new Date().toLocaleDateString()}
+                    </span>
+                  </p>
+                </div>
 
-          <div className="mb-4">
-            <label className="block font-medium text-gray-700 mb-2">
-              Attach Documents (up to 3):
-            </label>
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileUpload}
-              className="w-full p-2 border rounded"
-            />
-            <ul className="mt-2">
-              {documents.map((doc, index) => (
-                <li
-                  key={index}
-                  className="flex justify-between items-center bg-gray-100 p-2 rounded mb-2"
-                >
-                  <span className="truncate">{doc.name}</span>
-                  <button
-                    onClick={() => handleRemoveDocument(index)}
-                    className="text-red-500 hover:underline"
+                <div className="mb-4">
+                  <label className="block font-medium text-gray-700 mb-2">
+                    Select Customer:
+                  </label>
+                  <select
+                    value={selectedCustomer?.id || ""}
+                    onChange={(e) =>
+                      setSelectedCustomer(
+                        customers.find((c) => c.id === parseInt(e.target.value))
+                      )
+                    }
+                    className="w-full p-2 border rounded"
                   >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+                    <option value="">Select Customer</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name} ({customer.customer_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 mr-2"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              className={`px-4 py-2 rounded ${
-                loading
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-              disabled={loading}
-            >
-              {loading ? "Processing..." : "Process Sale"}
-            </button>
+                {/* ProcessSaleModal Items */}
+                <div className="max-h-[30vh] overflow-auto">
+                  <table className="w-full table-auto border-collapse border border-gray-200 text-sm">
+                    <thead>
+                      <tr className="bg-gray-100 border-b">
+                        <th className="p-2 text-left font-medium text-gray-700 border-r">
+                          Item
+                        </th>
+                        <th className="p-2 text-center font-medium text-gray-700 border-r">
+                          Qty
+                        </th>
+                        <th className="p-2 text-center font-medium text-gray-700 border-r">
+                          Price (₵)
+                        </th>
+                        <th className="p-2 text-center font-medium text-gray-700 border-r">
+                          Total (₵)
+                        </th>
+                        {showDraft && (
+                          <th className="p-2 text-center font-medium text-gray-700">
+                            Action
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.map((item, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-2 text-gray-600 border-r">
+                            {item.product.name}
+                          </td>
+                          <td className="p-2 text-center text-gray-600 border-r">
+                            <input
+                              type={showDraft ? "number" : "text"}
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleQuantityChangeNew(e, item, index)
+                              }
+                              className="w-16 p-1 text-center border rounded"
+                              disabled={showDraft ? false : true}
+                            />
+                          </td>
+                          <td className="p-2 text-center text-gray-600 border-r">
+                            {parseFloat(item.product.sp).toFixed(2)}
+                          </td>
+                          <td className="p-2 text-center text-gray-600 border-r">
+                            {parseFloat(
+                              item.quantity * item.product.sp
+                            ).toFixed(2)}
+                          </td>
+                          
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Right Column - Documents */}
+              <div className="w-full lg:w-1/2">
+                {/* Summary */}
+
+                <div className="mt-6">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-700">
+                      Subtotal:
+                    </span>
+                    <span>₵{calculateTotal().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-700">
+                      Tax (10%):
+                    </span>
+                    <span>₵{(calculateTotal() * 0.1).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between mt-2 border-t pt-2">
+                    <span className="font-semibold text-lg">Grand Total:</span>
+                    <span className="text-xl font-bold">
+                      ₵{(calculateTotal() * 1.1).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                {showDraft && (
+                  <div className="mt-6">
+                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                      Documents
+                    </h2>
+                    <div>
+                      <input
+                        type="file"
+                        onChange={(e) => {
+                          const selectedFiles = e.target.files;
+                          const maxFileSize = 4 * 1024 * 1024; // 4MB in bytes
+
+                          if (selectedFiles) {
+                            const validFiles = [];
+                            const rejectedFiles = [];
+
+                            Array.from(selectedFiles).forEach((file) => {
+                              if (file.size <= maxFileSize) {
+                                validFiles.push(file);
+                              } else {
+                                rejectedFiles.push(file.name);
+                              }
+                            });
+
+                            // Update state with valid files
+                            setDocuments([...documents, ...validFiles]);
+
+                            // Toast notification for rejected files
+                            if (rejectedFiles.length > 0) {
+                              toast.error(
+                                `The following files exceed the 4MB limit and were not added: ${rejectedFiles.join(
+                                  ", "
+                                )}`,
+                                {
+                                  position: "top-right",
+                                  autoClose: 5000,
+                                  hideProgressBar: false,
+                                  closeOnClick: true,
+                                  pauseOnHover: true,
+                                  draggable: true,
+                                }
+                              );
+                            }
+                          }
+                        }}
+                        className="p-2 border rounded w-full mb-2"
+                        multiple // Allow selecting multiple files at once
+                      />
+                    </div>
+
+                    <ul className="mt-4 space-y-2">
+                      {documents.map((doc, index) => (
+                        <li
+                          key={index}
+                          className="flex justify-between items-center border p-2 rounded"
+                        >
+                          <span>{doc.name || doc.document_name}</span>{" "}
+                          <button
+                            onClick={() => removeDocument(index, doc.id)} // Pass the document's ID to the function
+                            className="text-red-500 hover:underline"
+                          >
+                            <FaTrash />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {!showDraft && (
+                  <div className="mt-6">
+                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                      Documents
+                    </h2>
+                    {documents.length > 0 ? (
+                      <ul className="mt-4 space-y-2">
+                        {documents.map((doc) => (
+                          <li
+                            key={doc.id}
+                            className="flex justify-between items-center border p-2 rounded"
+                          >
+                            <span>{doc.document_name}</span>
+                            <a
+                              href={doc.file_path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline"
+                            >
+                              <FaEye />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500">No documents attached.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="mt-6 flex justify-between">
+              <button
+                onClick={() => setShowProcessSaleModal(false)}
+                className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+              >
+                Close
+              </button>
+                <button
+                  onClick={handleCompleteSale}
+                  className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Complete Sale
+                </button>
+            </div>
           </div>
         </div>
-      </div>
-    )
+      )}
+    </div>
   );
 }
 

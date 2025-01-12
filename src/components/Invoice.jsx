@@ -3,7 +3,7 @@ import axios from "axios";
 import printInvoice from "./PrintInvoice";
 import { useCart } from "../CartContext";
 import { FaEye, FaTrash } from "react-icons/fa";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 
 function Invoice({
   showInvoice,
@@ -20,14 +20,14 @@ function Invoice({
   phone,
   documents,
   setDocuments,
-  handleCompleteSale,
-
+  setShowProcessSaleModal,
+  handleSaleDraft,
 }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-const {cart} = useCart()
+  const { cart } = useCart();
   const fetchProducts = async () => {
     try {
       const response = await axios.get("http://localhost:5000/products", {
@@ -194,13 +194,14 @@ const {cart} = useCart()
                           </td>
                           <td className="p-2 text-center text-gray-600 border-r">
                             <input
-                              type="number"
+                              type={showDraft ? "number" : "text"}
                               min="1"
                               value={item.quantity}
                               onChange={(e) =>
                                 handleQuantityChangeNew(e, item, index)
                               }
                               className="w-16 p-1 text-center border rounded"
+                              disabled={showDraft ? false : true}
                             />
                           </td>
                           <td className="p-2 text-center text-gray-600 border-r">
@@ -376,7 +377,11 @@ const {cart} = useCart()
               )}
               {showDraft && (
                 <button
-                  onClick={handleCompleteSale}
+                  onClick={() => {
+                    setShowInvoice(false);
+                    setShowProcessSaleModal(true);
+                    handleSaleDraft();
+                  }}
                   className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
                   Complete Sale
