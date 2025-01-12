@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import printInvoice from "./PrintInvoice";
 import { useCart } from "../CartContext";
 import { FaEye, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -20,14 +19,15 @@ function Invoice({
   phone,
   documents,
   setDocuments,
-  setShowProcessSaleModal,
   handleSaleDraft,
+  showClearCart,
+  setShowClearCart
 }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { cart } = useCart();
+  const { cart,clearCart } = useCart();
   const fetchProducts = async () => {
     try {
       const response = await axios.get("http://localhost:5000/products", {
@@ -361,12 +361,17 @@ function Invoice({
               >
                 Close
               </button>
-              <button
-                onClick={() => printInvoice()}
+              {showClearCart&&(<button
+                onClick={() => {
+                  clearCart()
+                  setShowInvoice(false)
+                  setShowClearCart(false)
+                  toast.success("Cart Cleared")
+                }}
                 className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
               >
-                Print Invoice
-              </button>
+                Clear Cart
+              </button>)}
               {showDraft && (
                 <button
                   onClick={handleSaveDraft}
@@ -382,7 +387,7 @@ function Invoice({
                   }}
                   className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  Complete Sale
+                  Process Draft
                 </button>
               )}
             </div>

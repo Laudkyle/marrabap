@@ -13,7 +13,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [loading, setLoading] = useState(true);
   const [showDraft, setShowDraft] = useState(true);
   const [showProcessSaleModal, setShowProcessSaleModal] = useState(null);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -25,6 +24,8 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [refNum, setRefNum] = useState("");
   const [documents, setDocuments] = useState([]); // State to handle documents
   const [newDocument, setNewDocument] = useState(""); // State for new document input
+const [showClearCart, setShowClearCart] = useState(false)
+
   const { cart, addToCart, setCart, clearCart, processSale, makeSale } =
     useCart();
 
@@ -227,7 +228,12 @@ function Shop({ companyName, companyAddress, email, phone }) {
           <div className="relative w-10 h-10">
             <FaShoppingCart
               className="text-3xl mt-1 cursor-pointer"
-              onClick={() => setShowInvoice(true)} // Show invoice modal
+              onClick={() => {
+                if (cart.length === 0) return toast.info("Cart is Empty!!!");
+
+                setShowInvoice(true);
+                setShowClearCart(true)
+              }} // Show invoice modal
             />
             {cart.length > 0 && (
               <span className="absolute top-0 right-0 bg-red-500 text-center text-white text-xs w-6 h-6 rounded-full">
@@ -353,7 +359,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         showDraft={showDraft}
         showCompleteSale={showCompleteSale}
         editDraftId={editDraftId}
-        handleCompleteSale={handleCompleteSale}
+        handleSaleDraft={handleCompleteSale}
         handleQuantityChangeNew={handleQuantityChangeNew}
         handleRemoveFromCart={handleRemoveFromCart}
         handleSaveDraft={handleSaveDraft}
@@ -362,6 +368,9 @@ function Shop({ companyName, companyAddress, email, phone }) {
         setDocuments={setDocuments}
         newDocument={newDocument}
         setNewDocument={setDocuments}
+        showClearCart={showClearCart}
+        setShowClearCart={setShowClearCart}
+        
       />
 
       <style jsx>
