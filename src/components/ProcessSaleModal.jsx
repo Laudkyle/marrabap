@@ -143,7 +143,7 @@ function ProcessSaleModal({
                     <option value="">Select Customer</option>
                     {customers.map((customer) => (
                       <option key={customer.id} value={customer.id}>
-                        {customer.name} ({customer.customer_type})
+                        {customer.name|| customer.business_name} ({customer.customer_type})
                       </option>
                     ))}
                   </select>

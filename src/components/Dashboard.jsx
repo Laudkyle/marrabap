@@ -181,9 +181,9 @@ const Dashboard = () => {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-12">
+      <div className="grid grid-cols-1 gap-8 mb-16">
         {/* Bar Chart */}
-        <div className="h-[calc(50vh-2rem)] bg-white shadow-lg rounded-lg p-4">
+        <div className="h-[calc(60vh-2rem)] bg-white shadow-lg rounded-lg p-4">
           <h2 className="text-2xl text-centsm font-light mb-4 text-gray-700">
             Total Sales by Product
           </h2>
@@ -194,7 +194,7 @@ const Dashboard = () => {
         </div>
 
         {/* Line Chart */}
-        <div className="h-[calc(50vh-2rem)] bg-white shadow-lg rounded-lg p-4">
+        <div className="h-[calc(60vh-2rem)] bg-white shadow-lg rounded-lg p-4">
           <h2 className="text-2xl text-centsm font-light mb-4 text-gray-700">
             Sales Over Time
           </h2>

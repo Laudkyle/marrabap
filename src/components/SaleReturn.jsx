@@ -41,14 +41,14 @@ const SaleReturn = () => {
       toast.error("Invalid return quantity!");
       return;
     }
-  
+
     const returnData = {
-      sale_id: selectedSale.id,          // Send sale_id
+      sale_id: selectedSale.id, // Send sale_id
       reference_number: selectedSale.reference_number, // Send reference_number
       return_quantity: returnQuantity,
       action: restockOption,
     };
-  
+
     try {
       const response = await axios.post(
         "http://localhost:5000/sales/return",
@@ -57,10 +57,10 @@ const SaleReturn = () => {
       if (response.status !== 200 && response.status !== 201) {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
-  
+
       toast.success("Return processed successfully!");
       setModalVisible(false);
-  
+
       // Update the sales list
       const updatedSales = sales.map((sale) =>
         sale.id === selectedSale.id
@@ -74,7 +74,7 @@ const SaleReturn = () => {
             }
           : sale
       );
-  
+
       // Update both states
       setSales(updatedSales);
       setFilteredSales(updatedSales.filter((sale) => sale.quantity > 0));
@@ -83,7 +83,7 @@ const SaleReturn = () => {
       toast.error("Error processing return. Please try again.");
     }
   };
-  
+
   const columns = [
     {
       name: "Reference Number",
@@ -127,7 +127,6 @@ const SaleReturn = () => {
                 className="cursor-pointer text-gray-500 hover:text-blue-500"
                 title="Return"
               />
-              
             </div>
           </button>
         </div>
@@ -243,12 +242,19 @@ const SaleReturn = () => {
           striped
           subHeader
           subHeaderComponent={
-            <input
-              type="text"
-              placeholder="Search sales"
-              className="p-2 border border-gray-300 rounded-md"
-              onChange={handleSearch}
-            />
+            <div className="flex justify-between items-center w-full">
+              <div className="flex items-center">
+                <h2 className="text-xl font-semibold text-gray-700">
+                  Sales List
+                </h2>
+              </div>
+              <input
+                type="text"
+                placeholder="Search sales"
+                className="p-2 border border-gray-300 rounded-md"
+                onChange={handleSearch}
+              />
+            </div>
           }
         />
       </div>
