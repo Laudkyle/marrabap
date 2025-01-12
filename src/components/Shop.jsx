@@ -136,10 +136,11 @@ const [showClearCart, setShowClearCart] = useState(false)
   };
 
   // Updated handleCompleteSale function
-  const handleCompleteSale = async () => {
+  const handleCompleteSale = async (customer_id) => {
+    console.log("Customer id",customer_id)
     try {
       const referenceNumber = refNum; // Generate unique reference number
-      const response = await processSale(referenceNumber); // Await the response from processSale
+      const response = await processSale(referenceNumber,customer_id); // Await the response from processSale
 
       if (response.status === 200 || response.status === 201) {
         // Check for 200 or 201 status

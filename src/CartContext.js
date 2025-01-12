@@ -94,6 +94,7 @@ export const CartProvider = ({ children }) => {
           product_id: selectedProduct.id,
           quantity: quantity,
           reference_number: referenceNumber, // Add reference number to sale
+          customer_id:1
         }),
       });
   

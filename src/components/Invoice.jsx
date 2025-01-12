@@ -21,13 +21,30 @@ function Invoice({
   setDocuments,
   handleSaleDraft,
   showClearCart,
-  setShowClearCart
+  setShowClearCart,
 }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { cart,clearCart } = useCart();
+  const { cart, clearCart } = useCart();
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(1);
+  // Fetch customers from the database
+  const fetchCustomers = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/customers", {
+        timeout: 5000,
+      });
+      setCustomers(response.data);
+    } catch (error) {
+      toast.error("Failed to fetch customers. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
   const fetchProducts = async () => {
     try {
       const response = await axios.get("http://localhost:5000/products", {
@@ -113,9 +130,33 @@ function Invoice({
                     </span>
                   </p>
                 </div>
-
+                {showClearCart && (
+                  <div className="mb-4">
+                    <label className="block font-medium text-gray-700 mb-2">
+                      Select Customer:
+                    </label>
+                    <select
+                      value={selectedCustomer?.id || "1"}
+                      onChange={(e) =>
+                        setSelectedCustomer(
+                          customers.find(
+                            (c) => c.id === parseInt(e.target.value)
+                          )
+                        )
+                      }
+                      className="w-full p-2 border rounded"
+                    >
+                      <option value="">Select Customer</option>
+                      {customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.name} ({customer.customer_type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {/* Product Selection for Draft */}
-                {showDraft && (
+                {showDraft && !showClearCart && (
                   <div className="flex space-x-2 mb-4">
                     <select
                       value={selectedProduct?.id || ""}
@@ -361,21 +402,23 @@ function Invoice({
               >
                 Close
               </button>
-              {showClearCart&&(<button
-                onClick={() => {
-                  clearCart()
-                  setShowInvoice(false)
-                  setShowClearCart(false)
-                  toast.success("Cart Cleared")
-                }}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                Clear Cart
-              </button>)}
+              {showClearCart && (
+                <button
+                  onClick={() => {
+                    clearCart();
+                    setShowInvoice(false);
+                    setShowClearCart(false);
+                    toast.success("Cart Cleared");
+                  }}
+                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                >
+                  Clear Cart
+                </button>
+              )}
               {showDraft && (
                 <button
                   onClick={handleSaveDraft}
-                  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                 >
                   Save Draft
                 </button>
@@ -383,11 +426,11 @@ function Invoice({
               {showDraft && (
                 <button
                   onClick={() => {
-                    handleSaleDraft();
+                    handleSaleDraft(selectedCustomer);
                   }}
                   className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  Process Draft
+                {showClearCart ? "Complete Sale" : "Process Draft"}
                 </button>
               )}
             </div>
