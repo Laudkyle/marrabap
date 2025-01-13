@@ -529,8 +529,8 @@ const Draft = () => {
               </button>
               <button
                 onClick={() => handleDraft(row.id)}
-                className="text-green-600 hover:bg-red-100 p-2 rounded"
-                title="Delete Draft"
+                className="text-green-600 hover:bg-green-100 p-2 rounded"
+                title="Process Draft"
               >
                 <FaMoneyBillWave />
               </button>
