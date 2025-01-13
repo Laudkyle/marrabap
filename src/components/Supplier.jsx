@@ -22,20 +22,23 @@ const Supplier = () => {
 
   
   const [formData, setFormData] = useState({
-    type: "individual",
-    contact_id: "",
-    business_name: "",
-    name: "",
-    email: "",
-    tax_number: "",
-    pay_term: "",
-    opening_balance: "",
-    advance_balance: "",
-    added_on: "",
-    address: "",
-    mobile: "",
-    active_status: true,
+    type: "individual", // Default to "individual"
+    contact_id: "", // Unique identifier for the contact
+    business_name: "", // Business name (null for individuals)
+    name: "", // Supplier's name
+    email: "", // Email address (optional)
+    tax_number: "", // Tax number (optional)
+    pay_term: "", // Payment terms
+    opening_balance: 0, // Default opening balance
+    advance_balance: 0, // Default advance balance
+    added_on: new Date().toISOString().split("T")[0], // Default to today's date
+    address: "", // Address of the supplier
+    mobile: "", // Mobile number (unique)
+    total_purchase_due: 0, // Total purchase due (default to 0)
+    total_purchase_return_due: 0, // Total purchase return due (default to 0)
+    active_status: true, // Active by default
   });
+  
   const API_URL = "http://localhost:5000/suppliers"; // Update with your backend URL
 // Filter suppliers based on the search text
 const filteredSuppliersd = useMemo(() => {

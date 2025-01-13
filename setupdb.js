@@ -27,6 +27,11 @@ db.serialize(() => {
       account_type: "asset",
     },
     {
+      account_code: "1020",
+      account_name: "Inventory",
+      account_type: "asset", // New Inventory account
+    },
+    {
       account_code: "2000",
       account_name: "Accounts Payable",
       account_type: "liability",
@@ -54,10 +59,10 @@ db.serialize(() => {
     {
       account_code: "5020",
       account_name: "Sales Returns",
-      account_type: "expense", // Categorized as an expense
+      account_type: "expense",
     },
   ];
-  
+
   defaultAccounts.forEach((account) => {
     db.run(
       `INSERT OR IGNORE INTO chart_of_accounts (account_code, account_name, account_type)
@@ -74,7 +79,10 @@ db.serialize(() => {
     cp REAL CHECK(cp >= 0), -- Cost Price with non-negative constraint
     sp REAL CHECK(sp >= 0), -- Selling Price with non-negative constraint
     stock INTEGER DEFAULT 0 CHECK(stock >= 0), -- Non-negative stock
-    image TEXT -- Optional, for product image URL or file path
+    image TEXT, -- Optional, for product image URL or file path
+    suppliers_id INTEGER NOT NULL DEFAULT 1,
+    payment_method TEXT CHECK(payment_method IN ('cash', 'credit')), -- Added payment_method
+    FOREIGN KEY (suppliers_id) REFERENCES suppliers(id)
 )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS sales (
@@ -446,10 +454,72 @@ BEGIN
         )
     );
 END;
+`);
+  db.run(`CREATE TRIGGER after_add_stock
+AFTER INSERT ON products
+BEGIN
+    -- Handle supplier's total_purchase_due if purchased on credit
+    UPDATE suppliers
+    SET total_purchase_due = total_purchase_due + (NEW.cp * NEW.stock)
+    WHERE id = NEW.suppliers_id 
+      AND NEW.payment_method = 'credit';
 
+    -- Create a journal entry for the stock addition
+    INSERT INTO journal_entries (reference_number, date, description)
+    VALUES (
+        NEW.id, -- Use the product ID as the reference number
+        CURRENT_TIMESTAMP,
+        'Stock Addition for Product: ' || NEW.name
+    );
+
+    -- Record the debit side (Inventory)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT id FROM journal_entries WHERE reference_number = NEW.id ORDER BY id DESC LIMIT 1),
+        (SELECT id FROM chart_of_accounts WHERE account_name = 'Inventory'),
+        (NEW.cp * NEW.stock),
+        0
+    );
+
+    -- Record the credit side (Accounts Payable or Cash)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT id FROM journal_entries WHERE reference_number = NEW.id ORDER BY id DESC LIMIT 1),
+        CASE
+            WHEN NEW.payment_method = 'credit' THEN 
+                (SELECT id FROM chart_of_accounts WHERE account_name = 'Accounts Payable')
+            ELSE
+                (SELECT id FROM chart_of_accounts WHERE account_name = 'Cash')
+        END,
+        0,
+        (NEW.cp * NEW.stock)
+    );
+
+    -- Log the stock addition in the audit trail
+    INSERT INTO audit_trails (
+        user_id, 
+        table_name, 
+        record_id, 
+        action, 
+        changes
+    )
+    VALUES (
+        1, -- Assume a static user ID; replace with dynamic user handling if needed
+        'products',
+        NEW.id,
+        'insert',
+        json_object(
+            'name', NEW.name,
+            'cp', NEW.cp,
+            'sp', NEW.sp,
+            'stock', NEW.stock,
+            'suppliers_id', NEW.suppliers_id,
+            'payment_method', NEW.payment_method
+        )
+    );
+END;
 
 `);
-
   // Insert product data
   const insertStmt =
     db.prepare(`INSERT INTO products (id, name, cp, sp, stock, image)
@@ -461,7 +531,7 @@ END;
       name: "Can Malt 200",
       cp: 180,
       sp: 220,
-      image: "/images/logo.png",
+      
       stock: 4,
     },
     {
@@ -469,7 +539,7 @@ END;
       name: "Plastic Malt",
       cp: 95,
       sp: 98,
-      image: "/images/logo.png",
+      
       stock: 6,
     },
     {
@@ -477,7 +547,7 @@ END;
       name: "Bigoo Cola",
       cp: 42,
       sp: 45,
-      image: "/images/logo.png",
+      
       stock: 5,
     },
     {
@@ -485,7 +555,7 @@ END;
       name: "Bigoo Cocktail",
       cp: 42,
       sp: 47,
-      image: "/images/logo.png",
+      
       stock: 2,
     },
     {
@@ -493,7 +563,7 @@ END;
       name: "Bigoo Grapes",
       cp: 42,
       sp: 47,
-      image: "/images/logo.png",
+      
       stock: 3,
     },
     {
@@ -501,7 +571,7 @@ END;
       name: "Storm Small",
       cp: 45,
       sp: 48,
-      image: "/images/logo.png",
+      
       stock: 4,
     },
     {
@@ -509,7 +579,7 @@ END;
       name: "Storm Big",
       cp: 62,
       sp: "30",
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -517,7 +587,7 @@ END;
       name: "Beta Malt",
       cp: 68,
       sp: 70,
-      image: "/images/logo.png",
+      
       stock: 10,
     },
     {
@@ -525,7 +595,7 @@ END;
       name: "Kiki",
       cp: 72,
       sp: "30",
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -533,7 +603,7 @@ END;
       name: "U Fresh Grapes",
       cp: 30,
       sp: 33,
-      image: "/images/logo.png",
+      
       stock: 7,
     },
     {
@@ -541,7 +611,7 @@ END;
       name: "U Fresh Banana",
       cp: 34,
       sp: 33,
-      image: "/images/logo.png",
+      
       stock: 1,
     },
     {
@@ -549,7 +619,7 @@ END;
       name: "U Fresh Orange",
       cp: 34,
       sp: 33,
-      image: "/images/logo.png",
+      
       stock: 1,
     },
     {
@@ -557,7 +627,7 @@ END;
       name: "5 Star",
       cp: 39,
       sp: 44,
-      image: "/images/logo.png",
+      
       stock: 5,
     },
     {
@@ -565,7 +635,7 @@ END;
       name: "Rush",
       cp: 39,
       sp: 44,
-      image: "/images/logo.png",
+      
       stock: 5,
     },
     {
@@ -573,7 +643,7 @@ END;
       name: "U Fresh Chocolate",
       cp: 64,
       sp: 66,
-      image: "/images/logo.png",
+      
       stock: 8,
     },
     {
@@ -581,7 +651,7 @@ END;
       name: "U fresh Soya",
       cp: 64,
       sp: 66,
-      image: "/images/logo.png",
+      
       stock: 6,
     },
     {
@@ -589,7 +659,7 @@ END;
       name: "U fresh kids",
       cp: 31,
       sp: 34,
-      image: "/images/logo.png",
+      
       stock: 2,
     },
     {
@@ -597,7 +667,7 @@ END;
       name: "U fresh sachet",
       cp: 35,
       sp: 36,
-      image: "/images/logo.png",
+      
       stock: 2,
     },
     {
@@ -605,7 +675,7 @@ END;
       name: "Alvaro",
       cp: 20,
       sp: 20,
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -613,7 +683,7 @@ END;
       name: "Darling Lemon",
       cp: 50,
       sp: 53,
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -621,7 +691,7 @@ END;
       name: "Bel Active",
       cp: 36,
       sp: 40,
-      image: "/images/logo.png",
+      
       stock: 10,
     },
     {
@@ -629,7 +699,7 @@ END;
       name: "Bel Tropical",
       cp: 37,
       sp: 40,
-      image: "/images/logo.png",
+      
       stock: 1,
     },
     {
@@ -637,7 +707,7 @@ END;
       name: "Squeeze",
       cp: 37,
       sp: 40,
-      image: "/images/logo.png",
+      
       stock: 5,
     },
     {
@@ -645,7 +715,7 @@ END;
       name: "Bel Cola",
       cp: 40,
       sp: 42,
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -653,7 +723,7 @@ END;
       name: "Bel Water (Medium)",
       cp: 26,
       sp: 28,
-      image: "/images/logo.png",
+      
       stock: 18,
     },
     {
@@ -661,7 +731,7 @@ END;
       name: "Bel Water (Small)",
       cp: 22,
       sp: 25,
-      image: "/images/logo.png",
+      
       stock: 20,
     },
     {
@@ -669,7 +739,7 @@ END;
       name: "Bel Water Box",
       cp: 50,
       sp: "30",
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -677,7 +747,7 @@ END;
       name: "Slim Fit",
       cp: 18,
       sp: 21,
-      image: "/images/logo.png",
+      
       stock: 2,
     },
     {
@@ -685,7 +755,7 @@ END;
       name: "Kaeser Apple",
       cp: 35,
       sp: 42,
-      image: "/images/logo.png",
+      
       stock: 3,
     },
     {
@@ -693,7 +763,7 @@ END;
       name: "Perla",
       cp: 22,
       sp: 25,
-      image: "/images/logo.png",
+      
       stock: 8,
     },
     {
@@ -701,7 +771,7 @@ END;
       name: "Awake small",
       cp: 22,
       sp: 24,
-      image: "/images/logo.png",
+      
       stock: 10,
     },
     {
@@ -709,7 +779,7 @@ END;
       name: "Pukka",
       cp: 41,
       sp: 43,
-      image: "/images/logo.png",
+      
       stock: 8,
     },
     {
@@ -717,7 +787,7 @@ END;
       name: "Kalyppo",
       cp: 93,
       sp: 96,
-      image: "/images/logo.png",
+      
       stock: 200,
     },
     {
@@ -725,7 +795,7 @@ END;
       name: "Fruity",
       cp: 50,
       sp: 52,
-      image: "/images/logo.png",
+      
       stock: 20,
     },
     {
@@ -733,7 +803,7 @@ END;
       name: "Juicee",
       cp: 70,
       sp: 73,
-      image: "/images/logo.png",
+      
       stock: 10,
     },
     {
@@ -741,7 +811,7 @@ END;
       name: "Tampico Big",
       cp: 53,
       sp: 58,
-      image: "/images/logo.png",
+      
       stock: 5,
     },
     {
@@ -749,7 +819,7 @@ END;
       name: "Tampico Small",
       cp: 20,
       sp: 58,
-      image: "/images/logo.png",
+      
       stock: 5,
     },
     {
@@ -757,7 +827,7 @@ END;
       name: "Don Simon Big",
       cp: 20,
       sp: 30,
-      image: "/images/logo.png",
+      
       stock: 12,
     },
     {
@@ -765,7 +835,7 @@ END;
       name: "Don Simon Small",
       cp: 17,
       sp: 12,
-      image: "/images/logo.png",
+      
       stock: 12,
     },
     {
@@ -773,7 +843,7 @@ END;
       name: "Don Simon Multivitamin",
       cp: 20,
       sp: 25,
-      image: "/images/logo.png",
+      
       stock: 12,
     },
     {
@@ -781,7 +851,7 @@ END;
       name: "Coke Big 1.5",
       cp: 20,
       sp: 25,
-      image: "/images/logo.png",
+      
       stock: 16,
     },
     {
@@ -789,7 +859,7 @@ END;
       name: "Coke Small",
       cp: 55,
       sp: 58,
-      image: "/images/logo.png",
+      
       stock: 15,
     },
     {
@@ -797,7 +867,7 @@ END;
       name: "Hollandia 1 ltr",
       cp: 20,
       sp: 25,
-      image: "/images/logo.png",
+      
       stock: 10,
     },
     {
@@ -805,7 +875,7 @@ END;
       name: "BB Cocktail",
       cp: 20,
       sp: 240,
-      image: "/images/logo.png",
+      
       stock: 11,
     },
     {
@@ -813,7 +883,7 @@ END;
       name: "Nero",
       cp: 15,
       sp: 20,
-      image: "/images/logo.png",
+      
       stock: 1,
     },
     {
@@ -821,7 +891,7 @@ END;
       name: "Special Tangerine",
       cp: 20,
       sp: 45,
-      image: "/images/logo.png",
+      
       stock: 2,
     },
     {
@@ -829,7 +899,7 @@ END;
       name: "Vita Milk 250ml",
       cp: 300,
       sp: 20,
-      image: "/images/logo.png",
+      
       stock: 6,
     },
     {
@@ -837,7 +907,7 @@ END;
       name: "Vita Milk Bottle",
       cp: 75,
       sp: 78,
-      image: "/images/logo.png",
+      
       stock: 4,
     },
     {
@@ -845,7 +915,7 @@ END;
       name: "Vita Milk Champ",
       cp: 20,
       sp: 27,
-      image: "/images/logo.png",
+      
       stock: 10,
     },
     {
@@ -853,7 +923,7 @@ END;
       name: "Verna Water",
       cp: 20,
       sp: 25,
-      image: "/images/logo.png",
+      
       stock: 30,
     },
     {
@@ -861,7 +931,7 @@ END;
       name: "Voltic Water",
       cp: 20,
       sp: 20,
-      image: "/images/logo.png",
+      
       stock: 30,
     },
   ];
@@ -879,8 +949,7 @@ END;
   // Finalize the insert statement
   insertStmt.finalize();
 
-   const insertStmt1 =
-    db.run(`INSERT INTO suppliers (
+  db.run(`INSERT INTO suppliers (
     type, 
     contact_id, 
     name, 
@@ -894,8 +963,7 @@ END;
     datetime('now'),       -- Date of addition (current date and time)
     '1234567890',          -- Mobile number (ensure it’s unique)
     1                      -- Active status: 1 means active
-);`)
-
+);`);
 });
 
 // Close the database connection

@@ -103,11 +103,11 @@ app.get("/products/:id", (req, res) => {
 
 // Add a new product
 app.post("/products", (req, res) => {
-  const { name, cp, sp, stock } = req.body;
+  const { name, cp, sp, stock, suppliers_id } = req.body;
   const stmt = db.prepare(
-    "INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)"
+    "INSERT INTO products (name, cp, sp, stock,suppliers_id) VALUES (?, ?, ?, ?,?)"
   );
-  stmt.run(name, cp, sp, stock, function (err) {
+  stmt.run(name, cp, sp, stock,suppliers_id, function (err) {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error adding product");
@@ -117,10 +117,18 @@ app.post("/products", (req, res) => {
   });
 });
 
-// Add multiple products in bulk
 app.post("/products/bulk", (req, res) => {
-  const { products } = req.body;
+  const { suppliers_id,payment_method, products } = req.body;
 
+  // Validate suppliers_id
+  if (!suppliers_id) {
+    return res.status(400).send("Supplier ID is required");
+  }
+  if (!payment_method) {
+    return res.status(400).send("Payment method is required");
+  }
+
+  // Validate products array
   if (!Array.isArray(products) || products.length === 0) {
     return res.status(400).send("Invalid product data");
   }
@@ -130,28 +138,42 @@ app.post("/products/bulk", (req, res) => {
 
     let errorOccurred = false;
 
+    // Insert each product into the products table
     products.forEach((product) => {
       const { name, cp, sp, stock } = product;
+
+      // Validate product fields
+      if (!name || isNaN(cp) || isNaN(sp) || isNaN(stock)) {
+        errorOccurred = true;
+        console.error("Invalid product data:", product);
+        return;
+      }
+
       const stmt = db.prepare(
-        "INSERT INTO products (name, cp, sp, stock) VALUES (?, ?, ?, ?)"
+        "INSERT INTO products (name, cp, sp, stock, suppliers_id,payment_method) VALUES (?, ?, ?, ?, ?,?)"
       );
-      stmt.run(name, cp, sp, stock, (err) => {
+
+      stmt.run(name, cp, sp, stock, suppliers_id, payment_method,(err) => {
         if (err) {
           console.error("Error inserting product:", err.message);
           errorOccurred = true;
         }
       });
+
+      stmt.finalize();
     });
 
+    // Commit or rollback the transaction based on error state
     if (errorOccurred) {
       db.run("ROLLBACK");
-      res.status(400).send("Error adding products");
+      res.status(400).send("Error adding products. Check the input data.");
     } else {
       db.run("COMMIT");
-      res.status(201).send("Products added successfully");
+      res.status(201).send("Products added successfully.");
     }
   });
 });
+
 
 // Update a product
 app.put("/products/:id", upload.single("image"), (req, res) => {
