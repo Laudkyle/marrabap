@@ -1,24 +1,6 @@
 import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
-import {
-  FaTachometerAlt,
-  FaStore,
-  FaCogs,
-  FaUserCircle,
-  FaUserLock,
-  FaBox,
-  FaPlus,
-  FaList,
-  FaEdit,
-  FaWarehouse,
-  FaArrowLeft,
-  FaCashRegister,
-  FaChevronDown,
-  FaUsers,
-  FaUserFriends,
-  FaPeopleCarry,
-  FaSave,
-} from "react-icons/fa";
+import { FaTachometerAlt, FaChevronDown } from "react-icons/fa";
 import {
   Store,
   Box,
