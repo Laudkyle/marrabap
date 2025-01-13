@@ -105,7 +105,19 @@ db.serialize(() => {
   payment_method TEXT, -- Optional (e.g., cash, credit card, etc.)
   payment_reference TEXT -- Optional payment reference number
 )`);
-
+  db.run(`CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
+    customer_id INTEGER NOT NULL, -- Links the invoice to a customer
+    issue_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Invoice issue date
+    due_date TEXT, -- Due date for payment
+    total_amount REAL NOT NULL CHECK(total_amount >= 0), -- Total invoice amount
+    amount_paid REAL DEFAULT 0 CHECK(amount_paid >= 0), -- Amount paid towards the invoice
+    balance_due REAL GENERATED ALWAYS AS (total_amount - amount_paid) VIRTUAL, -- Calculated field for balance
+    status TEXT DEFAULT 'unpaid', -- Status: unpaid, partial, or paid
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+`);
   db.run(`CREATE TABLE IF NOT EXISTS returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL,
@@ -269,8 +281,7 @@ db.serialize(() => {
 )`);
 
   // Additional logic for recording a sale with journal entries
-  db.run(`
-CREATE TRIGGER after_sale_insert
+  db.run(`CREATE TRIGGER after_sale_insert
 AFTER INSERT ON sales
 BEGIN
     -- Validate stock
@@ -343,7 +354,6 @@ BEGIN
         )
     );
 END;
-
 `);
   db.run(`CREATE TRIGGER after_return_insert
 AFTER INSERT ON returns
@@ -367,7 +377,7 @@ BEGIN
     )
     AND NEW.action = 'restock';
 
-    -- If the original sale was on credit, reduce the customer's total_sale_due
+    -- If the original sale was on credit, adjust the customer's total_sale_due
     UPDATE customers
     SET total_sale_due = total_sale_due - (
         (SELECT total_price 
@@ -385,6 +395,21 @@ BEGIN
         FROM sales 
         WHERE id = NEW.sale_id
     ) = 'credit';
+
+    -- Update the corresponding invoice with adjusted quantity, total amount, and balance due
+    UPDATE invoices
+    SET 
+        total_amount = total_amount - (
+            total_amount * (NEW.return_quantity * 1.0 / (SELECT quantity FROM sales WHERE id = NEW.sale_id))
+        ),
+        balance_due = balance_due - (
+            total_amount * (NEW.return_quantity * 1.0 / (SELECT quantity FROM sales WHERE id = NEW.sale_id))
+        )
+    WHERE reference_number = (
+        SELECT reference_number 
+        FROM sales 
+        WHERE id = NEW.sale_id
+    );
 
     -- Create a journal entry for the return
     INSERT INTO journal_entries (reference_number, date, description)
@@ -454,6 +479,7 @@ BEGIN
         )
     );
 END;
+
 `);
   db.run(`CREATE TRIGGER after_add_stock
 AFTER INSERT ON products
@@ -531,7 +557,7 @@ END;
       name: "Can Malt 200",
       cp: 180,
       sp: 220,
-      
+
       stock: 4,
     },
     {
@@ -539,7 +565,7 @@ END;
       name: "Plastic Malt",
       cp: 95,
       sp: 98,
-      
+
       stock: 6,
     },
     {
@@ -547,7 +573,7 @@ END;
       name: "Bigoo Cola",
       cp: 42,
       sp: 45,
-      
+
       stock: 5,
     },
     {
@@ -555,7 +581,7 @@ END;
       name: "Bigoo Cocktail",
       cp: 42,
       sp: 47,
-      
+
       stock: 2,
     },
     {
@@ -563,7 +589,7 @@ END;
       name: "Bigoo Grapes",
       cp: 42,
       sp: 47,
-      
+
       stock: 3,
     },
     {
@@ -571,7 +597,7 @@ END;
       name: "Storm Small",
       cp: 45,
       sp: 48,
-      
+
       stock: 4,
     },
     {
@@ -579,7 +605,7 @@ END;
       name: "Storm Big",
       cp: 62,
       sp: "30",
-      
+
       stock: 30,
     },
     {
@@ -587,7 +613,7 @@ END;
       name: "Beta Malt",
       cp: 68,
       sp: 70,
-      
+
       stock: 10,
     },
     {
@@ -595,7 +621,7 @@ END;
       name: "Kiki",
       cp: 72,
       sp: "30",
-      
+
       stock: 30,
     },
     {
@@ -603,7 +629,7 @@ END;
       name: "U Fresh Grapes",
       cp: 30,
       sp: 33,
-      
+
       stock: 7,
     },
     {
@@ -611,7 +637,7 @@ END;
       name: "U Fresh Banana",
       cp: 34,
       sp: 33,
-      
+
       stock: 1,
     },
     {
@@ -619,7 +645,7 @@ END;
       name: "U Fresh Orange",
       cp: 34,
       sp: 33,
-      
+
       stock: 1,
     },
     {
@@ -627,7 +653,7 @@ END;
       name: "5 Star",
       cp: 39,
       sp: 44,
-      
+
       stock: 5,
     },
     {
@@ -635,7 +661,7 @@ END;
       name: "Rush",
       cp: 39,
       sp: 44,
-      
+
       stock: 5,
     },
     {
@@ -643,7 +669,7 @@ END;
       name: "U Fresh Chocolate",
       cp: 64,
       sp: 66,
-      
+
       stock: 8,
     },
     {
@@ -651,7 +677,7 @@ END;
       name: "U fresh Soya",
       cp: 64,
       sp: 66,
-      
+
       stock: 6,
     },
     {
@@ -659,7 +685,7 @@ END;
       name: "U fresh kids",
       cp: 31,
       sp: 34,
-      
+
       stock: 2,
     },
     {
@@ -667,7 +693,7 @@ END;
       name: "U fresh sachet",
       cp: 35,
       sp: 36,
-      
+
       stock: 2,
     },
     {
@@ -675,7 +701,7 @@ END;
       name: "Alvaro",
       cp: 20,
       sp: 20,
-      
+
       stock: 30,
     },
     {
@@ -683,7 +709,7 @@ END;
       name: "Darling Lemon",
       cp: 50,
       sp: 53,
-      
+
       stock: 30,
     },
     {
@@ -691,7 +717,7 @@ END;
       name: "Bel Active",
       cp: 36,
       sp: 40,
-      
+
       stock: 10,
     },
     {
@@ -699,7 +725,7 @@ END;
       name: "Bel Tropical",
       cp: 37,
       sp: 40,
-      
+
       stock: 1,
     },
     {
@@ -707,7 +733,7 @@ END;
       name: "Squeeze",
       cp: 37,
       sp: 40,
-      
+
       stock: 5,
     },
     {
@@ -715,7 +741,7 @@ END;
       name: "Bel Cola",
       cp: 40,
       sp: 42,
-      
+
       stock: 30,
     },
     {
@@ -723,7 +749,7 @@ END;
       name: "Bel Water (Medium)",
       cp: 26,
       sp: 28,
-      
+
       stock: 18,
     },
     {
@@ -731,7 +757,7 @@ END;
       name: "Bel Water (Small)",
       cp: 22,
       sp: 25,
-      
+
       stock: 20,
     },
     {
@@ -739,7 +765,7 @@ END;
       name: "Bel Water Box",
       cp: 50,
       sp: "30",
-      
+
       stock: 30,
     },
     {
@@ -747,7 +773,7 @@ END;
       name: "Slim Fit",
       cp: 18,
       sp: 21,
-      
+
       stock: 2,
     },
     {
@@ -755,7 +781,7 @@ END;
       name: "Kaeser Apple",
       cp: 35,
       sp: 42,
-      
+
       stock: 3,
     },
     {
@@ -763,7 +789,7 @@ END;
       name: "Perla",
       cp: 22,
       sp: 25,
-      
+
       stock: 8,
     },
     {
@@ -771,7 +797,7 @@ END;
       name: "Awake small",
       cp: 22,
       sp: 24,
-      
+
       stock: 10,
     },
     {
@@ -779,7 +805,7 @@ END;
       name: "Pukka",
       cp: 41,
       sp: 43,
-      
+
       stock: 8,
     },
     {
@@ -787,7 +813,7 @@ END;
       name: "Kalyppo",
       cp: 93,
       sp: 96,
-      
+
       stock: 200,
     },
     {
@@ -795,7 +821,7 @@ END;
       name: "Fruity",
       cp: 50,
       sp: 52,
-      
+
       stock: 20,
     },
     {
@@ -803,7 +829,7 @@ END;
       name: "Juicee",
       cp: 70,
       sp: 73,
-      
+
       stock: 10,
     },
     {
@@ -811,7 +837,7 @@ END;
       name: "Tampico Big",
       cp: 53,
       sp: 58,
-      
+
       stock: 5,
     },
     {
@@ -819,7 +845,7 @@ END;
       name: "Tampico Small",
       cp: 20,
       sp: 58,
-      
+
       stock: 5,
     },
     {
@@ -827,7 +853,7 @@ END;
       name: "Don Simon Big",
       cp: 20,
       sp: 30,
-      
+
       stock: 12,
     },
     {
@@ -835,7 +861,7 @@ END;
       name: "Don Simon Small",
       cp: 17,
       sp: 12,
-      
+
       stock: 12,
     },
     {
@@ -843,7 +869,7 @@ END;
       name: "Don Simon Multivitamin",
       cp: 20,
       sp: 25,
-      
+
       stock: 12,
     },
     {
@@ -851,7 +877,7 @@ END;
       name: "Coke Big 1.5",
       cp: 20,
       sp: 25,
-      
+
       stock: 16,
     },
     {
@@ -859,7 +885,7 @@ END;
       name: "Coke Small",
       cp: 55,
       sp: 58,
-      
+
       stock: 15,
     },
     {
@@ -867,7 +893,7 @@ END;
       name: "Hollandia 1 ltr",
       cp: 20,
       sp: 25,
-      
+
       stock: 10,
     },
     {
@@ -875,7 +901,7 @@ END;
       name: "BB Cocktail",
       cp: 20,
       sp: 240,
-      
+
       stock: 11,
     },
     {
@@ -883,7 +909,7 @@ END;
       name: "Nero",
       cp: 15,
       sp: 20,
-      
+
       stock: 1,
     },
     {
@@ -891,7 +917,7 @@ END;
       name: "Special Tangerine",
       cp: 20,
       sp: 45,
-      
+
       stock: 2,
     },
     {
@@ -899,7 +925,7 @@ END;
       name: "Vita Milk 250ml",
       cp: 300,
       sp: 20,
-      
+
       stock: 6,
     },
     {
@@ -907,7 +933,7 @@ END;
       name: "Vita Milk Bottle",
       cp: 75,
       sp: 78,
-      
+
       stock: 4,
     },
     {
@@ -915,7 +941,7 @@ END;
       name: "Vita Milk Champ",
       cp: 20,
       sp: 27,
-      
+
       stock: 10,
     },
     {
@@ -923,7 +949,7 @@ END;
       name: "Verna Water",
       cp: 20,
       sp: 25,
-      
+
       stock: 30,
     },
     {
@@ -931,7 +957,7 @@ END;
       name: "Voltic Water",
       cp: 20,
       sp: 20,
-      
+
       stock: 30,
     },
   ];

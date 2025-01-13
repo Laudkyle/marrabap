@@ -355,21 +355,219 @@ app.delete("/drafts/:id", (req, res) => {
     }
   });
 });
+// ===================== Invoice Endpoints =====================
+
+// Create invoice (POST request)
+app.post('/invoices', (req, res) => {
+  const { reference_number, customer_id, total_amount, amount_paid = 0, due_date = null, status = 'unpaid' } = req.body;
+
+  const sql = `
+    INSERT INTO invoices (reference_number, customer_id, total_amount, amount_paid, due_date, status)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(sql, [reference_number, customer_id, total_amount, amount_paid, due_date, status], function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.status(201).json({ id: this.lastID });
+    }
+  });
+});
+
+// Get all invoices (GET request)
+app.get('/invoices', (req, res) => {
+  const sql = 'SELECT * FROM invoices';
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.status(200).json(rows);
+    }
+  });
+});
+
+// Get a single invoice by reference_number (GET request)
+app.get('/invoices/:reference_number', (req, res) => {
+  const { reference_number } = req.params;
+  
+  const sql = 'SELECT * FROM invoices WHERE reference_number = ?';
+  
+  db.get(sql, [reference_number], (err, row) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else if (!row) {
+      res.status(404).json({ message: 'Invoice not found' });
+    } else {
+      res.status(200).json(row);
+    }
+  });
+});
+
+// Update an invoice (PUT request)
+app.put('/invoices/:reference_number', (req, res) => {
+  const { reference_number } = req.params;
+  const { total_amount, amount_paid, due_date, status } = req.body;
+
+  const sql = `
+    UPDATE invoices
+    SET total_amount = ?, amount_paid = ?, due_date = ?, status = ?
+    WHERE reference_number = ?
+  `;
+  
+  db.run(sql, [total_amount, amount_paid, due_date, status, reference_number], function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else if (this.changes === 0) {
+      res.status(404).json({ message: 'Invoice not found' });
+    } else {
+      res.status(200).json({ message: 'Invoice updated successfully' });
+    }
+  });
+});
+
+// Delete an invoice (DELETE request)
+app.delete('/invoices/:reference_number', (req, res) => {
+  const { reference_number } = req.params;
+
+  const sql = 'DELETE FROM invoices WHERE reference_number = ?';
+  
+  db.run(sql, [reference_number], function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else if (this.changes === 0) {
+      res.status(404).json({ message: 'Invoice not found' });
+    } else {
+      res.status(200).json({ message: 'Invoice deleted successfully' });
+    }
+  });
+});
+
+// ===================== Payments Endpoints =====================
+// CREATE: Add a new payment
+app.post("/payments", (req, res) => {
+  const { reference_number, payment_date, amount_paid, payment_method, payment_reference } = req.body;
+
+  if (!reference_number || !amount_paid) {
+    return res.status(400).send("Reference number and amount paid are required.");
+  }
+
+  const query = `
+    INSERT INTO payments (reference_number, payment_date, amount_paid, payment_method, payment_reference)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  const params = [
+    reference_number,
+    payment_date || new Date().toISOString(),
+    amount_paid,
+    payment_method || null,
+    payment_reference || null,
+  ];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error("Error adding payment:", err.message);
+      return res.status(500).send("Failed to add payment.");
+    }
+    res.status(201).send({ id: this.lastID });
+  });
+});
+
+// READ: Get all payments
+app.get("/payments", (req, res) => {
+  const query = "SELECT * FROM payments";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error("Error retrieving payments:", err.message);
+      return res.status(500).send("Failed to retrieve payments.");
+    }
+    res.status(200).json(rows);
+  });
+});
+
+// READ: Get a specific payment by ID
+app.get("/payments/:id", (req, res) => {
+  const query = "SELECT * FROM payments WHERE id = ?";
+  const params = [req.params.id];
+
+  db.get(query, params, (err, row) => {
+    if (err) {
+      console.error("Error retrieving payment:", err.message);
+      return res.status(500).send("Failed to retrieve payment.");
+    }
+    if (!row) {
+      return res.status(404).send("Payment not found.");
+    }
+    res.status(200).json(row);
+  });
+});
+
+// UPDATE: Update a payment
+app.put("/payments/:id", (req, res) => {
+  const { reference_number, payment_date, amount_paid, payment_method, payment_reference } = req.body;
+
+  const query = `
+    UPDATE payments
+    SET reference_number = ?, payment_date = ?, amount_paid = ?, payment_method = ?, payment_reference = ?
+    WHERE id = ?
+  `;
+  const params = [
+    reference_number,
+    payment_date,
+    amount_paid,
+    payment_method,
+    payment_reference,
+    req.params.id,
+  ];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error("Error updating payment:", err.message);
+      return res.status(500).send("Failed to update payment.");
+    }
+    if (this.changes === 0) {
+      return res.status(404).send("Payment not found.");
+    }
+    res.status(200).send("Payment updated successfully.");
+  });
+});
+
+// DELETE: Delete a payment
+app.delete("/payments/:id", (req, res) => {
+  const query = "DELETE FROM payments WHERE id = ?";
+  const params = [req.params.id];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error("Error deleting payment:", err.message);
+      return res.status(500).send("Failed to delete payment.");
+    }
+    if (this.changes === 0) {
+      return res.status(404).send("Payment not found.");
+    }
+    res.status(200).send("Payment deleted successfully.");
+  });
+});
 
 // ===================== Sales Endpoints =====================
-// Add a sale or bulk sales
 app.post("/sales", async (req, res) => {
   const salesData = Array.isArray(req.body) ? req.body : [req.body];
-
   const dbPromise = new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run("BEGIN TRANSACTION", (err) => {
         if (err) return reject(new Error("Failed to start transaction"));
 
         let errorOccurred = false;
+        let totalCartPrice = 0;
         const saleResponses = [];
+        const reference_number = salesData[0].reference_number; // Assuming reference_number is the same for all items in the cart
+        const customer_id = salesData[0].customer_id; // Assuming customer_id is the same for all items in the cart
+        const payment_method = salesData[0].payment_method; // Assuming payment_method is the same for all items in the cart
 
-        const processSalePromises = salesData.map(({ product_id, quantity, payment_method,reference_number, customer_id }) => {
+        // Process each sale item in the cart
+        const processSalePromises = salesData.map(({ product_id, quantity }) => {
           return new Promise((resolveSale, rejectSale) => {
             db.get("SELECT * FROM products WHERE id = ?", [product_id], (err, product) => {
               if (err || !product) {
@@ -385,16 +583,17 @@ app.post("/sales", async (req, res) => {
               }
 
               const total_price = product.sp * quantity;
+              totalCartPrice += total_price; // Sum total price for the cart
 
-              // Insert the sale record
+              // Insert the sale record for each item
               db.run(
-                "INSERT INTO sales (customer_id, product_id,payment_method, reference_number, quantity, total_price, date) VALUES (?, ?, ?,?, ?, ?, ?)",
-                [customer_id, product_id,payment_method, reference_number, quantity, total_price, new Date().toISOString()],
+                "INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [customer_id, product_id, payment_method, reference_number, quantity, total_price, new Date().toISOString()],
                 (err) => {
                   if (err) {
                     errorOccurred = true;
-                    console.error(err.message);
-                    return rejectSale("Error inserting sale");
+                    console.error("Error: ", err.message);
+                    return rejectSale("Error inserting sale items");
                   }
                   resolveSale({ customer_id, product_id, quantity, total_price });
                 }
@@ -403,7 +602,7 @@ app.post("/sales", async (req, res) => {
           });
         });
 
-        // Wait for all sales to be processed
+        // Wait for all sales items in the cart to be processed
         Promise.allSettled(processSalePromises)
           .then((results) => {
             results.forEach((result, index) => {
@@ -415,6 +614,27 @@ app.post("/sales", async (req, res) => {
               }
             });
 
+            // After processing all items, insert the total price for the cart
+            if (!errorOccurred) {
+              db.run(
+                "INSERT INTO invoices (reference_number, customer_id, total_amount, amount_paid, status) VALUES (?, ?, ?, ?, ?)",
+                [
+                  reference_number, // Reference number for the cart
+                  customer_id, // Customer ID
+                  totalCartPrice, // Total price for the cart
+                  payment_method == "credit" ? 0 : totalCartPrice, // Amount paid: 0 for credit, full amount for cash
+                  payment_method == "credit" ? "unpaid" : "paid" // Status: 'unpaid' for credit, 'paid' for cash
+                ],
+                (err) => {
+                  if (err) {
+                    errorOccurred = true;
+                    console.error("Invoice error: ", err.message);
+                  }
+                }
+              );
+            }
+
+            // If any error occurred, rollback transaction
             if (errorOccurred) {
               db.run("ROLLBACK", (rollbackErr) => {
                 if (rollbackErr) {
