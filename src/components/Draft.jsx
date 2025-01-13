@@ -276,7 +276,7 @@ const Draft = () => {
   };
 
   // Updated handleCompleteSale function
-  const handleCompleteSaleDraft = async (customer) => {
+  const handleCompleteSaleDraft = async (customer,paymentMethod) => {
     try {
       // Fetch draft details
       const response = await axios.get(
@@ -285,6 +285,7 @@ const Draft = () => {
       const draft = response.data;
       const referenceNumber = draft.reference_number; // Extract reference number
       const customer_id = customer;
+      const payment_method=paymentMethod;
       // Parse draft items
       const draftItems = JSON.parse(draft.details);
       console.log("customer id: ",customer_id);
@@ -306,7 +307,7 @@ const Draft = () => {
       await Promise.all(stockCheckPromises);
 
       // Process the sale if all items pass the stock check
-      const saleResponse = await processSale(referenceNumber,customer_id);
+      const saleResponse = await processSale(referenceNumber,customer_id,payment_method);
       if (saleResponse.status !== 200 && saleResponse.status !== 201) {
         throw new Error(
           `Unexpected response status from sale process: ${saleResponse}`

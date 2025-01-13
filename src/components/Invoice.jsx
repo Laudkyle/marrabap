@@ -27,6 +27,8 @@ function Invoice({
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+
   const { cart, clearCart } = useCart();
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(1);
@@ -296,6 +298,24 @@ function Invoice({
                 </div>
                 {showDraft && (
                   <div className="mt-6">
+                    {showClearCart && (
+                      <>
+                        <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                          Select Payment Method
+                        </h2>
+                        <div className="w-full p-2 border rounded mb-4">
+                          {/* Select Dropdown for Payment Method */}
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="w-full p-2 border rounded "
+                          >
+                            <option value="cash">Cash</option>
+                            <option value="credit">Credit</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
                     <h2 className="text-lg font-semibold text-blue-600 mb-4">
                       Documents
                     </h2>
@@ -426,11 +446,11 @@ function Invoice({
               {showDraft && (
                 <button
                   onClick={() => {
-                    handleSaleDraft(selectedCustomer);
+                    handleSaleDraft(selectedCustomer,paymentMethod);
                   }}
                   className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                {showClearCart ? "Complete Sale" : "Process Draft"}
+                  {showClearCart ? "Complete Sale" : "Process Draft"}
                 </button>
               )}
             </div>

@@ -46,13 +46,14 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem("cart");
   };
 
-  const processSale = async (referenceNumber,customer_id) => {
+  const processSale = async (referenceNumber,customer_id,payment_method) => {
     try {
       const salesData = cart.map((item) => ({
         product_id: item.product.id,
         quantity: item.quantity,
         reference_number: referenceNumber,
-        customer_id:customer_id
+        customer_id:customer_id,
+        payment_method:payment_method
       }));
   console.log("this is sales data:", salesData)
       // Sending the request
@@ -94,7 +95,8 @@ export const CartProvider = ({ children }) => {
           product_id: selectedProduct.id,
           quantity: quantity,
           reference_number: referenceNumber, // Add reference number to sale
-          customer_id:1
+          customer_id:1,
+          payment_method:'cash'
         }),
       });
   

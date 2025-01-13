@@ -18,10 +18,11 @@ function ProcessSaleModal({
   setDocuments,
   handleCompleteSale,
 }) {
-
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+
   const [selectedCustomer, setSelectedCustomer] = useState(1);
   // Fetch customers from the database
   const fetchCustomers = async () => {
@@ -112,9 +113,7 @@ function ProcessSaleModal({
                     Email: {email || "support@company.com"} | Phone:{" "}
                     {phone || "(123) 456-7890"}
                   </p>
-                  <h2 className="text-lg font-semibold mt-4">
-                    Process Sale
-                  </h2>
+                  <h2 className="text-lg font-semibold mt-4">Process Sale</h2>
                   <p className="text-sm text-gray-600">
                     Reference Number:{" "}
                     <span className="font-medium">{refNum}</span>
@@ -143,7 +142,8 @@ function ProcessSaleModal({
                     <option value="">Select Customer</option>
                     {customers.map((customer) => (
                       <option key={customer.id} value={customer.id}>
-                        {customer.name|| customer.business_name} ({customer.customer_type})
+                        {customer.name || customer.business_name} (
+                        {customer.customer_type})
                       </option>
                     ))}
                   </select>
@@ -199,7 +199,6 @@ function ProcessSaleModal({
                               item.quantity * item.product.sp
                             ).toFixed(2)}
                           </td>
-                          
                         </tr>
                       ))}
                     </tbody>
@@ -233,6 +232,20 @@ function ProcessSaleModal({
                 </div>
                 {showDraft && (
                   <div className="mt-6">
+                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                      Select Payment Method
+                    </h2>
+                    <div className="w-full p-2 border rounded mb-4">
+                      {/* Select Dropdown for Payment Method */}
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full p-2 border rounded "
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="credit">Credit</option>
+                      </select>
+                    </div>
                     <h2 className="text-lg font-semibold text-blue-600 mb-4">
                       Documents
                     </h2>
@@ -302,6 +315,21 @@ function ProcessSaleModal({
                 {!showDraft && (
                   <div className="mt-6">
                     <h2 className="text-lg font-semibold text-blue-600 mb-4">
+                      Select Payment Method
+                    </h2>
+                    <div className="w-full p-2 border rounded mb-4">
+                      {/* Select Dropdown for Payment Method */}
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full p-2 border rounded "
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="credit">Credit</option>
+                      </select>
+                    </div>
+
+                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
                       Documents
                     </h2>
                     {documents.length > 0 ? (
@@ -339,15 +367,15 @@ function ProcessSaleModal({
               >
                 Close
               </button>
-                <button
-                  onClick={()=>{
-                    
-                    handleCompleteSale(selectedCustomer.id|| 1)
-                  }}
-                  className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Complete Sale
-                </button>
+
+              <button
+                onClick={() =>
+                  handleCompleteSale(selectedCustomer.id || 1, paymentMethod)
+                }
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Complete Sale
+              </button>
             </div>
           </div>
         </div>
