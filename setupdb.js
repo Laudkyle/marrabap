@@ -133,6 +133,80 @@ db.run(`CREATE TABLE IF NOT EXISTS payments (
   uploaded_on TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP -- Date and time of upload
 );`);
 
+db.run(`CREATE TABLE IF NOT EXISTS chart_of_accounts (
+  id INTEGER PRIMARY KEY,
+  account_code TEXT NOT NULL UNIQUE, -- Unique identifier for the account
+  account_name TEXT NOT NULL, -- Name of the account
+  account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
+  parent_account_id INTEGER, -- For hierarchical accounts
+  FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
+);
+`)
+db.run(`CREATE TABLE IF NOT EXISTS general_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  date TEXT NOT NULL, -- Transaction date
+  description TEXT, -- Details of the transaction
+  debit REAL DEFAULT 0 CHECK(debit >= 0), -- Debit amount
+  credit REAL DEFAULT 0 CHECK(credit >= 0), -- Credit amount
+  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
+);
+`)
+db.run(`CREATE TABLE IF NOT EXISTS journal_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reference_number TEXT UNIQUE NOT NULL, -- Unique identifier
+  date TEXT NOT NULL, -- Transaction date
+  description TEXT, -- Summary of the transaction
+  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'posted')), -- Posting status
+  created_on TEXT DEFAULT CURRENT_TIMESTAMP -- Timestamp
+);
+CREATE TABLE IF NOT EXISTS journal_entry_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  journal_entry_id INTEGER NOT NULL,
+  account_id INTEGER NOT NULL,
+  debit REAL DEFAULT 0 CHECK(debit >= 0),
+  credit REAL DEFAULT 0 CHECK(credit >= 0),
+  FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id),
+  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
+);
+CREATE TABLE IF NOT EXISTS taxes (
+  id INTEGER PRIMARY KEY,
+  tax_name TEXT NOT NULL UNIQUE, -- Name of the tax
+  tax_rate REAL NOT NULL CHECK(tax_rate >= 0), -- Tax rate
+  tax_type TEXT CHECK(tax_type IN ('inclusive', 'exclusive')), -- How tax is applied
+  account_id INTEGER NOT NULL, -- Linked to the chart of accounts
+  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
+);
+CREATE TABLE IF NOT EXISTS fixed_assets (
+  id INTEGER PRIMARY KEY,
+  asset_name TEXT NOT NULL,
+  purchase_date TEXT NOT NULL,
+  cost REAL NOT NULL CHECK(cost >= 0),
+  useful_life INTEGER NOT NULL CHECK(useful_life > 0), -- In years
+  depreciation_method TEXT CHECK(depreciation_method IN ('straight_line', 'reducing_balance')), -- Depreciation type
+  salvage_value REAL DEFAULT 0 CHECK(salvage_value >= 0), -- Residual value
+  accumulated_depreciation REAL DEFAULT 0 CHECK(accumulated_depreciation >= 0),
+  account_id INTEGER NOT NULL, -- Linked to chart of accounts
+  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
+);
+CREATE TABLE IF NOT EXISTS audit_trails (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL, -- User making the change
+  table_name TEXT NOT NULL, -- Affected table
+  record_id INTEGER NOT NULL, -- Affected record
+  action TEXT NOT NULL CHECK(action IN ('insert', 'update', 'delete')), -- Type of change
+  change_date TEXT DEFAULT CURRENT_TIMESTAMP, -- Timestamp
+  changes TEXT -- JSON object capturing the change details
+);
+CREATE TABLE IF NOT EXISTS budgets (
+  id INTEGER PRIMARY KEY,
+  account_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  budget_amount REAL NOT NULL CHECK(budget_amount >= 0), -- Planned budget
+  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
+);
+
+`)
   // Insert product data
   const insertStmt =
     db.prepare(`INSERT INTO products (id, name, cp, sp, stock, image)
