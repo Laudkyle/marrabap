@@ -378,7 +378,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
             <div
               className={`overflow-hidden transition-all duration-300 ${
                 openDropdown === dropdown
-                  ? "max-h-48 opacity-100"
+                  ? "max-h-60 opacity-100"
                   : "max-h-0 opacity-0"
               }`}
             >
