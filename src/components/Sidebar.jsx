@@ -114,7 +114,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           icon: <PlusCircle className="w-4 h-4" />,
         },
         {
-          path: "/make-supplier-payment",
+          path: "/supplier-payment",
           label: "Supplier Payment",
           icon: <CreditCard className="w-4 h-4" />,
         },

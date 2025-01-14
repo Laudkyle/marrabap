@@ -205,7 +205,7 @@ db.serialize(() => {
 )`);
   db.run(`CREATE TABLE IF NOT EXISTS documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  transaction_type TEXT NOT NULL CHECK(transaction_type IN ('sale', 'return', 'expense','stock')), -- Type of transaction
+  transaction_type TEXT NOT NULL CHECK(transaction_type IN ('sale', 'return', 'expense','stock','payment')), -- Type of transaction
   reference_number TEXT NOT NULL, -- Associated transaction's reference number
   document_name TEXT NOT NULL, -- Name of the document
   file_path TEXT NOT NULL, -- File path where the document is stored
