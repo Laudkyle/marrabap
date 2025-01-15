@@ -20,6 +20,8 @@ import Draft from './components/Draft';
 import SaleReturnList from './components/SaleReturnList';
 import ProcessPayment from './components/ProcessPayment';
 import SupplierPayment from './components/SupplierPayment';
+import PaymentList from './components/PaymentList';
+import CustomerPayment from './components/customerPayment';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName="Essential Anchor";
@@ -50,6 +52,8 @@ const App = () => {
             <Route path="/list-stock" element={<StockList />} />
             <Route path="/add-payment" element={<ProcessPayment />} />
             <Route path="/supplier-payment" element={<SupplierPayment />} />
+            <Route path="/customer-payment" element={<CustomerPayment />} />
+            <Route path="/payment-history" element={<PaymentList />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>

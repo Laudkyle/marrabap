@@ -119,6 +119,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
           icon: <CreditCard className="w-4 h-4" />,
         },
         {
+          path: "/customer-payment",
+          label: "Customer Payment",
+          icon: <CreditCard className="w-4 h-4" />,
+        },
+        {
           path: "/payment-history",
           label: "Payment History",
           icon: <List className="w-4 h-4" />,

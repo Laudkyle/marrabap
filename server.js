@@ -10,13 +10,13 @@ const app = express();
 const port = 5000;
 
 // Ensure `uploads` directory exists
-const uploadsDir = path.join(__dirname,"public", "uploads","images");
+const uploadsDir = path.join(__dirname, "public", "uploads", "images");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
 // Ensure `uploads/documents` directory exists
-const documentsDir = path.join(__dirname,"public", "uploads", "documents");
+const documentsDir = path.join(__dirname, "public", "uploads", "documents");
 if (!fs.existsSync(documentsDir)) {
   fs.mkdirSync(documentsDir);
 }
@@ -37,8 +37,9 @@ app.use(
   })
 );
 app.use((req, res, next) => {
-  res.setTimeout(60000, () => { // Set timeout to 60 seconds
-    res.status(408).send('Request timeout');
+  res.setTimeout(60000, () => {
+    // Set timeout to 60 seconds
+    res.status(408).send("Request timeout");
   });
   next();
 });
@@ -69,8 +70,6 @@ const documentStorage = multer.diskStorage({
 });
 
 const documentUpload = multer({ storage: documentStorage });
-
-
 
 // ===================== Products Endpoints =====================
 
@@ -107,7 +106,7 @@ app.post("/products", (req, res) => {
   const stmt = db.prepare(
     "INSERT INTO products (name, cp, sp, stock,suppliers_id) VALUES (?, ?, ?, ?,?)"
   );
-  stmt.run(name, cp, sp, stock,suppliers_id, function (err) {
+  stmt.run(name, cp, sp, stock, suppliers_id, function (err) {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error adding product");
@@ -118,7 +117,7 @@ app.post("/products", (req, res) => {
 });
 
 app.post("/products/bulk", (req, res) => {
-  const { suppliers_id,payment_method, products } = req.body;
+  const { suppliers_id, payment_method, products } = req.body;
 
   // Validate suppliers_id
   if (!suppliers_id) {
@@ -153,7 +152,7 @@ app.post("/products/bulk", (req, res) => {
         "INSERT INTO products (name, cp, sp, stock, suppliers_id,payment_method) VALUES (?, ?, ?, ?, ?,?)"
       );
 
-      stmt.run(name, cp, sp, stock, suppliers_id, payment_method,(err) => {
+      stmt.run(name, cp, sp, stock, suppliers_id, payment_method, (err) => {
         if (err) {
           console.error("Error inserting product:", err.message);
           errorOccurred = true;
@@ -173,7 +172,6 @@ app.post("/products/bulk", (req, res) => {
     }
   });
 });
-
 
 // Update a product
 app.put("/products/:id", upload.single("image"), (req, res) => {
@@ -358,27 +356,45 @@ app.delete("/drafts/:id", (req, res) => {
 // ===================== Invoice Endpoints =====================
 
 // Create invoice (POST request)
-app.post('/invoices', (req, res) => {
-  const { reference_number, customer_id, total_amount, amount_paid = 0, due_date = null, status = 'unpaid' } = req.body;
+app.post("/invoices", (req, res) => {
+  const {
+    reference_number,
+    customer_id,
+    total_amount,
+    amount_paid = 0,
+    due_date = null,
+    status = "unpaid",
+  } = req.body;
 
   const sql = `
     INSERT INTO invoices (reference_number, customer_id, total_amount, amount_paid, due_date, status)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-  
-  db.run(sql, [reference_number, customer_id, total_amount, amount_paid, due_date, status], function (err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.status(201).json({ id: this.lastID });
+
+  db.run(
+    sql,
+    [
+      reference_number,
+      customer_id,
+      total_amount,
+      amount_paid,
+      due_date,
+      status,
+    ],
+    function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+      } else {
+        res.status(201).json({ id: this.lastID });
+      }
     }
-  });
+  );
 });
 
 // Get all invoices (GET request)
-app.get('/invoices', (req, res) => {
-  const sql = 'SELECT * FROM invoices';
-  
+app.get("/invoices", (req, res) => {
+  const sql = "SELECT * FROM invoices";
+
   db.all(sql, [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -389,24 +405,41 @@ app.get('/invoices', (req, res) => {
 });
 
 // Get a single invoice by reference_number (GET request)
-app.get('/invoices/:reference_number', (req, res) => {
+app.get("/invoices/:reference_number", (req, res) => {
   const { reference_number } = req.params;
-  
-  const sql = 'SELECT * FROM invoices WHERE reference_number = ?';
-  
+
+  const sql = "SELECT * FROM invoices WHERE reference_number = ?";
+
   db.get(sql, [reference_number], (err, row) => {
     if (err) {
       res.status(500).json({ error: err.message });
     } else if (!row) {
-      res.status(404).json({ message: 'Invoice not found' });
+      res.status(404).json({ message: "Invoice not found" });
     } else {
       res.status(200).json(row);
     }
   });
 });
+// Get invoices by customer and status (unpaid or partial)
+app.get("/invoices/:customer_id", (req, res) => {
+  console.log("this is customer id:")
+
+  const { customer_id } = req.params;
+  console.log("this is customer id:", customer_id)
+  const sql =
+    'SELECT * FROM invoices WHERE customer_id = ? AND (status = "unpaid" OR status = "partial")';
+
+  db.all(sql, [customer_id], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.status(200).json(rows);
+    }
+  });
+});
 
 // Update an invoice (PUT request)
-app.put('/invoices/:reference_number', (req, res) => {
+app.put("/invoices/:reference_number", (req, res) => {
   const { reference_number } = req.params;
   const { total_amount, amount_paid, due_date, status } = req.body;
 
@@ -415,31 +448,35 @@ app.put('/invoices/:reference_number', (req, res) => {
     SET total_amount = ?, amount_paid = ?, due_date = ?, status = ?
     WHERE reference_number = ?
   `;
-  
-  db.run(sql, [total_amount, amount_paid, due_date, status, reference_number], function (err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else if (this.changes === 0) {
-      res.status(404).json({ message: 'Invoice not found' });
-    } else {
-      res.status(200).json({ message: 'Invoice updated successfully' });
+
+  db.run(
+    sql,
+    [total_amount, amount_paid, due_date, status, reference_number],
+    function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+      } else if (this.changes === 0) {
+        res.status(404).json({ message: "Invoice not found" });
+      } else {
+        res.status(200).json({ message: "Invoice updated successfully" });
+      }
     }
-  });
+  );
 });
 
 // Delete an invoice (DELETE request)
-app.delete('/invoices/:reference_number', (req, res) => {
+app.delete("/invoices/:reference_number", (req, res) => {
   const { reference_number } = req.params;
 
-  const sql = 'DELETE FROM invoices WHERE reference_number = ?';
-  
+  const sql = "DELETE FROM invoices WHERE reference_number = ?";
+
   db.run(sql, [reference_number], function (err) {
     if (err) {
       res.status(500).json({ error: err.message });
     } else if (this.changes === 0) {
-      res.status(404).json({ message: 'Invoice not found' });
+      res.status(404).json({ message: "Invoice not found" });
     } else {
-      res.status(200).json({ message: 'Invoice deleted successfully' });
+      res.status(200).json({ message: "Invoice deleted successfully" });
     }
   });
 });
@@ -447,10 +484,18 @@ app.delete('/invoices/:reference_number', (req, res) => {
 // ===================== Payments Endpoints =====================
 // CREATE: Add a new payment
 app.post("/payments", (req, res) => {
-  const { reference_number, payment_date, amount_paid, payment_method, payment_reference } = req.body;
+  const {
+    reference_number,
+    payment_date,
+    amount_paid,
+    payment_method,
+    payment_reference,
+  } = req.body;
 
   if (!reference_number || !amount_paid) {
-    return res.status(400).send("Reference number and amount paid are required.");
+    return res
+      .status(400)
+      .send("Reference number and amount paid are required.");
   }
 
   const query = `
@@ -506,7 +551,13 @@ app.get("/payments/:id", (req, res) => {
 
 // UPDATE: Update a payment
 app.put("/payments/:id", (req, res) => {
-  const { reference_number, payment_date, amount_paid, payment_method, payment_reference } = req.body;
+  const {
+    reference_number,
+    payment_date,
+    amount_paid,
+    payment_method,
+    payment_reference,
+  } = req.body;
 
   const query = `
     UPDATE payments
@@ -567,40 +618,62 @@ app.post("/sales", async (req, res) => {
         const payment_method = salesData[0].payment_method; // Assuming payment_method is the same for all items in the cart
 
         // Process each sale item in the cart
-        const processSalePromises = salesData.map(({ product_id, quantity }) => {
-          return new Promise((resolveSale, rejectSale) => {
-            db.get("SELECT * FROM products WHERE id = ?", [product_id], (err, product) => {
-              if (err || !product) {
-                errorOccurred = true;
-                console.error(err ? err.message : "Product not found");
-                return rejectSale("Product not found");
-              }
-
-              if (product.stock < quantity) {
-                errorOccurred = true;
-                console.error("Insufficient stock for product ID:", product_id);
-                return rejectSale("Insufficient stock");
-              }
-
-              const total_price = product.sp * quantity;
-              totalCartPrice += total_price; // Sum total price for the cart
-
-              // Insert the sale record for each item
-              db.run(
-                "INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [customer_id, product_id, payment_method, reference_number, quantity, total_price, new Date().toISOString()],
-                (err) => {
-                  if (err) {
+        const processSalePromises = salesData.map(
+          ({ product_id, quantity }) => {
+            return new Promise((resolveSale, rejectSale) => {
+              db.get(
+                "SELECT * FROM products WHERE id = ?",
+                [product_id],
+                (err, product) => {
+                  if (err || !product) {
                     errorOccurred = true;
-                    console.error("Error: ", err.message);
-                    return rejectSale("Error inserting sale items");
+                    console.error(err ? err.message : "Product not found");
+                    return rejectSale("Product not found");
                   }
-                  resolveSale({ customer_id, product_id, quantity, total_price });
+
+                  if (product.stock < quantity) {
+                    errorOccurred = true;
+                    console.error(
+                      "Insufficient stock for product ID:",
+                      product_id
+                    );
+                    return rejectSale("Insufficient stock");
+                  }
+
+                  const total_price = product.sp * quantity;
+                  totalCartPrice += total_price; // Sum total price for the cart
+
+                  // Insert the sale record for each item
+                  db.run(
+                    "INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [
+                      customer_id,
+                      product_id,
+                      payment_method,
+                      reference_number,
+                      quantity,
+                      total_price,
+                      new Date().toISOString(),
+                    ],
+                    (err) => {
+                      if (err) {
+                        errorOccurred = true;
+                        console.error("Error: ", err.message);
+                        return rejectSale("Error inserting sale items");
+                      }
+                      resolveSale({
+                        customer_id,
+                        product_id,
+                        quantity,
+                        total_price,
+                      });
+                    }
+                  );
                 }
               );
             });
-          });
-        });
+          }
+        );
 
         // Wait for all sales items in the cart to be processed
         Promise.allSettled(processSalePromises)
@@ -623,7 +696,7 @@ app.post("/sales", async (req, res) => {
                   customer_id, // Customer ID
                   totalCartPrice, // Total price for the cart
                   payment_method == "credit" ? 0 : totalCartPrice, // Amount paid: 0 for credit, full amount for cash
-                  payment_method == "credit" ? "unpaid" : "paid" // Status: 'unpaid' for credit, 'paid' for cash
+                  payment_method == "credit" ? "unpaid" : "paid", // Status: 'unpaid' for credit, 'paid' for cash
                 ],
                 (err) => {
                   if (err) {
@@ -705,7 +778,8 @@ app.post("/sales/return", async (req, res) => {
   // Validate input
   if (!sale_id || !reference_number || !return_quantity || !action) {
     return res.status(400).json({
-      message: "Invalid input. Provide sale_id, reference_number, return_quantity, and action.",
+      message:
+        "Invalid input. Provide sale_id, reference_number, return_quantity, and action.",
     });
   }
 
@@ -719,7 +793,13 @@ app.post("/sales/return", async (req, res) => {
     // Insert return record; trigger will handle the rest
     db.run(
       "INSERT INTO returns (sale_id, reference_number, return_quantity, action, return_date) VALUES (?, ?, ?, ?, ?)",
-      [sale_id, reference_number, return_quantity, action, new Date().toISOString()],
+      [
+        sale_id,
+        reference_number,
+        return_quantity,
+        action,
+        new Date().toISOString(),
+      ],
       (err) => {
         if (err) {
           console.error("Error logging return:", err.message);
@@ -740,7 +820,6 @@ app.post("/sales/return", async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 
 // Get All Returns
 app.get("/sales/returns", async (req, res) => {
@@ -979,13 +1058,12 @@ app.patch("/suppliers/:id", (req, res) => {
   });
 });
 
-
 // ===================== Documents Endpoints =====================
 
 // CREATE: Add multiple or single documents
-app.post('/documents', documentUpload.array('files'), async (req, res) => {
+app.post("/documents", documentUpload.array("files"), async (req, res) => {
   if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: 'No files uploaded' });
+    return res.status(400).json({ message: "No files uploaded" });
   }
 
   const { transaction_type, reference_number } = req.body;
@@ -997,17 +1075,21 @@ app.post('/documents', documentUpload.array('files'), async (req, res) => {
         return new Promise((resolve, reject) => {
           const filePath = `/uploads/documents/${file.filename}`;
           const query = `INSERT INTO documents (transaction_type, reference_number, document_name, file_path) VALUES (?, ?, ?, ?)`;
-          db.run(query, [transaction_type, reference_number, file.originalname, filePath], function (err) {
-            if (err) return reject(err);
-            uploadedDocuments.push({
-              id: this.lastID,
-              transaction_type,
-              reference_number,
-              document_name: file.originalname,
-              file_path: filePath,
-            });
-            resolve();
-          });
+          db.run(
+            query,
+            [transaction_type, reference_number, file.originalname, filePath],
+            function (err) {
+              if (err) return reject(err);
+              uploadedDocuments.push({
+                id: this.lastID,
+                transaction_type,
+                reference_number,
+                document_name: file.originalname,
+                file_path: filePath,
+              });
+              resolve();
+            }
+          );
         });
       })
     );
@@ -1015,12 +1097,12 @@ app.post('/documents', documentUpload.array('files'), async (req, res) => {
     return res.status(201).json(uploadedDocuments);
   } catch (error) {
     console.error("Error during document upload:", error.message);
-    return res.status(500).json({ message: 'Error during document upload' });
+    return res.status(500).json({ message: "Error during document upload" });
   }
 });
 
 // READ: Get all documents
-app.get('/documents', (req, res) => {
+app.get("/documents", (req, res) => {
   const query = `SELECT * FROM documents`;
   db.all(query, [], (err, rows) => {
     if (err) {
@@ -1031,7 +1113,7 @@ app.get('/documents', (req, res) => {
 });
 
 // READ: Get a document by ID
-app.get('/documents/:id', (req, res) => {
+app.get("/documents/:id", (req, res) => {
   const { id } = req.params;
   const query = `SELECT * FROM documents WHERE id = ?`;
   db.get(query, [id], (err, row) => {
@@ -1045,9 +1127,8 @@ app.get('/documents/:id', (req, res) => {
   });
 });
 
-
 // DELETE: Delete a document by ID
-app.delete('/documents/:id', (req, res) => {
+app.delete("/documents/:id", (req, res) => {
   const { id } = req.params;
   const query = `DELETE FROM documents WHERE id = ?`;
   db.run(query, [id], function (err) {
@@ -1061,10 +1142,10 @@ app.delete('/documents/:id', (req, res) => {
   });
 });
 
-app.get('/documents/by-reference/:referenceNumber', (req, res) => {
+app.get("/documents/by-reference/:referenceNumber", (req, res) => {
   const { referenceNumber } = req.params;
   const query = `SELECT * FROM documents WHERE reference_number = ?`;
-  
+
   db.all(query, [referenceNumber], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
