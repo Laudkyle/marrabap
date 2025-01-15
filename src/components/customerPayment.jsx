@@ -9,7 +9,7 @@ const CustomerPayment = () => {
     invoiceId: "", // To hold the selected invoice
     amountPaid: "",
     paymentMethod: "cash", // Default to cash
-    paymentReference: "", // This will be generated automatically
+    paymentReference: "", // Will be set to the selected invoice reference
     paymentDate: new Date().toISOString(),
     documents: [], // To hold multiple documents
     errorMessage: "",
@@ -39,9 +39,8 @@ const CustomerPayment = () => {
     // Fetch invoices when a customer is selected
     const fetchInvoices = async (customerId) => {
       if (customerId) {
-        console.log("this is customer id:", customerId)
         try {
-          const response = await axios.get(`http://localhost:5000/invoices/${customerId}`);
+          const response = await axios.get(`http://localhost:5000/invoices/customer/${customerId}`);
           setInvoices(response.data);
         } catch (error) {
           console.error("Error fetching invoices:", error);
@@ -57,18 +56,18 @@ const CustomerPayment = () => {
     }
   }, [paymentData.customerId]);
 
-  // Utility function to generate a unique reference number
-  const generateReferenceNumber = () => {
-    const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
-    return `REF ${uniqueNumber}`;
-  };
-
+  // Handle input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setPaymentData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setPaymentData((prevData) => {
+      const newData = { ...prevData, [name]: value };
+      // If the invoice is changed, set the payment reference to the selected invoice's reference number
+      if (name === "invoiceId") {
+        const selectedInvoice = invoices.find((invoice) => invoice.id === parseInt(value));
+        newData.paymentReference = selectedInvoice ? selectedInvoice.reference_number : "";
+      }
+      return newData;
+    });
   };
 
   const handleFileChange = (e) => {
@@ -115,15 +114,7 @@ const CustomerPayment = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    // Generate a reference number for the payment
-    const referenceNumber = generateReferenceNumber();
-
-    setPaymentData((prevData) => ({
-      ...prevData,
-      paymentReference: referenceNumber,
-    }));
-
+  
     // Ensure payment amount is valid
     if (!paymentData.amountPaid || paymentData.amountPaid <= 0) {
       setLoading(false);
@@ -134,42 +125,94 @@ const CustomerPayment = () => {
       toast.error("Please enter a valid payment amount.");
       return;
     }
-
+  
+    // Ensure that an invoice is selected
+    if (!paymentData.invoiceId) {
+      setLoading(false);
+      setPaymentData((prevData) => ({
+        ...prevData,
+        errorMessage: "Please select an invoice.",
+      }));
+      toast.error("Please select an invoice.");
+      return;
+    }
+  console.log("invoices : ",invoices)
+    // Find the selected invoice based on invoiceId
+    const selectedInvoice = invoices.find(
+      (invoice) => invoice.id == paymentData.invoiceId
+    );
+  
+    // Ensure that the selected invoice exists
+    if (!selectedInvoice) {
+      setLoading(false);
+      setPaymentData((prevData) => ({
+        ...prevData,
+        errorMessage: "Invoice not found.",
+      }));
+      toast.error("Invoice not found.");
+      return;
+    }
+  
+    // Calculate remaining balance and determine invoice status
+    const remainingBalance = selectedInvoice.total_amount - selectedInvoice.amount_paid;
+    let updatedStatus = selectedInvoice.status;
+  
+    if (paymentData.amountPaid >= remainingBalance) {
+      updatedStatus = "paid"; // Fully paid
+    } else if (paymentData.amountPaid > 0) {
+      updatedStatus = "partial"; // Partially paid
+    }
+  
+    // Create the payment payload
     const paymentPayload = {
-      reference_number: referenceNumber,
+      reference_number: selectedInvoice.reference_number, // Use the selected invoice reference here
       payment_date: paymentData.paymentDate,
       amount_paid: paymentData.amountPaid,
       payment_method: paymentData.paymentMethod,
-      payment_reference: paymentData.paymentReference,
+      payment_reference: selectedInvoice.reference_number, // Payment reference will be the invoice reference
     };
-
+  
     try {
       // Post payment data to the server
       const paymentResponse = await axios.post("http://localhost:5000/payments", paymentPayload);
-
+  
       // If documents are attached, post them to /documents
       if (paymentData.documents.length > 0) {
         const formData = new FormData();
         formData.append("transaction_type", "payment"); // Define transaction type
-        formData.append("reference_number", referenceNumber); // Attach the reference number
-
+        formData.append("reference_number", selectedInvoice.reference_number); // Attach the reference number
+  
         // Append each document to the FormData
         paymentData.documents.forEach((file) => {
           formData.append("files", file);
         });
-
+  
         const documentResponse = await axios.post("http://localhost:5000/documents", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         });
-
+  
         console.log("Documents uploaded successfully:", documentResponse.data);
       }
-
+  
+      // Update the invoice status based on the payment
+      const invoiceUpdatePayload = {
+        total_amount: selectedInvoice.total_amount,
+        amount_paid: parseInt(selectedInvoice.amount_paid) + parseInt(paymentData.amountPaid),
+        due_date: selectedInvoice.due_date,
+        status: updatedStatus,
+      };
+  
+      // Send PUT request to update the invoice status
+      const invoiceUpdateResponse = await axios.put(
+        `http://localhost:5000/invoices/${selectedInvoice.reference_number}`,
+        invoiceUpdatePayload
+      );
+  
       // Handle success
-      if (paymentResponse.status === 201) {
-        toast.success("Customer payment processed successfully.");
+      if (paymentResponse.status === 201 && invoiceUpdateResponse.status === 200) {
+        toast.success("Customer payment processed successfully and invoice status updated.");
         setPaymentData({
           customerId: "",
           invoiceId: "",
@@ -188,13 +231,13 @@ const CustomerPayment = () => {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg space-y-6">
       <h2 className="text-2xl font-semibold text-gray-700">Customer Payment</h2>
       {paymentData.errorMessage && <p className="text-red-600 text-sm">{paymentData.errorMessage}</p>}
       <form onSubmit={handleSubmit} className="space-y-6">
-      <ToastContainer />
+        <ToastContainer />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Customer Dropdown */}
           <div className="flex flex-col">
@@ -230,7 +273,7 @@ const CustomerPayment = () => {
               <option value="">Select Invoice</option>
               {invoices.map((invoice) => (
                 <option key={invoice.id} value={invoice.id}>
-                  {invoice.reference_number} - {invoice.status} - ${invoice.balance_due}
+                  {invoice.reference_number} - {(invoice.status).toUpperCase()} - ₵{" "}{invoice.balance_due}
                 </option>
               ))}
             </select>
@@ -265,19 +308,6 @@ const CustomerPayment = () => {
               <option value="cash">Cash</option>
               <option value="credit">Credit</option>
             </select>
-          </div>
-
-          {/* Payment Reference */}
-          <div className="flex flex-col">
-            <label htmlFor="paymentReference" className="text-gray-600">Payment Reference (Generated)</label>
-            <input
-              type="text"
-              name="paymentReference"
-              id="paymentReference"
-              value={paymentData.paymentReference}
-              readOnly
-              className="mt-2 p-3 border border-gray-300 rounded-md bg-gray-100"
-            />
           </div>
 
           {/* Document Upload */}

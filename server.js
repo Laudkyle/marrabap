@@ -233,6 +233,172 @@ app.delete("/products/:id", (req, res) => {
     }
   });
 });
+
+// ===================== Pos Products Endpoints =====================
+// Add a product to POS
+app.post("/pos_products", (req, res) => {
+  const { product_id } = req.body;
+
+  // Validate product_id
+  if (!product_id) {
+    return res.status(400).send("Product ID is required");
+  }
+
+  // Fetch product from the main products table
+  const query = `
+    SELECT id, name, sp AS price, stock 
+    FROM products 
+    WHERE id = ?
+  `;
+
+  db.get(query, [product_id], (err, product) => {
+    if (err) {
+      console.error(err.message);
+      return res.status(500).send("Error fetching product");
+    }
+
+    if (!product) {
+      return res.status(404).send("Product not found");
+    }
+
+    // Insert product into pos_products
+    const insertQuery = `
+      INSERT INTO pos_products (product_id, name, stock, price)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    db.run(
+      insertQuery,
+      [product.id, product.name, product.stock, product.price],
+      function (err) {
+        if (err) {
+          console.error(err.message);
+          return res.status(500).send("Error adding product to POS");
+        }
+
+        res.status(201).json({
+          product_id: product.id,
+          name: product.name,
+          stock: product.stock,
+          price: product.price,
+        });
+      }
+    );
+  });
+});
+
+// Update POS product
+app.put("/pos_products/:product_id", (req, res) => {
+  const { product_id } = req.params;
+  const { stock, price } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  if (stock !== undefined) {
+    fields.push("stock = ?");
+    values.push(stock);
+  }
+  if (price !== undefined) {
+    fields.push("price = ?");
+    values.push(price);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).send("No valid fields to update");
+  }
+
+  values.push(product_id);
+
+  const query = `UPDATE pos_products SET ${fields.join(", ")} WHERE product_id = ?`;
+
+  db.run(query, values, function (err) {
+    if (err) {
+      console.error(err.message);
+      return res.status(500).send("Error updating POS product");
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).send("POS product not found");
+    }
+
+    res.status(200).send("POS product updated successfully");
+  });
+});
+
+// Delete a POS product
+app.delete("/pos_products/:product_id", (req, res) => {
+  const { product_id } = req.params;
+
+  const query = "DELETE FROM pos_products WHERE product_id = ?";
+
+  db.run(query, [product_id], function (err) {
+    if (err) {
+      console.error(err.message);
+      return res.status(500).send("Error deleting POS product");
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).send("POS product not found");
+    }
+
+    res.status(204).send();
+  });
+});
+
+// Bulk sync products to POS
+app.post("/pos_products/sync", (req, res) => {
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    let errorOccurred = false;
+
+    // Fetch all products from the main products table
+    db.all(
+      "SELECT id, name, sp AS price, stock FROM products",
+      (err, products) => {
+        if (err) {
+          console.error(err.message);
+          errorOccurred = true;
+          return;
+        }
+
+        // Insert products into pos_products
+        products.forEach((product) => {
+          const query = `
+            INSERT INTO pos_products (product_id, name, stock, price)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET
+              name = excluded.name,
+              stock = excluded.stock,
+              price = excluded.price
+          `;
+
+          db.run(
+            query,
+            [product.id, product.name, product.stock, product.price],
+            (err) => {
+              if (err) {
+                console.error("Error syncing product to POS:", err.message);
+                errorOccurred = true;
+              }
+            }
+          );
+        });
+      }
+    );
+
+    // Commit or rollback based on error state
+    if (errorOccurred) {
+      db.run("ROLLBACK");
+      res.status(500).send("Error syncing products to POS");
+    } else {
+      db.run("COMMIT");
+      res.status(200).send("Products synced to POS successfully");
+    }
+  });
+});
+
 // ===================== Draft Endpoints =====================
 
 // Get all drafts
@@ -421,11 +587,9 @@ app.get("/invoices/:reference_number", (req, res) => {
   });
 });
 // Get invoices by customer and status (unpaid or partial)
-app.get("/invoices/:customer_id", (req, res) => {
-  console.log("this is customer id:")
+app.get("/invoices/customer/:customer_id", (req, res) => {
 
   const { customer_id } = req.params;
-  console.log("this is customer id:", customer_id)
   const sql =
     'SELECT * FROM invoices WHERE customer_id = ? AND (status = "unpaid" OR status = "partial")';
 
