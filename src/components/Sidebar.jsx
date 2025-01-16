@@ -71,7 +71,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
       links: [
         {
           path: "/add-product",
-          label: "Edit Product",
+          label: "Add Product",
           icon: <PlusCircle className="w-4 h-4" />,
         },
         {
@@ -87,8 +87,8 @@ const Sidebar = ({ isExpanded, companyName }) => {
       dropdown: "stock",
       links: [
         {
-          path: "/add-stock",
-          label: "Add Stock",
+          path: "/add-purchase-order",
+          label: "Add Purchase",
           icon: <PlusCircle className="w-4 h-4" />,
         },
         {

@@ -100,36 +100,31 @@ app.get("/products/:id", (req, res) => {
   });
 });
 
-// Add a new product
-app.post("/products", (req, res) => {
-  const { name, cp, sp, stock, suppliers_id } = req.body;
-  const stmt = db.prepare(
-    "INSERT INTO products (name, cp, sp, stock,suppliers_id) VALUES (?, ?, ?, ?,?)"
-  );
-  stmt.run(name, cp, sp, stock, suppliers_id, function (err) {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error adding product");
-    } else {
-      res.status(201).json({ id: this.lastID, name, cp, sp, stock });
-    }
-  });
-});
-
 app.post("/products/bulk", (req, res) => {
-  const { suppliers_id, payment_method, products } = req.body;
+  const { suppliers_id, products } = req.body;
 
-  // Validate suppliers_id
+  // Validate input
   if (!suppliers_id) {
-    return res.status(400).send("Supplier ID is required");
-  }
-  if (!payment_method) {
-    return res.status(400).send("Payment method is required");
+    return res.status(400).send("Supplier ID is required.");
   }
 
-  // Validate products array
   if (!Array.isArray(products) || products.length === 0) {
-    return res.status(400).send("Invalid product data");
+    return res.status(400).send("Products array is required and cannot be empty.");
+  }
+
+  const invalidProduct = products.find(
+    (product) =>
+      !product.name ||
+      isNaN(product.cp) ||
+      isNaN(product.sp) ||
+      product.cp < 0 ||
+      product.sp < 0
+  );
+
+  if (invalidProduct) {
+    return res
+      .status(400)
+      .send("Each product must have a name, cp, and sp with non-negative values.");
   }
 
   db.serialize(() => {
@@ -137,38 +132,62 @@ app.post("/products/bulk", (req, res) => {
 
     let errorOccurred = false;
 
-    // Insert each product into the products table
     products.forEach((product) => {
-      const { name, cp, sp, stock } = product;
-
-      // Validate product fields
-      if (!name || isNaN(cp) || isNaN(sp) || isNaN(stock)) {
-        errorOccurred = true;
-        console.error("Invalid product data:", product);
-        return;
-      }
-
       const stmt = db.prepare(
-        "INSERT INTO products (name, cp, sp, stock, suppliers_id,payment_method) VALUES (?, ?, ?, ?, ?,?)"
+        "INSERT INTO products (name, cp, sp, suppliers_id) VALUES (?, ?, ?, ?)"
       );
 
-      stmt.run(name, cp, sp, stock, suppliers_id, payment_method, (err) => {
-        if (err) {
-          console.error("Error inserting product:", err.message);
-          errorOccurred = true;
+      stmt.run(
+        product.name,
+        product.cp,
+        product.sp,
+        suppliers_id,
+        (err) => {
+          if (err) {
+            console.error("Error inserting product:", err.message);
+            errorOccurred = true;
+          }
         }
-      });
+      );
 
       stmt.finalize();
     });
 
-    // Commit or rollback the transaction based on error state
     if (errorOccurred) {
       db.run("ROLLBACK");
-      res.status(400).send("Error adding products. Check the input data.");
+      return res.status(500).send("Failed to add products. Transaction rolled back.");
+    }
+
+    db.run("COMMIT");
+    res.status(201).send("Products added successfully.");
+  });
+});
+// Add a new product
+app.post("/products", upload.single("image"), (req, res) => {
+  const { name, cp, sp, suppliers_id } = req.body;
+  const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
+
+  // Validation: Ensure required fields are provided and constraints are respected
+  if (!name || cp < 0 || sp < 0 || !suppliers_id) {
+    return res.status(400).send("Invalid product data. Please check your inputs.");
+  }
+
+  const stmt = db.prepare(
+    "INSERT INTO products (name, cp, sp, image, suppliers_id) VALUES (?, ?, ?, ?, ?)"
+  );
+  stmt.run(name, cp, sp, imagePath, suppliers_id, function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error adding product");
     } else {
-      db.run("COMMIT");
-      res.status(201).send("Products added successfully.");
+      res.status(201).json({
+        id: this.lastID,
+        name,
+        cp,
+        sp,
+        image: imagePath,
+        suppliers_id,
+      });
     }
   });
 });
@@ -176,31 +195,36 @@ app.post("/products/bulk", (req, res) => {
 // Update a product
 app.put("/products/:id", upload.single("image"), (req, res) => {
   const { id } = req.params;
-  const { name, cp, sp, stock } = req.body;
+  const { name, cp, sp, suppliers_id } = req.body;
   const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
 
   const fields = [];
   const values = [];
 
+  // Dynamically add fields for update based on input
   if (name) {
     fields.push("name = ?");
     values.push(name);
   }
-  if (cp) {
+  if (cp >= 0) {
     fields.push("cp = ?");
     values.push(cp);
   }
-  if (sp) {
+  if (sp >= 0) {
     fields.push("sp = ?");
     values.push(sp);
   }
-  if (stock) {
-    fields.push("stock = ?");
-    values.push(stock);
+  if (suppliers_id) {
+    fields.push("suppliers_id = ?");
+    values.push(suppliers_id);
   }
   if (imagePath) {
     fields.push("image = ?");
     values.push(imagePath);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).send("No valid fields provided for update.");
   }
 
   values.push(id);
@@ -214,10 +238,18 @@ app.put("/products/:id", upload.single("image"), (req, res) => {
     } else if (this.changes === 0) {
       res.status(404).send("Product not found");
     } else {
-      res.json({ id, name, cp, sp, stock, image: imagePath });
+      res.json({
+        id,
+        name,
+        cp,
+        sp,
+        image: imagePath,
+        suppliers_id,
+      });
     }
   });
 });
+
 
 // Delete a product
 app.delete("/products/:id", (req, res) => {
@@ -395,6 +427,172 @@ app.post("/pos_products/sync", (req, res) => {
     } else {
       db.run("COMMIT");
       res.status(200).send("Products synced to POS successfully");
+    }
+  });
+});
+
+// ===================== Purchase order Endpoints =====================
+app.post("/purchase_orders", (req, res) => {
+  const { reference_number, supplier_id, total_amount, status, items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).send("Product details are required");
+  }
+
+  // Prepare the temporary table with product details
+  db.serialize(() => {
+    // Begin a transaction
+    db.run("BEGIN TRANSACTION");
+
+    // Insert items into the temporary table
+    const stmt = db.prepare("INSERT INTO temp_purchase_order_items (product_id, quantity, unit_price) VALUES (?, ?, ?)");
+    
+    items.forEach(item => {
+      const { product_id, quantity, unit_price } = item;
+
+      stmt.run(product_id, quantity, unit_price, (err) => {
+        if (err) {
+          console.error("Error inserting item into temp table:", err.message);
+        }
+      });
+    });
+
+    stmt.finalize();
+
+    // Insert the purchase order itself
+    const purchaseOrderStmt = db.prepare(
+      "INSERT INTO purchase_orders (reference_number, supplier_id, total_amount, status) VALUES (?, ?, ?, ?)"
+    );
+
+    purchaseOrderStmt.run(reference_number, supplier_id, total_amount, status || 'pending', function (err) {
+      if (err) {
+        console.error(err.message);
+        db.run("ROLLBACK");
+        res.status(500).send("Error creating purchase order");
+      } else {
+        // After inserting the purchase order, the trigger will populate the purchase_order_details table
+        const purchase_order_id = this.lastID;
+
+        // Commit the transaction
+        db.run("COMMIT");
+        res.status(201).json({
+          id: purchase_order_id,
+          reference_number,
+          supplier_id,
+          total_amount,
+          status: status || 'pending',
+        });
+      }
+    });
+  });
+});
+
+
+// Get all purchase orders
+app.get("/purchase_orders", (req, res) => {
+  db.all("SELECT * FROM purchase_orders", (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send("Error fetching purchase orders");
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+
+// Get all purchase orders
+app.get("/purchase_orders", (req, res) => {
+  db.all("SELECT * FROM purchase_orders", (err, rows) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send("Error fetching purchase orders");
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+
+// Update a purchase order
+app.put("/purchase_orders/:id", (req, res) => {
+  const { id } = req.params;
+  const { reference_number, supplier_id, total_amount, status } = req.body;
+
+  const query = "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ?, status = ? WHERE id = ?";
+  db.run(query, [reference_number, supplier_id, total_amount, status], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating purchase order");
+    } else if (this.changes === 0) {
+      res.status(404).send("Purchase order not found");
+    } else {
+      res.json({
+        id,
+        reference_number,
+        supplier_id,
+        total_amount,
+        status,
+      });
+    }
+  });
+});
+
+
+// Delete a purchase order
+app.delete("/purchase_orders/:id", (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM purchase_orders WHERE id = ?", [id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error deleting purchase order");
+    } else if (this.changes === 0) {
+      res.status(404).send("Purchase order not found");
+    } else {
+      res.status(204).send();
+    }
+  });
+});
+
+
+// Get purchase order details by purchase order ID
+app.get("/purchase_orders/:id/details", (req, res) => {
+  const { id } = req.params;
+  db.all(
+    `SELECT pod.id, pod.product_id, p.name, pod.quantity, pod.unit_price
+     FROM purchase_order_details pod
+     JOIN products p ON pod.product_id = p.id
+     WHERE pod.purchase_order_id = ?`,
+    [id],
+    (err, rows) => {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error fetching purchase order details");
+      } else {
+        res.json(rows);
+      }
+    }
+  );
+});
+
+
+// Update purchase order details
+app.put("/purchase_orders/:purchase_order_id/details/:detail_id", (req, res) => {
+  const { purchase_order_id, detail_id } = req.params;
+  const { quantity, unit_price } = req.body;
+
+  const query = `UPDATE purchase_order_details
+                 SET quantity = ?, unit_price = ?
+                 WHERE id = ? AND purchase_order_id = ?`;
+
+  db.run(query, [quantity, unit_price, detail_id, purchase_order_id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating purchase order details");
+    } else if (this.changes === 0) {
+      res.status(404).send("Purchase order detail not found");
+    } else {
+      res.json({ purchase_order_id, detail_id, quantity, unit_price });
     }
   });
 });

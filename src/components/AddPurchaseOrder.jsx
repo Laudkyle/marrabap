@@ -3,12 +3,13 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const AddStock = ({ onProductsAdded }) => {
-  const [items, setItems] = useState([{ name: "", cp: "", sp: "", stock: "" }]);
+const AddPurchaseOrder = ({ onPurchaseOrderAdded }) => {
+  const [items, setItems] = useState([{ product_id: "", quantity: "", unit_price: "" }]);
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(1);
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [status, setStatus] = useState("pending");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
 
   useEffect(() => {
     // Fetch the suppliers from the API
@@ -25,6 +26,12 @@ const AddStock = ({ onProductsAdded }) => {
     fetchSuppliers();
   }, []);
 
+  // Utility function to generate a unique reference number
+  const generateReferenceNumber = () => {
+    const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
+    return `PUR ${uniqueNumber}`;
+  };
+
   const handleChange = (index, e) => {
     const { name, value } = e.target;
     const updatedItems = [...items];
@@ -33,7 +40,7 @@ const AddStock = ({ onProductsAdded }) => {
   };
 
   const addItem = () => {
-    setItems([...items, { name: "", cp: "", sp: "", stock: "" }]);
+    setItems([...items, { product_id: "", quantity: "", unit_price: "" }]);
   };
 
   const removeItem = (index) => {
@@ -53,41 +60,52 @@ const AddStock = ({ onProductsAdded }) => {
       return;
     }
 
+    if (!referenceNumber) {
+      // Auto-generate reference number if it's not provided
+      setReferenceNumber(generateReferenceNumber());
+    }
+
+    if (!referenceNumber) {
+      toast.error("Please provide a reference number!");
+      return;
+    }
+
     const invalidItem = items.find(
       (item) =>
-        !item.name || isNaN(item.cp) || isNaN(item.sp) || isNaN(item.stock)
+        !item.product_id ||
+        isNaN(item.quantity) ||
+        isNaN(item.unit_price)
     );
 
     if (invalidItem) {
-      toast.error(
-        "All fields are required, and cost price, selling price, and stock must be numbers!"
-      );
+      toast.error("All fields are required, and quantity and unit price must be numbers!");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const response = await axios.post("http://localhost:5000/products/bulk", {
-        suppliers_id: selectedSupplier, // Include the selected supplier
-        payment_method: paymentMethod,
-        products: items.map((item) => ({
-          name: item.name,
-          cp: parseFloat(item.cp),
-          sp: parseFloat(item.sp),
-          stock: parseInt(item.stock, 10),
+      const response = await axios.post("http://localhost:5000/purchase_orders", {
+        reference_number: referenceNumber,
+        supplier_id: selectedSupplier, // Include the selected supplier
+        status,
+        items: items.map((item) => ({
+          product_id: item.product_id,
+          quantity: parseInt(item.quantity, 10),
+          unit_price: parseFloat(item.unit_price),
         })),
       });
 
-      toast.success("Products added successfully!");
+      toast.success("Purchase Order added successfully!");
 
-      setItems([{ name: "", cp: "", sp: "", stock: "" }]);
+      setReferenceNumber("");
+      setItems([{ product_id: "", quantity: "", unit_price: "" }]);
       setIsSubmitting(false);
 
-      if (onProductsAdded) onProductsAdded(response.data);
+      if (onPurchaseOrderAdded) onPurchaseOrderAdded(response.data);
     } catch (error) {
-      console.error("Error adding stock:", error);
-      toast.error("Failed to add stock. Please try again.");
+      console.error("Error adding purchase order:", error);
+      toast.error("Failed to add purchase order. Please try again.");
       setIsSubmitting(false);
     }
   };
@@ -97,7 +115,7 @@ const AddStock = ({ onProductsAdded }) => {
       <ToastContainer />
 
       <h2 className="text-2xl font-bold mb-4 text-gray-800">
-        Stock New Products
+        Add Purchase Order
       </h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-6 flex flex-wrap gap-4">
@@ -127,18 +145,40 @@ const AddStock = ({ onProductsAdded }) => {
             </select>
           </div>
 
-          {/* Payment Method Selection */}
+          {/* Reference Number */}
           <div className="w-[30vw]">
-            <h2 className="text-sm font-medium text-gray-700 mb-1">
-              Payment Method
-            </h2>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            <label
+              htmlFor="reference_number"
+              className="block text-sm font-medium text-gray-700"
             >
-              <option value="cash">Cash</option>
-              <option value="credit">Credit</option>
+              Reference Number
+            </label>
+            <input
+              type="text"
+              id="reference_number"
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
+          </div>
+
+          {/* Status Selection */}
+          <div className="w-[30vw]">
+            <label
+              htmlFor="status"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Status
+            </label>
+            <select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              <option value="pending">Pending</option>
+              <option value="received">Received</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
         </div>
@@ -148,16 +188,16 @@ const AddStock = ({ onProductsAdded }) => {
             <div className="grid grid-cols-4 gap-4 items-center">
               <div>
                 <label
-                  htmlFor={`name-${index}`}
+                  htmlFor={`product_id-${index}`}
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Product Name
+                  Product ID
                 </label>
                 <input
                   type="text"
-                  id={`name-${index}`}
-                  name="name"
-                  value={item.name}
+                  id={`product_id-${index}`}
+                  name="product_id"
+                  value={item.product_id}
                   onChange={(e) => handleChange(index, e)}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
@@ -166,52 +206,34 @@ const AddStock = ({ onProductsAdded }) => {
 
               <div>
                 <label
-                  htmlFor={`cp-${index}`}
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Cost Price (CP)
-                </label>
-                <input
-                  type="text"
-                  id={`cp-${index}`}
-                  name="cp"
-                  value={item.cp}
-                  onChange={(e) => handleChange(index, e)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`sp-${index}`}
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Selling Price (SP)
-                </label>
-                <input
-                  type="text"
-                  id={`sp-${index}`}
-                  name="sp"
-                  value={item.sp}
-                  onChange={(e) => handleChange(index, e)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`stock-${index}`}
+                  htmlFor={`quantity-${index}`}
                   className="block text-sm font-medium text-gray-700"
                 >
                   Quantity
                 </label>
                 <input
                   type="text"
-                  id={`stock-${index}`}
-                  name="stock"
-                  value={item.stock}
+                  id={`quantity-${index}`}
+                  name="quantity"
+                  value={item.quantity}
+                  onChange={(e) => handleChange(index, e)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor={`unit_price-${index}`}
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Unit Price
+                </label>
+                <input
+                  type="text"
+                  id={`unit_price-${index}`}
+                  name="unit_price"
+                  value={item.unit_price}
                   onChange={(e) => handleChange(index, e)}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
@@ -248,11 +270,11 @@ const AddStock = ({ onProductsAdded }) => {
           } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Adding Products..." : "Add Products"}
+          {isSubmitting ? "Adding Purchase Order..." : "Add Purchase Order"}
         </button>
       </form>
     </div>
   );
 };
 
-export default AddStock;
+export default AddPurchaseOrder;

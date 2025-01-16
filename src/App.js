@@ -9,7 +9,7 @@ import Header from './components/Header';
 import ProductList from './components/ProductList';
 import StockList from './components/StockList';
 import Edit from './components/EditProduct';
-import AddStock from './components/AddStock';
+import AddPurchaseOrder from './components/AddPurchaseOrder';
 import EditStock from './components/EditStock';
 import ExpenseList from './components/ExpenseList';
 import Supplier from './components/Supplier';
@@ -22,6 +22,7 @@ import ProcessPayment from './components/ProcessPayment';
 import SupplierPayment from './components/SupplierPayment';
 import PaymentList from './components/PaymentList';
 import CustomerPayment from './components/customerPayment';
+import AddProduct from './components/AddProducts';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName="Essential Anchor";
@@ -42,8 +43,8 @@ const App = () => {
             <Route path="/sale-return-list" element={<SaleReturnList />} />
 
             <Route path="/list-expenses" element={<ExpenseList />} />
-            <Route path="/add-product" element={<Edit />} />
-            <Route path="/add-stock" element={<AddStock />} />
+            <Route path="/add-product" element={<AddProduct />} />
+            <Route path="/add-purchase-order" element={<AddPurchaseOrder />} />
             <Route path="/edit-stock" element={<EditStock />} />
             <Route path="/suppliers" element={<Supplier/>} />
             <Route path="/customers" element={<Customer/>} />

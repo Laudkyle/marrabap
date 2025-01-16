@@ -80,9 +80,9 @@ db.serialize(() => {
     sp REAL CHECK(sp >= 0), -- Selling Price with non-negative constraint
     image TEXT, -- Optional, for product image URL or file path
     suppliers_id INTEGER NOT NULL DEFAULT 1,
-    payment_method TEXT CHECK(payment_method IN ('cash', 'credit')), -- Added payment_method
     FOREIGN KEY (suppliers_id) REFERENCES suppliers(id)
-  );
+);
+
 
   CREATE TABLE IF NOT EXISTS pos_products (
   product_id INTEGER PRIMARY KEY,
@@ -111,6 +111,24 @@ CREATE TABLE IF NOT EXISTS purchase_order_details (
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
 
+CREATE TEMP TABLE temp_purchase_order_items (
+  product_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price REAL NOT NULL CHECK(unit_price >= 0)
+);
+
+
+CREATE TRIGGER update_purchase_order_details
+AFTER INSERT ON purchase_orders
+FOR EACH ROW
+BEGIN
+  -- Insert corresponding details into the purchase_order_details table
+  INSERT INTO purchase_order_details (purchase_order_id, product_id, quantity, unit_price)
+  SELECT NEW.id, product_id, quantity, unit_price
+  FROM temp_purchase_order_items;
+END;
+);
+
 CREATE TABLE IF NOT EXISTS inventory_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL, -- References the product being adjusted
@@ -121,7 +139,7 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     cost REAL NOT NULL CHECK(cost >= 0), -- Unit cost (important for COGS calculations)
     description TEXT, -- Additional details (optional)
     FOREIGN KEY (product_id) REFERENCES products(id)
-);
+
 
 )`);
 
