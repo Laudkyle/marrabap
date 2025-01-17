@@ -460,10 +460,10 @@ app.post("/purchase_orders", (req, res) => {
 
     // Insert the purchase order itself
     const purchaseOrderStmt = db.prepare(
-      "INSERT INTO purchase_orders (reference_number, supplier_id, total_amount, status) VALUES (?, ?, ?, ?)"
+      "INSERT INTO purchase_orders (reference_number, supplier_id, total_amount, order_status,payment_status) VALUES (?, ?, ?, ?,?)"
     );
 
-    purchaseOrderStmt.run(reference_number, supplier_id, total_amount, status || 'pending', function (err) {
+    purchaseOrderStmt.run(reference_number, supplier_id, total_amount, status || 'pending', 'unpaid',function (err) {
       if (err) {
         console.error(err.message);
         db.run("ROLLBACK");
@@ -479,7 +479,8 @@ app.post("/purchase_orders", (req, res) => {
           reference_number,
           supplier_id,
           total_amount,
-          status: status || 'pending',
+          order_status: status || 'pending',
+          payment_status: 'unpaid'
         });
       }
     });
@@ -516,18 +517,18 @@ app.get("/purchase_orders/:id", (req, res) => {
 });
 
 // Update status of a purchase order by ID
-app.patch("/purchase_orders/:id/status", (req, res) => {
+app.patch("/purchase_orders/:id/order_status", (req, res) => {
   const { id } = req.params;
-  const { status } = req.body; // Get the new status from the request body
-
+  const { order_status } = req.body; // Get the new status from the request body
+console.log('order status:',order_status)
   // Check if the status is valid
-  if (!["pending", "received", "cancelled"].includes(status)) {
+  if (!["pending", "received", "cancelled"].includes(order_status)) {
     return res.status(400).send("Invalid status.");
   }
 
   db.run(
-    `UPDATE purchase_orders SET status = ? WHERE id = ?`,
-    [status, id],
+    `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+    [order_status, id],
     function (err) {
       if (err) {
         console.error(err);
@@ -543,13 +544,12 @@ app.patch("/purchase_orders/:id/status", (req, res) => {
   );
 });
 
-
 // Update a purchase order
 app.put("/purchase_orders/:id", (req, res) => {
   const { id } = req.params;
   const { reference_number, supplier_id, total_amount, status } = req.body;
 
-  const query = "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ?, status = ? WHERE id = ?";
+  const query = "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ?, order_status = ? WHERE id = ?";
   db.run(query, [reference_number, supplier_id, total_amount, status], function (err) {
     if (err) {
       console.error(err.message);

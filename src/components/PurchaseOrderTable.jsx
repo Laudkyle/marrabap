@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DataTable from "react-data-table-component";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { FaEdit, FaEye, FaTrashAlt, FaDollarSign } from "react-icons/fa";
+import { FaEdit, FaTrashAlt } from "react-icons/fa";
 import EditPurchaseOrder from "./EditPurchaseOrder";
 
 const PurchaseOrdersTable = () => {
@@ -13,6 +13,9 @@ const PurchaseOrdersTable = () => {
   const [loading, setLoading] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState(null);
+  const [dropdownStatus, setDropdownStatus] = useState(null);
+
+  const dropdownRef = useRef(null); // Ref for the dropdown container
 
   // Fetch suppliers and purchase orders
   useEffect(() => {
@@ -130,23 +133,23 @@ const PurchaseOrdersTable = () => {
       sortable: true,
     },
     {
-      name: "Status",
+      name: "Order Status",
       cell: (row) => (
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => handleStatusClick(row.id)}
-            className="px-4 py-2 border rounded-md text-blue-500"
+            className="px-4 py-2 border rounded-md text-blue-500 capitalize"
           >
-            {row.status}
+            {row.order_status}
           </button>
           {dropdownStatus === row.id && (
-            <div className="absolute bg-white border rounded-md shadow-lg mt-1 w-full">
+            <div className="absolute z-10 bg-white border rounded-md shadow-lg mt-1 w-full">
               <ul className="text-gray-700">
-                {["Pending", "Received", "Cancelled"].map((status) => (
+                {["pending", "received", "cancelled"].map((status) => (
                   <li
                     key={status}
                     onClick={() => handleStatusChange(row.id, status)}
-                    className="px-4 py-2 hover:bg-gray-200 cursor-pointer"
+                    className="px-2 py-2 hover:bg-gray-200 cursor-pointer"
                   >
                     {status}
                   </li>
@@ -156,6 +159,11 @@ const PurchaseOrdersTable = () => {
           )}
         </div>
       ),
+      sortable: true,
+    },
+    {
+      name: "Payment Status",
+      selector: (row) => <div className="capitalize">{row.payment_status}</div>,
       sortable: true,
     },
     {
@@ -184,8 +192,6 @@ const PurchaseOrdersTable = () => {
     },
   ];
 
-  const [dropdownStatus, setDropdownStatus] = useState(null);
-
   // Show the dropdown when a status button is clicked
   const handleStatusClick = (id) => {
     setDropdownStatus((prevId) => (prevId === id ? null : id)); // Toggle dropdown visibility
@@ -194,14 +200,17 @@ const PurchaseOrdersTable = () => {
   // Handle status change and update in the database
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await axios.patch(`http://localhost:5000/purchase_orders/${id}/status`, {
-        status: newStatus,
-      });
+      await axios.patch(
+        `http://localhost:5000/purchase_orders/${id}/order_status`,
+        {
+          order_status: newStatus,
+        }
+      );
 
       // Update the status in the local state
       setPurchaseOrders((prevOrders) =>
         prevOrders.map((order) =>
-          order.id === id ? { ...order, status: newStatus } : order
+          order.id === id ? { ...order, order_status: newStatus } : order
         )
       );
 
@@ -213,18 +222,36 @@ const PurchaseOrdersTable = () => {
     }
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownStatus(null); // Close the dropdown if click is outside
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className="p-6 bg-white shadow-md rounded-lg">
+    <div className="container mx-auto p-6 bg-gray-100 shadow-lg rounded-lg">
+      <h2 className="text-3xl font-semibold text-gray-800 mb-6">
+        Purchase Order List
+      </h2>
+
       <ToastContainer />
 
       {/* Search Input */}
-      <div className="flex items-center mb-4">
+      <div className="flex justify-end mb-4">
         <input
           type="text"
           placeholder="Search by reference number..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          className="w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
         />
       </div>
 
@@ -241,22 +268,38 @@ const PurchaseOrdersTable = () => {
         highlightOnHover
         striped
         responsive
+        customStyles={{
+          table: {
+            style: {
+              overflowY: 'auto', // Allow vertical scrolling
+              maxHeight: 'calc(100vh - 260px)', // Set a maximum height for the table
+              zIndex: 0,
+            },
+          },
+          headCells: {
+            style: {
+              backgroundColor: '#f5f5f5', // Custom header background color
+              fontWeight: 'bold', // Make the header bold
+            },
+          },
+          cells: {
+            style: {
+              padding: '8px', // Adjust cell padding
+            },
+          },
+        }}
       />
 
       {/* Edit Purchase Order Modal */}
       {editModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white p-6 rounded-lg w-3/4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg w-3/4 max-h-[90vh] overflow-y-auto">
             <EditPurchaseOrder
               purchaseOrderId={selectedPurchaseOrderId}
               onPurchaseOrderUpdated={handlePurchaseOrderUpdated}
+              editModalOpen={editModalOpen}
+              setEditModalOpen={setEditModalOpen}
             />
-            <button
-              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
-              onClick={() => setEditModalOpen(false)}
-            >
-              Close
-            </button>
           </div>
         </div>
       )}

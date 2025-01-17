@@ -5,7 +5,16 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaTrashAlt } from "react-icons/fa";
 
-const EditPurchaseOrder = ({ purchaseOrderId, onPurchaseOrderUpdated }) => {
+const EditPurchaseOrder = ({
+  purchaseOrderId,
+  onPurchaseOrderUpdated,
+  editModalOpen,
+  setEditModalOpen,
+  companyAddress,
+  companyName,
+  email,
+  phone,
+}) => {
   const [products, setProducts] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,33 +25,33 @@ const EditPurchaseOrder = ({ purchaseOrderId, onPurchaseOrderUpdated }) => {
   useEffect(() => {
     const fetchPurchaseOrderDetails = async () => {
       try {
-        // Fetch purchase order basic info
         const purchaseOrderResponse = await axios.get(
           `http://localhost:5000/purchase_orders/${purchaseOrderId}`
         );
         const purchaseOrder = purchaseOrderResponse.data;
 
-        // Set the initial state
         setReferenceNumber(purchaseOrder.reference_number);
         setSupplierId(purchaseOrder.supplier_id);
 
-        // Fetch purchase order items
         const itemsResponse = await axios.get(
           `http://localhost:5000/purchase_orders/${purchaseOrderId}/details`
         );
         setSelectedProducts(
           itemsResponse.data.map((item) => ({
             ...item,
-            cp: item.unit_price, // Rename for consistency
+            cp: item.unit_price,
           }))
         );
 
-        // Fetch all products
-        const productsResponse = await axios.get("http://localhost:5000/products");
+        const productsResponse = await axios.get(
+          "http://localhost:5000/products"
+        );
         setProducts(productsResponse.data);
       } catch (error) {
         console.error("Error fetching purchase order details:", error);
-        toast.error("Failed to fetch purchase order details. Please try again.");
+        toast.error(
+          "Failed to fetch purchase order details. Please try again."
+        );
       }
     };
 
@@ -64,11 +73,16 @@ const EditPurchaseOrder = ({ purchaseOrderId, onPurchaseOrderUpdated }) => {
       return;
     }
 
-    setSelectedProducts([...selectedProducts, { ...product, quantity: 1, cp: product.price }]);
+    setSelectedProducts([
+      ...selectedProducts,
+      { ...product, quantity: 1, cp: product.price },
+    ]);
   };
 
   const removeProduct = (productId) => {
-    setSelectedProducts((prev) => prev.filter((product) => product.product_id !== productId));
+    setSelectedProducts((prev) =>
+      prev.filter((product) => product.product_id !== productId)
+    );
   };
 
   const updateQuantity = (productId, quantity) => {
@@ -78,7 +92,9 @@ const EditPurchaseOrder = ({ purchaseOrderId, onPurchaseOrderUpdated }) => {
     }
     setSelectedProducts((prev) =>
       prev.map((product) =>
-        product.product_id === productId ? { ...product, quantity: parseInt(quantity, 10) } : product
+        product.product_id === productId
+          ? { ...product, quantity: parseInt(quantity, 10) }
+          : product
       )
     );
   };
@@ -94,18 +110,19 @@ const EditPurchaseOrder = ({ purchaseOrderId, onPurchaseOrderUpdated }) => {
     setIsSubmitting(true);
 
     try {
-      // Update the purchase order itself
       const totalAmount = selectedProducts.reduce((total, product) => {
         return total + product.cp * product.quantity;
       }, 0);
 
-      await axios.put(`http://localhost:5000/purchase_orders/${purchaseOrderId}`, {
-        reference_number: referenceNumber,
-        supplier_id: supplierId,
-        total_amount: totalAmount,
-      });
+      await axios.put(
+        `http://localhost:5000/purchase_orders/${purchaseOrderId}`,
+        {
+          reference_number: referenceNumber,
+          supplier_id: supplierId,
+          total_amount: totalAmount,
+        }
+      );
 
-      // Update each product in the purchase order
       for (const product of selectedProducts) {
         await axios.put(
           `http://localhost:5000/purchase_orders/${purchaseOrderId}/details/${product.id}`,
@@ -130,70 +147,134 @@ const EditPurchaseOrder = ({ purchaseOrderId, onPurchaseOrderUpdated }) => {
     <div className="p-6 bg-white shadow-md rounded-lg">
       <ToastContainer />
       <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Reference Number"
-            value={referenceNumber}
-            onChange={(e) => setReferenceNumber(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          />
-        </div>
+        <div className="flex flex-col gap-6">
+          {/* Header Section */}
+          <div className="border-b pb-4 mb-4">
+            <h1 className="text-2xl font-bold text-blue-600 mb-1">
+              {companyName || "Company Name"}
+            </h1>
+            <p className="text-sm text-gray-600">
+              {companyAddress || "123 Business St, City, Country"}
+            </p>
+            <p className="text-sm text-gray-600">
+              Email: {email || "support@company.com"} | Phone:{" "}
+              {phone || "(123) 456-7890"}
+            </p>
+            <h2 className="text-lg font-semibold mt-4">Edit Purchase Order</h2>
+            <p className="text-sm text-gray-600">
+              Reference Number:{" "}
+              <span className="font-medium">{referenceNumber}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Date:{" "}
+              <span className="font-medium">
+                {new Date().toLocaleDateString()}
+              </span>
+            </p>
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-bold mb-2">Available Products</h3>
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              {products
-                .filter((product) =>
-                  product.name.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map((product) => (
-                  <div key={product.id} onClick={() => addProduct(product)}>
-                    <ProductCard product={product} />
-                  </div>
-                ))}
+          {/* Available Products Section */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="w-full lg:w-1/2">
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                {products
+                  .filter((product) =>
+                    product.name
+                      .toLowerCase()
+                      .includes(searchTerm.toLowerCase())
+                  )
+                  .map((product) => (
+                    <div key={product.id} onClick={() => addProduct(product)}>
+                      <ProductCard product={product} />
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Selected Products Section */}
+            <div className="w-full lg:w-1/2">
+              <h3 className="text-lg font-semibold mb-2">Selected Products</h3>
+              <div className="max-h-[30vh] overflow-auto">
+                <table className="w-full table-auto border-collapse border border-gray-200 text-sm">
+                  <thead>
+                    <tr className="bg-gray-100 border-b">
+                      <th className="p-2 text-left font-medium text-gray-700">
+                        Item
+                      </th>
+                      <th className="p-2 text-center font-medium text-gray-700">
+                        Qty
+                      </th>
+                      <th className="p-2 text-center font-medium text-gray-700">
+                        Price (₵)
+                      </th>
+                      <th className="p-2 text-center font-medium text-gray-700">
+                        Total (₵)
+                      </th>
+                      <th className="p-2 text-center font-medium text-gray-700">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedProducts.map((product) => (
+                      <tr key={product.product_id} className="border-b">
+                        <td className="p-2 text-gray-600">{product.name}</td>
+                        <td className="p-2 text-center text-gray-600">
+                          <input
+                            type="number"
+                            value={product.quantity}
+                            onChange={(e) =>
+                              updateQuantity(product.product_id, e.target.value)
+                            }
+                            className="w-16 px-2 py-1 border rounded-md"
+                          />
+                        </td>
+                        <td className="p-2 text-center text-gray-600">
+                          {parseFloat(product.cp).toFixed(2)}
+                        </td>
+                        <td className="p-2 text-center text-gray-600">
+                          {parseFloat(product.cp * product.quantity).toFixed(2)}
+                        </td>
+                        <td className="p-2 text-center">
+                          <button
+                            onClick={() => removeProduct(product.product_id)}
+                            className="text-red-500"
+                          >
+                            <FaTrashAlt />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div>
-            <h3 className="font-bold mb-2">Selected Products</h3>
-            {selectedProducts.map((product) => (
-              <div key={product.product_id} className="flex items-center justify-between">
-                <div>
-                  <p>{product.name}</p>
-                  <p>₵{product.cp}</p>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    value={product.quantity}
-                    onChange={(e) => updateQuantity(product.product_id, e.target.value)}
-                    className="w-16 px-2 py-1 border rounded-md"
-                  />
-                  <button onClick={() => removeProduct(product.product_id)} className="ml-2">
-                    <FaTrashAlt className="text-red-500" />
-                  </button>
-                </div>
-              </div>
-            ))}
+          {/* Footer Section */}
+          <div className="flex justify-between mt-6">
+            <button
+              onClick={() => setEditModalOpen(false)}
+              className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+            >
+              Close
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Updating..." : "Update Purchase Order"}
+            </button>
           </div>
         </div>
-
-        <button
-          type="submit"
-          className="mt-6 px-4 py-2 bg-blue-500 text-white rounded-md"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Updating..." : "Update Purchase Order"}
-        </button>
       </form>
     </div>
   );

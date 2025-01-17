@@ -91,11 +91,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Add Purchase",
           icon: <PlusCircle className="w-4 h-4" />,
         },
-        {
-          path: "/edit-purchase-order",
-          label: "Edit purchase Order",
-          icon: <Edit className="w-4 h-4" />,
-        },
+       
         {
           path: "/list-purchase-orders",
           label: "List purchase",

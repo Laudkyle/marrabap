@@ -128,7 +128,8 @@ db.run(`
   reference_number TEXT NOT NULL UNIQUE, -- Unique purchase order reference
   supplier_id INTEGER NOT NULL,
   total_amount REAL NOT NULL CHECK(total_amount >= 0),
-  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'received', 'cancelled')),
+  order_status TEXT DEFAULT 'pending' CHECK(order_status IN ('pending', 'received', 'cancelled')),
+  payment_status TEXT DEFAULT 'unpaid' CHECK(payment_status IN ('unpaid', 'partial', 'paid')),
   date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 );`)
@@ -495,7 +496,7 @@ BEGIN
     NEW.id,                 -- Purchase order ID
     NEW.total_amount,       -- Total amount from the purchase order
     'unpaid'                -- Initial status set to 'unpaid'
-  WHERE NEW.status = 'pending';  -- Only create invoice if status is 'pending'
+  WHERE NEW.order_status = 'pending';  -- Only create invoice if status is 'pending'
 
   -- No General Ledger Entry for Pending Purchase Order
 END;
