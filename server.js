@@ -434,7 +434,6 @@ app.post("/pos_products/sync", (req, res) => {
 // ===================== Purchase order Endpoints =====================
 app.post("/purchase_orders", (req, res) => {
   const { reference_number, supplier_id, total_amount, status, items } = req.body;
-console.log('hit')
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).send("Product details are required");
   }
@@ -500,17 +499,48 @@ app.get("/purchase_orders", (req, res) => {
   });
 });
 
+// Get a single purchase order by ID
+app.get("/purchase_orders/:id", (req, res) => {
+  const { id } = req.params;
 
-// Get all purchase orders
-app.get("/purchase_orders", (req, res) => {
-  db.all("SELECT * FROM purchase_orders", (err, rows) => {
+  db.get("SELECT * FROM purchase_orders WHERE id = ?", [id], (err, row) => {
     if (err) {
       console.error(err);
-      res.status(500).send("Error fetching purchase orders");
+      res.status(500).send("Error fetching purchase order");
+    } else if (!row) {
+      res.status(404).send("Purchase order not found");
     } else {
-      res.json(rows);
+      res.json(row);
     }
   });
+});
+
+// Update status of a purchase order by ID
+app.patch("/purchase_orders/:id/status", (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // Get the new status from the request body
+
+  // Check if the status is valid
+  if (!["pending", "received", "cancelled"].includes(status)) {
+    return res.status(400).send("Invalid status.");
+  }
+
+  db.run(
+    `UPDATE purchase_orders SET status = ? WHERE id = ?`,
+    [status, id],
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error updating status.");
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).send("Purchase order not found.");
+      }
+
+      res.send("Status updated successfully.");
+    }
+  );
 });
 
 

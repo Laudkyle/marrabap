@@ -10,7 +10,7 @@ import ProductList from './components/ProductList';
 import StockList from './components/StockList';
 import Edit from './components/EditProduct';
 import AddPurchaseOrder from './components/AddPurchaseOrder';
-import EditStock from './components/EditStock';
+import EditPurchaseOrder from './components/EditPurchaseOrder';
 import ExpenseList from './components/ExpenseList';
 import Supplier from './components/Supplier';
 import Customer from './components/Customer';
@@ -23,6 +23,7 @@ import SupplierPayment from './components/SupplierPayment';
 import PaymentList from './components/PaymentList';
 import CustomerPayment from './components/customerPayment';
 import AddProduct from './components/AddProducts';
+import PurchaseOrdersTable from './components/PurchaseOrderTable';
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName="Essential Anchor";
@@ -45,12 +46,12 @@ const App = () => {
             <Route path="/list-expenses" element={<ExpenseList />} />
             <Route path="/add-product" element={<AddProduct />} />
             <Route path="/add-purchase-order" element={<AddPurchaseOrder />} />
-            <Route path="/edit-stock" element={<EditStock />} />
+            <Route path="/edit-purchase-order" element={<EditPurchaseOrder />} />
             <Route path="/suppliers" element={<Supplier/>} />
             <Route path="/customers" element={<Customer/>} />
             <Route path="/customer-groups" element={<CustomerGroup/>} />
             <Route path="/list-products" element={<ProductList />} />
-            <Route path="/list-stock" element={<StockList />} />
+            <Route path="/list-purchase-orders" element={<PurchaseOrdersTable />} />
             <Route path="/add-payment" element={<ProcessPayment />} />
             <Route path="/supplier-payment" element={<SupplierPayment />} />
             <Route path="/customer-payment" element={<CustomerPayment />} />

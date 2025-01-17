@@ -185,10 +185,10 @@ const handleSubmit = async (e) => {
                 >
                   <div>
                     <h3 className="text-sm font-medium">{product.name}</h3>
+                    <p className="text-sm text-gray-600">₵{product.cp}</p>
                     <p className="text-sm text-gray-600">
-                      Supplier: {product.supplierName}
+                      {product.supplierName}
                     </p>
-                    <p className="text-sm text-gray-600">₵{product.sp}</p>
                   </div>
                   <div className="flex items-center">
                     <input

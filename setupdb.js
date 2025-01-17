@@ -142,7 +142,9 @@ CREATE TABLE IF NOT EXISTS purchase_order_details (
   FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
+
 `)
+
 db.run(`
 CREATE TABLE temp_purchase_order_items (
   product_id INTEGER NOT NULL,
@@ -159,9 +161,19 @@ BEGIN
   INSERT INTO purchase_order_details (purchase_order_id, product_id, quantity, unit_price)
   SELECT NEW.id, product_id, quantity, unit_price
   FROM temp_purchase_order_items;
+
+  -- Clear the temp_purchase_order_items table to prevent duplicate entries
+  DELETE FROM temp_purchase_order_items;
 END;
 
 )`);
+db.run(`CREATE TRIGGER IF NOT EXISTS delete_purchase_order_details
+  AFTER DELETE ON purchase_orders
+  FOR EACH ROW
+  BEGIN
+    DELETE FROM purchase_order_details WHERE purchase_order_id = OLD.id;
+  END;
+  `)
 db.run(`CREATE TABLE IF NOT EXISTS inventory (
   id INTEGER PRIMARY KEY AUTOINCREMENT, -- Unique inventory record ID
   product_id INTEGER NOT NULL, -- Foreign key to Products table

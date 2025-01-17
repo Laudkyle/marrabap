@@ -82,9 +82,9 @@ const Sidebar = ({ isExpanded, companyName }) => {
       ],
     },
     {
-      name: "Stock",
+      name: "Purchases",
       icon: <Warehouse className="w-4 h-4" />,
-      dropdown: "stock",
+      dropdown: "purchases",
       links: [
         {
           path: "/add-purchase-order",
@@ -92,13 +92,13 @@ const Sidebar = ({ isExpanded, companyName }) => {
           icon: <PlusCircle className="w-4 h-4" />,
         },
         {
-          path: "/edit-stock",
-          label: "Update Stock",
+          path: "/edit-purchase-order",
+          label: "Edit purchase Order",
           icon: <Edit className="w-4 h-4" />,
         },
         {
-          path: "/list-stock",
-          label: "List Stock",
+          path: "/list-purchase-orders",
+          label: "List purchase",
           icon: <List className="w-4 h-4" />,
         },
       ],
