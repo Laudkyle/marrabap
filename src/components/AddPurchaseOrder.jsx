@@ -1,278 +1,230 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import ProductCard from "./ProductCard"; // Import the ProductCard component
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { FaTrashAlt } from "react-icons/fa"; // Import delete icon
 
 const AddPurchaseOrder = ({ onPurchaseOrderAdded }) => {
-  const [items, setItems] = useState([{ product_id: "", quantity: "", unit_price: "" }]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [selectedSupplier, setSelectedSupplier] = useState(1);
+  const [products, setProducts] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
-  const [status, setStatus] = useState("pending");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [supplierId, setSupplierId] = useState(null); // Track the selected supplier
 
+  // Fetch products and supplier names
   useEffect(() => {
-    // Fetch the suppliers from the API
-    const fetchSuppliers = async () => {
+    const fetchProductsAndSuppliers = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/suppliers");
-        setSuppliers(response.data);
+        // Fetch products
+        const productsResponse = await axios.get("http://localhost:5000/products");
+        const productsData = productsResponse.data;
+
+        // Fetch suppliers
+        const suppliersResponse = await axios.get("http://localhost:5000/suppliers");
+        const suppliersData = suppliersResponse.data;
+
+        // Map supplier names to products
+        const productsWithSuppliers = productsData.map((product) => ({
+          ...product,
+          supplierName:
+            suppliersData.find((supplier) => supplier.id === product.suppliers_id)?.name ||
+            "Unknown Supplier",
+        }));
+
+        setProducts(productsWithSuppliers);
       } catch (error) {
-        console.error("Error fetching suppliers:", error);
-        toast.error("Failed to fetch suppliers. Please try again.");
+        console.error("Error fetching products or suppliers:", error);
+        toast.error("Failed to fetch products or suppliers. Please try again.");
       }
     };
 
-    fetchSuppliers();
+    fetchProductsAndSuppliers();
   }, []);
 
-  // Utility function to generate a unique reference number
-  const generateReferenceNumber = () => {
-    const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
-    return `PUR ${uniqueNumber}`;
-  };
-
-  const handleChange = (index, e) => {
-    const { name, value } = e.target;
-    const updatedItems = [...items];
-    updatedItems[index][name] = value;
-    setItems(updatedItems);
-  };
-
-  const addItem = () => {
-    setItems([...items, { product_id: "", quantity: "", unit_price: "" }]);
-  };
-
-  const removeItem = (index) => {
-    if (items.length > 1) {
-      const updatedItems = items.filter((_, i) => i !== index);
-      setItems(updatedItems);
-    } else {
-      toast.error("You must have at least one item.");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!selectedSupplier) {
-      toast.error("Please select a supplier!");
+  // Handle adding a product to the selected list
+  const addProduct = (product) => {
+    if (selectedProducts.some((p) => p.id === product.id)) {
+      toast.error("Product already added.");
       return;
     }
 
-    if (!referenceNumber) {
-      // Auto-generate reference number if it's not provided
-      setReferenceNumber(generateReferenceNumber());
+    // Set supplier ID if it's the first product selected
+    if (!supplierId) {
+      setSupplierId(product.suppliers_id);
     }
 
-    if (!referenceNumber) {
-      toast.error("Please provide a reference number!");
+    // Ensure only products from the same supplier are selected
+    if (supplierId && product.suppliers_id !== supplierId) {
+      toast.error("You can only select products from the same supplier.");
       return;
     }
 
-    const invalidItem = items.find(
-      (item) =>
-        !item.product_id ||
-        isNaN(item.quantity) ||
-        isNaN(item.unit_price)
+    setSelectedProducts([...selectedProducts, { ...product, quantity: 1 }]);
+  };
+
+  // Handle removing a product from the selected list
+  const removeProduct = (productId) => {
+    const updatedProducts = selectedProducts.filter((product) => product.id !== productId);
+    setSelectedProducts(updatedProducts);
+  };
+
+  // Update quantity of a selected product
+  const updateQuantity = (productId, quantity) => {
+    if (quantity < 1) {
+      toast.error("Quantity must be at least 1.");
+      return;
+    }
+    setSelectedProducts((prevProducts) =>
+      prevProducts.map((product) =>
+        product.id === productId ? { ...product, quantity: parseInt(quantity, 10) } : product
+      )
     );
-
-    if (invalidItem) {
-      toast.error("All fields are required, and quantity and unit price must be numbers!");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await axios.post("http://localhost:5000/purchase_orders", {
-        reference_number: referenceNumber,
-        supplier_id: selectedSupplier, // Include the selected supplier
-        status,
-        items: items.map((item) => ({
-          product_id: item.product_id,
-          quantity: parseInt(item.quantity, 10),
-          unit_price: parseFloat(item.unit_price),
-        })),
-      });
-
-      toast.success("Purchase Order added successfully!");
-
-      setReferenceNumber("");
-      setItems([{ product_id: "", quantity: "", unit_price: "" }]);
-      setIsSubmitting(false);
-
-      if (onPurchaseOrderAdded) onPurchaseOrderAdded(response.data);
-    } catch (error) {
-      console.error("Error adding purchase order:", error);
-      toast.error("Failed to add purchase order. Please try again.");
-      setIsSubmitting(false);
-    }
   };
+
+  // Filter products based on search term and supplier
+  const filteredProducts = products.filter((product) => {
+    // Only show products from the same supplier as the first selected product
+    const matchesSupplier = supplierId ? product.suppliers_id === supplierId : true;
+    return product.name.toLowerCase().includes(searchTerm.toLowerCase()) && matchesSupplier;
+  });
+
+  // Handle form submission
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (selectedProducts.length === 0) {
+    toast.error("Please select at least one product.");
+    return;
+  }
+
+  if (!referenceNumber) {
+    setReferenceNumber(`PUR-${Date.now()+ Math.floor(Math.random() * 1000000)}` );
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    // Calculate total_amount based on selected products
+    const totalAmount = selectedProducts.reduce((total, product) => {
+      return total + product.cp * product.quantity; // Assuming `sp` is the unit price of the product
+    }, 0);
+
+    const response = await axios.post("http://localhost:5000/purchase_orders", {
+      reference_number: referenceNumber || `PUR-${Date.now()}`,
+      supplier_id: supplierId, // Include supplier ID in the submitted data
+      total_amount: totalAmount, // Include total_amount in the submitted data
+      items: selectedProducts.map((product) => ({
+        product_id: product.id,
+        quantity: product.quantity,
+        unit_price: product.cp,
+      })),
+    });
+
+    toast.success("Purchase Order added successfully!");
+    setReferenceNumber("");
+    setSelectedProducts([]);
+    setSupplierId(null); // Reset supplier ID for the next order
+    if (onPurchaseOrderAdded) onPurchaseOrderAdded(response.data);
+  } catch (error) {
+    console.error("Error adding purchase order:", error);
+    toast.error("Failed to add purchase order. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
-    <div className="max-w-4xl mx-auto mt-8 p-6 bg-white shadow-md rounded-lg">
+    <div className="p-6 bg-white shadow-md rounded-lg">
       <ToastContainer />
 
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">
-        Add Purchase Order
-      </h2>
-      <form onSubmit={handleSubmit}>
-        <div className="mb-6 flex flex-wrap gap-4">
-          {/* Supplier Selection */}
-          <div className="w-[30vw]">
-            <label
-              htmlFor="supplier"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Supplier
-            </label>
-            <select
-              id="supplier"
-              value={selectedSupplier}
-              onChange={(e) => setSelectedSupplier(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              required
-            >
-              <option value="">Select a supplier</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.type === "business"
-                    ? supplier.business_name
-                    : supplier.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Reference Number */}
-          <div className="w-[30vw]">
-            <label
-              htmlFor="reference_number"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Reference Number
-            </label>
+      <form onSubmit={handleSubmit} className="grid grid-cols-8 gap-8">
+        {/* Left Column: Products List */}
+        <div className="col-span-5 max-h-[calc(100vh-200px)] overflow-y-scroll pr-4">
+          <div className="flex items-center mb-4">
             <input
               type="text"
-              id="reference_number"
-              value={referenceNumber}
-              onChange={(e) => setReferenceNumber(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
           </div>
 
-          {/* Status Selection */}
-          <div className="w-[30vw]">
-            <label
-              htmlFor="status"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Status
-            </label>
-            <select
-              id="status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="pending">Pending</option>
-              <option value="received">Received</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+          <div className="grid grid-cols-3 gap-4 ">
+            {filteredProducts.map((product) => (
+              <div key={product.id} onClick={() => addProduct(product)}>
+                <ProductCard product={product} />
+              </div>
+            ))}
           </div>
         </div>
 
-        {items.map((item, index) => (
-          <div key={index} className="mb-6 border-b pb-4">
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <div>
-                <label
-                  htmlFor={`product_id-${index}`}
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Product ID
-                </label>
-                <input
-                  type="text"
-                  id={`product_id-${index}`}
-                  name="product_id"
-                  value={item.product_id}
-                  onChange={(e) => handleChange(index, e)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`quantity-${index}`}
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Quantity
-                </label>
-                <input
-                  type="text"
-                  id={`quantity-${index}`}
-                  name="quantity"
-                  value={item.quantity}
-                  onChange={(e) => handleChange(index, e)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`unit_price-${index}`}
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Unit Price
-                </label>
-                <input
-                  type="text"
-                  id={`unit_price-${index}`}
-                  name="unit_price"
-                  value={item.unit_price}
-                  onChange={(e) => handleChange(index, e)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => removeItem(index)}
-                  className="text-red-500 hover:text-red-700 text-sm"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
+        {/* Right Column: Selected Products */}
+        <div className="col-span-3 max-h-[calc(100vh-200px)] overflow-y-scroll pr-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold">Selected Products</h2>
+            <input
+              type="text"
+              placeholder="Reference Number"
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
           </div>
-        ))}
 
-        <button
-          type="button"
-          onClick={addItem}
-          className="w-full py-2 px-4 mb-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-        >
-          Add Another Item
-        </button>
-
-        <button
-          type="submit"
-          className={`w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white shadow-sm ${
-            isSubmitting
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Adding Purchase Order..." : "Add Purchase Order"}
-        </button>
+          {selectedProducts.length === 0 ? (
+            <p className="text-gray-600">No products selected.</p>
+          ) : (
+            <div>
+              {selectedProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between border-b py-2"
+                >
+                  <div>
+                    <h3 className="text-sm font-medium">{product.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      Supplier: {product.supplierName}
+                    </p>
+                    <p className="text-sm text-gray-600">₵{product.sp}</p>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="number"
+                      min="1"
+                      value={product.quantity}
+                      onChange={(e) => updateQuantity(product.id, e.target.value)}
+                      className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeProduct(product.id)}
+                      className="ml-2 text-red-500 hover:text-red-700 text-sm"
+                    >
+                      <FaTrashAlt />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </form>
+
+      <button
+        type="submit"
+        onClick={handleSubmit}
+        className={`mt-6 w-full py-2 px-4 text-sm font-medium rounded-md text-white ${
+          isSubmitting
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700"
+        }`}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Adding Purchase Order..." : "Submit Purchase Order"}
+      </button>
     </div>
   );
 };

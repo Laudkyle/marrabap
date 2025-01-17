@@ -1,34 +1,45 @@
 import React from 'react';
+import { FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'; // Stock status icons
 
 const ProductCard = ({ product }) => {
   return (
-    <div className="max-w-sm rounded overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-transform duration-200">
+    <div className="max-w-sm rounded-lg overflow-hidden border border-gray-300 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
       <div className="p-4">
         {/* Product Image */}
         {product.image ? (
           <img 
             src={product.image} 
             alt={product.name} 
-            className="w-full h-48 object-cover rounded-md mb-4" 
+            className="w-full h-32 object-cover rounded-md mb-4"
           />
         ) : (
           <div 
-            className="w-full bg-gray-300 h-48 flex items-center justify-center rounded-md mb-4 text-gray-500 text-sm font-medium"
+            className="w-full bg-gray-200 h-32 flex items-center justify-center rounded-md mb-4 text-gray-500 text-xs font-medium"
           >
             Add Product Image
           </div>
         )}
 
         {/* Product Name and Price */}
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-md font-semibold text-gray-800">{product.name}</span>
-          <span className="text-sm font-semibold text-gray-700">₵{parseFloat(product.sp).toFixed(2)}</span>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-gray-800">{product.name}</span>
+          {<span className="text-sm font-semibold text-gray-700">₵{product.cp?`${parseFloat(product.cp).toFixed(2)}`:"Not set"}</span>}
         </div>
 
         {/* Stock Status */}
-        <p className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
-        </p>
+        <div className="flex items-center text-xs">
+          {product.stock > 0 ? (
+            <>
+              <FaCheckCircle className="text-green-500 mr-2" />
+              <p className="text-gray-600">{product.stock} in stock</p>
+            </>
+          ) : (
+            <>
+              <FaExclamationCircle className="text-red-500 mr-2" />
+              <p className="text-gray-600">Out of stock</p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

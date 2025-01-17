@@ -434,7 +434,7 @@ app.post("/pos_products/sync", (req, res) => {
 // ===================== Purchase order Endpoints =====================
 app.post("/purchase_orders", (req, res) => {
   const { reference_number, supplier_id, total_amount, status, items } = req.body;
-
+console.log('hit')
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).send("Product details are required");
   }

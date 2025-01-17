@@ -10,15 +10,6 @@ const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
 });
 
 db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS chart_of_accounts (
-    id INTEGER PRIMARY KEY,
-    account_code TEXT NOT NULL UNIQUE, -- Unique identifier for the account
-    account_name TEXT NOT NULL, -- Name of the account
-    account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
-    parent_account_id INTEGER, -- For hierarchical accounts
-    FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
-  )`);
-
   const defaultAccounts = [
     { account_code: "1000", account_name: "Cash", account_type: "asset" },
     {
@@ -61,8 +52,56 @@ db.serialize(() => {
       account_name: "Sales Returns",
       account_type: "expense",
     },
+    // Added accounts for taxes:
+    {
+      account_code: "2010",
+      account_name: "Sales Tax Payable",
+      account_type: "liability",
+    },
+    {
+      account_code: "2020",
+      account_name: "Purchase Tax Recoverable",
+      account_type: "asset",
+    },
+    {
+      account_code: "2030",
+      account_name: "VAT Payable",
+      account_type: "liability",
+    },
+    {
+      account_code: "2040",
+      account_name: "VAT Receivable",
+      account_type: "asset",
+    },
+    {
+      account_code: "2050",
+      account_name: "Income Tax Payable",
+      account_type: "liability",
+    },
+    {
+      account_code: "6000",
+      account_name: "Tax Expense",
+      account_type: "expense",
+    },
+    // Added unbilled purchases:
+    {
+      account_code: "1030",
+      account_name: "Unbilled Purchases",
+      account_type: "asset",
+    },
   ];
 
+  
+  db.run(`CREATE TABLE IF NOT EXISTS chart_of_accounts (
+    id INTEGER PRIMARY KEY,
+    account_code TEXT NOT NULL UNIQUE, -- Unique identifier for the account
+    account_name TEXT NOT NULL, -- Name of the account
+    account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
+    parent_account_id INTEGER, -- For hierarchical accounts
+    FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
+  )`);
+
+ 
   defaultAccounts.forEach((account) => {
     db.run(
       `INSERT OR IGNORE INTO chart_of_accounts (account_code, account_name, account_type)
@@ -81,16 +120,8 @@ db.serialize(() => {
     image TEXT, -- Optional, for product image URL or file path
     suppliers_id INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (suppliers_id) REFERENCES suppliers(id)
-);
-
-
-  CREATE TABLE IF NOT EXISTS pos_products (
-  product_id INTEGER PRIMARY KEY,
-  name TEXT,
-  stock INTEGER DEFAULT 0,
-  price REAL,
-  FOREIGN KEY (product_id) REFERENCES products(id)
-);
+);`)
+db.run(`
 
     CREATE TABLE IF NOT EXISTS purchase_orders (
   id INTEGER PRIMARY KEY,
@@ -100,7 +131,8 @@ db.serialize(() => {
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'received', 'cancelled')),
   date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-);
+);`)
+db.run(`
 CREATE TABLE IF NOT EXISTS purchase_order_details (
   id INTEGER PRIMARY KEY,
   purchase_order_id INTEGER NOT NULL,
@@ -110,14 +142,15 @@ CREATE TABLE IF NOT EXISTS purchase_order_details (
   FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
-
-CREATE TEMP TABLE temp_purchase_order_items (
+`)
+db.run(`
+CREATE TABLE temp_purchase_order_items (
   product_id INTEGER NOT NULL,
   quantity INTEGER NOT NULL,
   unit_price REAL NOT NULL CHECK(unit_price >= 0)
 );
-
-
+`)
+db.run(`
 CREATE TRIGGER update_purchase_order_details
 AFTER INSERT ON purchase_orders
 FOR EACH ROW
@@ -127,9 +160,18 @@ BEGIN
   SELECT NEW.id, product_id, quantity, unit_price
   FROM temp_purchase_order_items;
 END;
-);
 
-CREATE TABLE IF NOT EXISTS inventory_movements (
+)`);
+db.run(`CREATE TABLE IF NOT EXISTS inventory (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, -- Unique inventory record ID
+  product_id INTEGER NOT NULL, -- Foreign key to Products table
+  quantity_in_stock INTEGER NOT NULL DEFAULT 0 CHECK(quantity_in_stock >= 0), -- Stock quantity (cannot be negative)
+  cost_per_unit REAL NOT NULL CHECK(cost_per_unit >= 0), -- Cost per unit (cannot be negative)
+  FOREIGN KEY (product_id) REFERENCES products(id) -- Linking to the products table
+);
+`)
+
+db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL, -- References the product being adjusted
     date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Movement date
@@ -138,10 +180,7 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     movement_type TEXT NOT NULL CHECK(movement_type IN ('purchase', 'sale', 'return', 'adjustment')), -- Type of movement
     cost REAL NOT NULL CHECK(cost >= 0), -- Unit cost (important for COGS calculations)
     description TEXT, -- Additional details (optional)
-    FOREIGN KEY (product_id) REFERENCES products(id)
-
-
-)`);
+    FOREIGN KEY (product_id) REFERENCES products(id))`)
 
   db.run(`CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY,
@@ -163,6 +202,7 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
   payment_method TEXT, -- Optional (e.g., cash, credit card, etc.)
   payment_reference TEXT -- Optional payment reference number
 )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
@@ -174,8 +214,23 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     balance_due REAL GENERATED ALWAYS AS (total_amount - amount_paid) VIRTUAL, -- Calculated field for balance
     status TEXT DEFAULT 'unpaid', -- Status: unpaid, partial, or paid
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
-);
+)
 `);
+db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Unique invoice ID
+    reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
+    supplier_id INTEGER NOT NULL, -- Links the invoice to a supplier
+    purchase_order_id INTEGER, -- Links the invoice to a purchase order, if applicable
+    issue_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Invoice issue date
+    due_date TEXT, -- Due date for payment
+    total_amount REAL NOT NULL CHECK(total_amount >= 0), -- Total invoice amount
+    amount_paid REAL DEFAULT 0 CHECK(amount_paid >= 0), -- Amount paid towards the invoice
+    balance_due REAL GENERATED ALWAYS AS (total_amount - amount_paid) VIRTUAL, -- Calculated balance due
+    status TEXT DEFAULT 'unpaid', -- Status: unpaid, partial, or paid
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE, -- Supplier reference
+    FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE SET NULL -- Link to purchase order (optional)
+);
+`)
   db.run(`CREATE TABLE IF NOT EXISTS returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL,
@@ -353,6 +408,86 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     '1234567890',          -- Mobile number (ensure it’s unique)
     1                      -- Active status: 1 means active
 );`);
+
+
+// Triggers
+db.run(`CREATE TRIGGER after_supplier_insert
+AFTER INSERT ON suppliers
+FOR EACH ROW
+BEGIN
+  -- 1. Update Supplier Balance (if opening balance exists)
+  UPDATE suppliers
+  SET total_purchase_due = COALESCE(NEW.opening_balance, 0)
+  WHERE id = NEW.id;
+
+  -- 2. Insert into Audit Trail
+  INSERT INTO audit_trails (user_id, table_name, record_id, action, change_date, changes)
+  VALUES (
+    1,  -- Example: assuming user_id is 1 (this should be dynamically set based on the logged-in user)
+    'suppliers',  -- Affected table
+    NEW.id,  -- Supplier ID of the newly created supplier
+    'insert',  -- Action type: insert
+    CURRENT_TIMESTAMP,  -- Timestamp of the action
+    '{"name": "' || NEW.name || '", "mobile": "' || NEW.mobile || '"}'  -- JSON representing changes (e.g., name and mobile)
+  );
+
+  -- 3. Update General Ledger (if applicable)
+  -- Conditional insertion based on opening balance
+  INSERT INTO general_ledger (account_id, date, description, debit, credit)
+  SELECT 
+    -- If opening_balance is positive, debit Accounts Receivable (asset), otherwise credit Accounts Payable (liability)
+    CASE 
+      WHEN NEW.opening_balance > 0 THEN (SELECT id FROM chart_of_accounts WHERE account_code = '1010')  -- Debit Accounts Receivable
+      ELSE (SELECT id FROM chart_of_accounts WHERE account_code = '2000')  -- Credit Accounts Payable
+    END,
+    CURRENT_TIMESTAMP,  -- Transaction date
+    'Opening balance for supplier ' || NEW.name,  -- Description
+    -- Debit if opening_balance is positive, otherwise 0
+    CASE 
+      WHEN NEW.opening_balance > 0 THEN NEW.opening_balance 
+      ELSE 0 
+    END,
+    -- Credit if opening_balance is negative, otherwise 0
+    CASE 
+      WHEN NEW.opening_balance < 0 THEN ABS(NEW.opening_balance) 
+      ELSE 0 
+    END;
+END;
+
+`)
+db.run(`CREATE TRIGGER after_purchase_order_insert
+AFTER INSERT ON purchase_orders
+FOR EACH ROW
+BEGIN
+  -- 1. Update Supplier Balance (Optional)
+  UPDATE suppliers
+  SET total_purchase_due = total_purchase_due + NEW.total_amount
+  WHERE id = NEW.supplier_id;
+
+  -- 2. Insert into Audit Trail
+  INSERT INTO audit_trails (user_id, table_name, record_id, action, change_date, changes)
+  VALUES (
+    1,  -- Example user ID
+    'purchase_orders',
+    NEW.id,
+    'insert',
+    CURRENT_TIMESTAMP,
+    '{"reference_number": "' || NEW.reference_number || '", "total_amount": ' || NEW.total_amount || '}'
+  );
+
+  -- 3. Create Supplier Invoice if Status is Pending
+  INSERT INTO supplier_invoices (reference_number, supplier_id, purchase_order_id, total_amount, status)
+  SELECT 
+    NEW.reference_number,   -- Reference number from the purchase order
+    NEW.supplier_id,        -- Supplier ID from the purchase order
+    NEW.id,                 -- Purchase order ID
+    NEW.total_amount,       -- Total amount from the purchase order
+    'unpaid'                -- Initial status set to 'unpaid'
+  WHERE NEW.status = 'pending';  -- Only create invoice if status is 'pending'
+
+  -- No General Ledger Entry for Pending Purchase Order
+END;
+`)
 });
 
 // Close the database connection
