@@ -42,6 +42,33 @@ const Sidebar = ({ isExpanded, companyName }) => {
 
   const dropdownMenus = [
     {
+      name: "Contacts",
+      icon: <Users className="w-4 h-4" />,
+      dropdown: "contacts",
+      links: [
+        {
+          path: "/suppliers",
+          label: "Suppliers",
+          icon: <Truck className="w-4 h-4" />,
+        },
+        {
+          path: "/customers",
+          label: "Customers",
+          icon: <UsersRound className="w-4 h-4" />,
+        },
+        {
+          path: "/customer-groups",
+          label: "Customer Groups",
+          icon: <Group className="w-4 h-4" />,
+        },
+        {
+          path: "/operations",
+          label: "Operations",
+          icon: <Cog className="w-4 h-4" />,
+        },
+      ],
+    },
+    {
       name: "Shop",
       icon: <Store className="w-4 h-4" />,
       dropdown: "shop",
@@ -248,33 +275,6 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/balance-sheet",
           label: "Balance Sheet",
           icon: <FileSpreadsheet className="w-4 h-4" />,
-        },
-      ],
-    },
-    {
-      name: "Contacts",
-      icon: <Users className="w-4 h-4" />,
-      dropdown: "contacts",
-      links: [
-        {
-          path: "/suppliers",
-          label: "Suppliers",
-          icon: <Truck className="w-4 h-4" />,
-        },
-        {
-          path: "/customers",
-          label: "Customers",
-          icon: <UsersRound className="w-4 h-4" />,
-        },
-        {
-          path: "/customer-groups",
-          label: "Customer Groups",
-          icon: <Group className="w-4 h-4" />,
-        },
-        {
-          path: "/operations",
-          label: "Operations",
-          icon: <Cog className="w-4 h-4" />,
         },
       ],
     },

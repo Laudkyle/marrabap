@@ -621,19 +621,50 @@ app.put("/purchase_orders/:id", (req, res) => {
 });
 
 // Delete a purchase order
-app.delete("/purchase_orders/:id", (req, res) => {
+app.delete("/purchase_orders/:id", async (req, res) => {
   const { id } = req.params;
-  db.run("DELETE FROM purchase_orders WHERE id = ?", [id], function (err) {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error deleting purchase order");
-    } else if (this.changes === 0) {
-      res.status(404).send("Purchase order not found");
-    } else {
-      res.status(204).send();
+
+  // Get the purchase order details before deleting
+  db.get(
+    `SELECT supplier_id, total_amount FROM purchase_orders WHERE id = ?`,
+    [id],
+    (err, purchaseOrder) => {
+      if (err) {
+        console.error("Error fetching purchase order:", err);
+        return res.status(500).send("Error deleting purchase order.");
+      }
+
+      if (!purchaseOrder) {
+        return res.status(404).send("Purchase order not found.");
+      }
+
+      const { supplier_id, total_amount } = purchaseOrder;
+
+      // Delete the purchase order
+      db.run(`DELETE FROM purchase_orders WHERE id = ?`, [id], (err) => {
+        if (err) {
+          console.error("Error deleting purchase order:", err);
+          return res.status(500).send("Error deleting purchase order.");
+        }
+
+        // Update the supplier's total_purchase_due
+        db.run(
+          `UPDATE suppliers SET total_purchase_due = total_purchase_due - ? WHERE id = ?`,
+          [total_amount, supplier_id],
+          (err) => {
+            if (err) {
+              console.error("Error updating supplier's total_purchase_due:", err);
+              return res.status(500).send("Error updating supplier's total_purchase_due.");
+            }
+
+            res.send("Purchase order deleted and supplier's total_purchase_due updated.");
+          }
+        );
+      });
     }
-  });
+  );
 });
+
 
 // Get purchase order details by purchase order ID
 app.get("/purchase_orders/:id/details", (req, res) => {
@@ -1496,12 +1527,15 @@ app.put("/suppliers/:id", (req, res) => {
     advance_balance,
     address,
     mobile,
+    total_purchase_due,
+    total_purchase_return_due,
     active_status,
   } = req.body;
 
   const fields = [];
   const values = [];
 
+  // Validate and add fields to the update statement
   if (type) {
     fields.push("type = ?");
     values.push(type);
@@ -1530,11 +1564,17 @@ app.put("/suppliers/:id", (req, res) => {
     fields.push("pay_term = ?");
     values.push(pay_term);
   }
-  if (opening_balance) {
+  if (opening_balance !== undefined) {
+    if (opening_balance < 0) {
+      return res.status(400).send("Opening balance must be non-negative.");
+    }
     fields.push("opening_balance = ?");
     values.push(opening_balance);
   }
-  if (advance_balance) {
+  if (advance_balance !== undefined) {
+    if (advance_balance < 0) {
+      return res.status(400).send("Advance balance must be non-negative.");
+    }
     fields.push("advance_balance = ?");
     values.push(advance_balance);
   }
@@ -1546,17 +1586,37 @@ app.put("/suppliers/:id", (req, res) => {
     fields.push("mobile = ?");
     values.push(mobile);
   }
-  if (active_status) {
+  if (total_purchase_due !== undefined) {
+    if (total_purchase_due < 0) {
+      return res.status(400).send("Total purchase due must be non-negative.");
+    }
+    fields.push("total_purchase_due = ?");
+    values.push(total_purchase_due);
+  }
+  if (total_purchase_return_due !== undefined) {
+    if (total_purchase_return_due < 0) {
+      return res.status(400).send("Total purchase return due must be non-negative.");
+    }
+    fields.push("total_purchase_return_due = ?");
+    values.push(total_purchase_return_due);
+  }
+  if (active_status !== undefined) {
+    if (![0, 1].includes(active_status)) {
+      return res.status(400).send("Active status must be 0 or 1.");
+    }
     fields.push("active_status = ?");
     values.push(active_status);
   }
 
+  // Add the supplier ID to the values array
   values.push(id);
 
+  // Construct the query
   const query = `UPDATE suppliers SET ${fields.join(
     ", "
-  )} WHERE contact_id = ?`;
+  )} WHERE id = ?`;
 
+  // Execute the query
   db.run(query, values, function (err) {
     if (err) {
       console.error(err.message);
@@ -1583,6 +1643,29 @@ app.delete("/suppliers/:id", (req, res) => {
     }
   });
 });
+
+// Get all purchase orders for a specific supplier
+app.get("/suppliers/purchase_orders/:supplierId", (req, res) => {
+  const { supplierId } = req.params;
+
+  const query = `
+    SELECT * 
+    FROM purchase_orders 
+    WHERE supplier_id = ?
+  `;
+
+  db.all(query, [supplierId], (err, rows) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error fetching purchase orders for supplier.");
+    } else if (rows.length === 0) {
+      res.status(404).send("No purchase orders found for this supplier.");
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
 // Update supplier active status
 app.patch("/suppliers/:id", (req, res) => {
   const { id } = req.params;

@@ -99,6 +99,7 @@ const EditPurchaseOrder = ({
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
+  
     if (selectedProducts.length === 0) {
       toast.error("Please select at least one product.");
       return;
@@ -158,6 +159,7 @@ const EditPurchaseOrder = ({
           }
         );
       }
+  
       // Add new products
       for (const product of newProducts) {
         await axios.post(
@@ -170,6 +172,38 @@ const EditPurchaseOrder = ({
         );
       }
   
+      // Update supplier's total purchase due
+      const updateSupplierDue = async () => {
+        try {
+          // Fetch all purchase orders for this supplier
+          const response = await axios.get(
+            `http://localhost:5000/suppliers/purchase_orders/${supplierId}`
+          );
+  
+          const purchaseOrders = response.data;
+          console.log(purchaseOrders)
+  
+          // Sum up the total amounts of all purchase orders for this supplier
+          const totalDue = purchaseOrders.reduce(
+            (sum, order) => sum + order.total_amount,
+            0
+          );
+  
+          // Update the supplier's total due in the database
+          await axios.put(`http://localhost:5000/suppliers/${supplierId}`, {
+            total_purchase_due: totalDue,
+          });
+  
+          console.log("Supplier's total purchase due updated successfully.");
+        } catch (error) {
+          console.error("Error updating supplier's total due:", error);
+          toast.error("Failed to update the supplier's total due.");
+        }
+      };
+  
+      // Call the function after updating the purchase order
+      await updateSupplierDue();
+  
       toast.success("Purchase order updated successfully!");
       onPurchaseOrderUpdated();
     } catch (error) {
@@ -179,6 +213,7 @@ const EditPurchaseOrder = ({
       setIsSubmitting(false);
     }
   };
+  
   
   return (
     <div className="p-6 bg-white shadow-md rounded-lg">

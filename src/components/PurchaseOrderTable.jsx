@@ -225,19 +225,6 @@ const PurchaseOrdersTable = () => {
     }
   };
 
-//   // Close dropdown when clicking outside
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-//         setDropdownStatus(null); // Close the dropdown if click is outside
-//       }
-//     };
-
-//     document.addEventListener("mousedown", handleClickOutside);
-//     return () => {
-//       document.removeEventListener("mousedown", handleClickOutside);
-//     };
-//   }, []);
 
   return (
     <div className="container mx-auto p-6 bg-gray-100 shadow-lg rounded-lg">
