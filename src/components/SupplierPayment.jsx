@@ -50,7 +50,7 @@ const SupplierPayment = () => {
     setPaymentData((prevData) => ({
       ...prevData,
       supplierId,
-      purchaseOrderId: "", // Reset purchase order when supplier changes
+      purchaseOrderId: "", 
     }));
 
     if (supplierId) {
