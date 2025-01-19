@@ -8,7 +8,6 @@ import { FaTrashAlt } from "react-icons/fa";
 const EditPurchaseOrder = ({
   purchaseOrderId,
   onPurchaseOrderUpdated,
-  editModalOpen,
   setEditModalOpen,
   companyAddress,
   companyName,
@@ -75,7 +74,7 @@ const EditPurchaseOrder = ({
 
     setSelectedProducts([
       ...selectedProducts,
-      { ...product, quantity: 1, cp: product.price },
+      { ...product, quantity: 1, cp: product.cp },
     ]);
   };
 
@@ -98,51 +97,89 @@ const EditPurchaseOrder = ({
       )
     );
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (selectedProducts.length === 0) {
       toast.error("Please select at least one product.");
       return;
     }
-
+  
     setIsSubmitting(true);
-
+  
     try {
       const totalAmount = selectedProducts.reduce((total, product) => {
         return total + product.cp * product.quantity;
       }, 0);
-
-      await axios.put(
-        `http://localhost:5000/purchase_orders/${purchaseOrderId}`,
-        {
-          reference_number: referenceNumber,
-          supplier_id: supplierId,
-          total_amount: totalAmount,
-        }
+  
+      // Fetch original purchase order details
+      const originalResponse = await axios.get(
+        `http://localhost:5000/purchase_orders/${purchaseOrderId}/details`
       );
-
-      for (const product of selectedProducts) {
+      const originalProducts = originalResponse.data;
+  
+      // Determine removed items
+      const removedItems = originalProducts.filter(
+        (originalItem) =>
+          !selectedProducts.some(
+            (selected) => selected.product_id === originalItem.product_id
+          )
+      );
+  
+      // Perform delete operations for removed items
+      for (const item of removedItems) {
+        await axios.delete(
+          `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details/${item.product_id}`
+        );
+      }
+  
+      // Update the purchase order
+      await axios.put(`http://localhost:5000/purchase_orders/${purchaseOrderId}`, {
+        reference_number: referenceNumber,
+        supplier_id: supplierId,
+        total_amount: totalAmount,
+      });
+  
+      // Separate existing and new products
+      const existingProductIds = originalProducts.map((p) => p.product_id);
+      const newProducts = selectedProducts.filter(
+        (p) => !existingProductIds.includes(p.product_id)
+      );
+      const updatedProducts = selectedProducts.filter((p) =>
+        existingProductIds.includes(p.product_id)
+      );
+  
+      // Update existing products
+      for (const product of updatedProducts) {
         await axios.put(
-          `http://localhost:5000/purchase_orders/${purchaseOrderId}/details/${product.id}`,
+          `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details/${product.product_id}`,
           {
             quantity: product.quantity,
             unit_price: product.cp,
           }
         );
       }
-
-      toast.success("Purchase Order updated successfully!");
-      if (onPurchaseOrderUpdated) onPurchaseOrderUpdated();
+      // Add new products
+      for (const product of newProducts) {
+        await axios.post(
+          `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details`,
+          {
+            product_id: product.id,
+            quantity: product.quantity,
+            unit_price: product.cp,
+          }
+        );
+      }
+  
+      toast.success("Purchase order updated successfully!");
+      onPurchaseOrderUpdated();
     } catch (error) {
       console.error("Error updating purchase order:", error);
-      toast.error("Failed to update purchase order. Please try again.");
+      toast.error("Failed to update the purchase order. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   return (
     <div className="p-6 bg-white shadow-md rounded-lg">
       <ToastContainer />
@@ -192,7 +229,7 @@ const EditPurchaseOrder = ({
                   )
                   .map((product) => (
                     <div key={product.id} onClick={() => addProduct(product)}>
-                      <ProductCard product={product} />
+                      <ProductCard key={product.id} product={product} />
                     </div>
                   ))}
               </div>

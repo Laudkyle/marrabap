@@ -109,7 +109,9 @@ app.post("/products/bulk", (req, res) => {
   }
 
   if (!Array.isArray(products) || products.length === 0) {
-    return res.status(400).send("Products array is required and cannot be empty.");
+    return res
+      .status(400)
+      .send("Products array is required and cannot be empty.");
   }
 
   const invalidProduct = products.find(
@@ -124,7 +126,9 @@ app.post("/products/bulk", (req, res) => {
   if (invalidProduct) {
     return res
       .status(400)
-      .send("Each product must have a name, cp, and sp with non-negative values.");
+      .send(
+        "Each product must have a name, cp, and sp with non-negative values."
+      );
   }
 
   db.serialize(() => {
@@ -137,25 +141,21 @@ app.post("/products/bulk", (req, res) => {
         "INSERT INTO products (name, cp, sp, suppliers_id) VALUES (?, ?, ?, ?)"
       );
 
-      stmt.run(
-        product.name,
-        product.cp,
-        product.sp,
-        suppliers_id,
-        (err) => {
-          if (err) {
-            console.error("Error inserting product:", err.message);
-            errorOccurred = true;
-          }
+      stmt.run(product.name, product.cp, product.sp, suppliers_id, (err) => {
+        if (err) {
+          console.error("Error inserting product:", err.message);
+          errorOccurred = true;
         }
-      );
+      });
 
       stmt.finalize();
     });
 
     if (errorOccurred) {
       db.run("ROLLBACK");
-      return res.status(500).send("Failed to add products. Transaction rolled back.");
+      return res
+        .status(500)
+        .send("Failed to add products. Transaction rolled back.");
     }
 
     db.run("COMMIT");
@@ -169,7 +169,9 @@ app.post("/products", upload.single("image"), (req, res) => {
 
   // Validation: Ensure required fields are provided and constraints are respected
   if (!name || cp < 0 || sp < 0 || !suppliers_id) {
-    return res.status(400).send("Invalid product data. Please check your inputs.");
+    return res
+      .status(400)
+      .send("Invalid product data. Please check your inputs.");
   }
 
   const stmt = db.prepare(
@@ -249,7 +251,6 @@ app.put("/products/:id", upload.single("image"), (req, res) => {
     }
   });
 });
-
 
 // Delete a product
 app.delete("/products/:id", (req, res) => {
@@ -342,7 +343,9 @@ app.put("/pos_products/:product_id", (req, res) => {
 
   values.push(product_id);
 
-  const query = `UPDATE pos_products SET ${fields.join(", ")} WHERE product_id = ?`;
+  const query = `UPDATE pos_products SET ${fields.join(
+    ", "
+  )} WHERE product_id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {
@@ -433,7 +436,8 @@ app.post("/pos_products/sync", (req, res) => {
 
 // ===================== Purchase order Endpoints =====================
 app.post("/purchase_orders", (req, res) => {
-  const { reference_number, supplier_id, total_amount, status, items } = req.body;
+  const { reference_number, supplier_id, total_amount, status, items } =
+    req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).send("Product details are required");
   }
@@ -444,9 +448,11 @@ app.post("/purchase_orders", (req, res) => {
     db.run("BEGIN TRANSACTION");
 
     // Insert items into the temporary table
-    const stmt = db.prepare("INSERT INTO temp_purchase_order_items (product_id, quantity, unit_price) VALUES (?, ?, ?)");
-    
-    items.forEach(item => {
+    const stmt = db.prepare(
+      "INSERT INTO temp_purchase_order_items (product_id, quantity, unit_price) VALUES (?, ?, ?)"
+    );
+
+    items.forEach((item) => {
       const { product_id, quantity, unit_price } = item;
 
       stmt.run(product_id, quantity, unit_price, (err) => {
@@ -463,30 +469,36 @@ app.post("/purchase_orders", (req, res) => {
       "INSERT INTO purchase_orders (reference_number, supplier_id, total_amount, order_status,payment_status) VALUES (?, ?, ?, ?,?)"
     );
 
-    purchaseOrderStmt.run(reference_number, supplier_id, total_amount, status || 'pending', 'unpaid',function (err) {
-      if (err) {
-        console.error(err.message);
-        db.run("ROLLBACK");
-        res.status(500).send("Error creating purchase order");
-      } else {
-        // After inserting the purchase order, the trigger will populate the purchase_order_details table
-        const purchase_order_id = this.lastID;
+    purchaseOrderStmt.run(
+      reference_number,
+      supplier_id,
+      total_amount,
+      status || "pending",
+      "unpaid",
+      function (err) {
+        if (err) {
+          console.error(err.message);
+          db.run("ROLLBACK");
+          res.status(500).send("Error creating purchase order");
+        } else {
+          // After inserting the purchase order, the trigger will populate the purchase_order_details table
+          const purchase_order_id = this.lastID;
 
-        // Commit the transaction
-        db.run("COMMIT");
-        res.status(201).json({
-          id: purchase_order_id,
-          reference_number,
-          supplier_id,
-          total_amount,
-          order_status: status || 'pending',
-          payment_status: 'unpaid'
-        });
+          // Commit the transaction
+          db.run("COMMIT");
+          res.status(201).json({
+            id: purchase_order_id,
+            reference_number,
+            supplier_id,
+            total_amount,
+            order_status: status || "pending",
+            payment_status: "unpaid",
+          });
+        }
       }
-    });
+    );
   });
 });
-
 
 // Get all purchase orders
 app.get("/purchase_orders", (req, res) => {
@@ -520,26 +532,63 @@ app.get("/purchase_orders/:id", (req, res) => {
 app.patch("/purchase_orders/:id/order_status", (req, res) => {
   const { id } = req.params;
   const { order_status } = req.body; // Get the new status from the request body
-console.log('order status:',order_status)
+  const user_id = 1; //
+  console.log("order status:", order_status);
+
   // Check if the status is valid
   if (!["pending", "received", "cancelled"].includes(order_status)) {
     return res.status(400).send("Invalid status.");
   }
 
-  db.run(
-    `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
-    [order_status, id],
-    function (err) {
+  db.get(
+    `SELECT order_status FROM purchase_orders WHERE id = ?`,
+    [id],
+    (err, row) => {
       if (err) {
         console.error(err);
-        return res.status(500).send("Error updating status.");
+        return res.status(500).send("Error fetching purchase order.");
       }
 
-      if (this.changes === 0) {
+      if (!row) {
         return res.status(404).send("Purchase order not found.");
       }
 
-      res.send("Status updated successfully.");
+      const oldStatus = row.order_status;
+
+      // Log the action in the audit_trails table
+      const changes = JSON.stringify({
+        old_status: oldStatus,
+        new_status: order_status,
+      });
+
+      // Insert a log entry into audit_trails
+      db.run(
+        `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`,
+        [user_id, "purchase_orders", id, "update", changes],
+        function (err) {
+          if (err) {
+            console.error("Error logging to audit_trails:", err);
+          }
+        }
+      );
+
+      // Update the purchase order status
+      db.run(
+        `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+        [order_status, id],
+        function (err) {
+          if (err) {
+            console.error(err);
+            return res.status(500).send("Error updating status.");
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).send("Purchase order not found.");
+          }
+
+          res.send("Status updated successfully.");
+        }
+      );
     }
   );
 });
@@ -547,27 +596,29 @@ console.log('order status:',order_status)
 // Update a purchase order
 app.put("/purchase_orders/:id", (req, res) => {
   const { id } = req.params;
-  const { reference_number, supplier_id, total_amount, status } = req.body;
-
-  const query = "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ?, order_status = ? WHERE id = ?";
-  db.run(query, [reference_number, supplier_id, total_amount, status], function (err) {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error updating purchase order");
-    } else if (this.changes === 0) {
-      res.status(404).send("Purchase order not found");
-    } else {
-      res.json({
-        id,
-        reference_number,
-        supplier_id,
-        total_amount,
-        status,
-      });
+  const { reference_number, supplier_id, total_amount } = req.body;
+  const query =
+    "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ? WHERE id = ?";
+  db.run(
+    query,
+    [reference_number, supplier_id, total_amount, id],
+    function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error updating purchase order");
+      } else if (this.changes === 0) {
+        res.status(404).send("Purchase order not found");
+      } else {
+        res.json({
+          id,
+          reference_number,
+          supplier_id,
+          total_amount,
+        });
+      }
     }
-  });
+  );
 });
-
 
 // Delete a purchase order
 app.delete("/purchase_orders/:id", (req, res) => {
@@ -584,10 +635,10 @@ app.delete("/purchase_orders/:id", (req, res) => {
   });
 });
 
-
 // Get purchase order details by purchase order ID
 app.get("/purchase_orders/:id/details", (req, res) => {
   const { id } = req.params;
+
   db.all(
     `SELECT pod.id, pod.product_id, p.name, pod.quantity, pod.unit_price
      FROM purchase_order_details pod
@@ -605,27 +656,130 @@ app.get("/purchase_orders/:id/details", (req, res) => {
   );
 });
 
+// Delete purchase order detail
+app.delete(
+  "/purchase_orders_with_details/:purchase_order_id/details/:detail_id",
+  (req, res) => {
+    const { purchase_order_id, detail_id } = req.params;
 
-// Update purchase order details
-app.put("/purchase_orders/:purchase_order_id/details/:detail_id", (req, res) => {
-  const { purchase_order_id, detail_id } = req.params;
-  const { quantity, unit_price } = req.body;
+    const query = `DELETE FROM purchase_order_details
+                 WHERE product_id = ? AND purchase_order_id = ?`;
 
-  const query = `UPDATE purchase_order_details
-                 SET quantity = ?, unit_price = ?
-                 WHERE id = ? AND purchase_order_id = ?`;
+    db.run(query, [detail_id, purchase_order_id], function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error deleting purchase order detail");
+      } else if (this.changes === 0) {
+        res.status(404).send("Purchase order detail not found");
+      } else {
+        res.status(200).send("Purchase order detail deleted successfully");
+      }
+    });
+  }
+);
 
-  db.run(query, [quantity, unit_price, detail_id, purchase_order_id], function (err) {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error updating purchase order details");
-    } else if (this.changes === 0) {
-      res.status(404).send("Purchase order detail not found");
-    } else {
-      res.json({ purchase_order_id, detail_id, quantity, unit_price });
+app.put(
+  "/purchase_orders_with_details/:purchase_order_id/details/:detail_id",
+  (req, res) => {
+    const { purchase_order_id, detail_id } = req.params;
+    const { quantity, unit_price } = req.body; // Assuming user_id is provided in the request
+    user_id = 1;
+    const query = `UPDATE purchase_order_details
+                   SET quantity = ?, unit_price = ?
+                   WHERE product_id = ? AND purchase_order_id = ?`;
+
+    db.run(
+      query,
+      [quantity, unit_price, detail_id, purchase_order_id],
+      function (err) {
+        if (err) {
+          console.error(err.message);
+          res.status(500).send("Error updating purchase order details");
+        } else if (this.changes === 0) {
+          res.status(404).send("Purchase order detail not found");
+        } else {
+          // Log the audit trail after successful update
+          const auditTrailQuery = `INSERT INTO audit_trails (
+            user_id,
+            table_name,
+            record_id,
+            action,
+            changes
+          ) VALUES (?, ?, ?, ?, ?)`;
+
+          const changes = JSON.stringify({
+            updated_fields: {
+              quantity,
+              unit_price,
+            },
+          });
+
+          db.run(
+            auditTrailQuery,
+            [
+              user_id, // ID of the user making the change
+              "purchase_order_details", // Affected table
+              detail_id, // Record ID (product_id in this case)
+              "update", // Action type
+              changes, // Change details in JSON
+            ],
+            (auditErr) => {
+              if (auditErr) {
+                console.error("Error logging audit trail:", auditErr.message);
+                res.status(500).send("Error logging audit trail");
+              } else {
+                res.json({
+                  purchase_order_id,
+                  detail_id,
+                  quantity,
+                  unit_price,
+                });
+              }
+            }
+          );
+        }
+      }
+    );
+  }
+);
+
+// Add a new purchase order detail
+app.post(
+  "/purchase_orders_with_details/:purchase_order_id/details",
+  (req, res) => {
+    const { purchase_order_id } = req.params;
+    const { product_id, quantity, unit_price } = req.body;
+
+    // Ensure all required fields are provided
+    if (!product_id || !quantity || !unit_price) {
+      return res
+        .status(400)
+        .send("Product ID, quantity, and unit price are required");
     }
-  });
-});
+
+    const query = `INSERT INTO purchase_order_details (purchase_order_id, product_id, quantity, unit_price)
+                 VALUES (?, ?, ?, ?)`;
+
+    db.run(
+      query,
+      [purchase_order_id, product_id, quantity, unit_price],
+      function (err) {
+        if (err) {
+          console.error(err.message);
+          res.status(500).send("Error adding purchase order detail");
+        } else {
+          res.status(201).json({
+            purchase_order_id,
+            product_id,
+            quantity,
+            unit_price,
+            id: this.lastID, // Return the ID of the inserted row if applicable
+          });
+        }
+      }
+    );
+  }
+);
 
 // ===================== Draft Endpoints =====================
 
@@ -816,7 +970,6 @@ app.get("/invoices/:reference_number", (req, res) => {
 });
 // Get invoices by customer and status (unpaid or partial)
 app.get("/invoices/customer/:customer_id", (req, res) => {
-
   const { customer_id } = req.params;
   const sql =
     'SELECT * FROM invoices WHERE customer_id = ? AND (status = "unpaid" OR status = "partial")';

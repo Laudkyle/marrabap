@@ -148,7 +148,10 @@ const PurchaseOrdersTable = () => {
                 {["pending", "received", "cancelled"].map((status) => (
                   <li
                     key={status}
-                    onClick={() => handleStatusChange(row.id, status)}
+                    onClick={() => {
+                        console.log(`Clicked on order with ID: ${row.id}`);
+
+                        handleStatusChange(row.id, status)}}
                     className="px-2 py-2 hover:bg-gray-200 cursor-pointer"
                   >
                     {status}
@@ -222,19 +225,19 @@ const PurchaseOrdersTable = () => {
     }
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownStatus(null); // Close the dropdown if click is outside
-      }
-    };
+//   // Close dropdown when clicking outside
+//   useEffect(() => {
+//     const handleClickOutside = (event) => {
+//       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+//         setDropdownStatus(null); // Close the dropdown if click is outside
+//       }
+//     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+//     document.addEventListener("mousedown", handleClickOutside);
+//     return () => {
+//       document.removeEventListener("mousedown", handleClickOutside);
+//     };
+//   }, []);
 
   return (
     <div className="container mx-auto p-6 bg-gray-100 shadow-lg rounded-lg">
