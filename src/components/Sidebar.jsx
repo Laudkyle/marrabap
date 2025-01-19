@@ -293,8 +293,19 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Account Settings",
           icon: <Lock className="w-4 h-4" />,
         },
+        {
+          path: "/opening-balances",
+          label: "Opening Balances",
+          icon: <PlusCircle className="w-4 h-4" />,
+        },
+        {
+          path: "/account-balances",
+          label: "Account Balances",
+          icon: <BookOpen className="w-4 h-4" />, // Adjust icon as needed
+        },
       ],
-    },
+    }
+    
   ];
 
   return (

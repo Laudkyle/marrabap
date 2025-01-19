@@ -1,26 +1,24 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { toast,ToastContainer } from "react-toastify"; // Make sure to install react-toastify
+import { toast, ToastContainer } from "react-toastify"; // Ensure react-toastify is installed
 
 const SupplierPayment = () => {
-  // Payment form state
   const [paymentData, setPaymentData] = useState({
     supplierId: "",
+    purchaseOrderId: "",
     amountPaid: "",
-    paymentMethod: "cash", // Default to cash
-    paymentReference: "", // This will be generated automatically
+    paymentMethod: "cash",
+    paymentReference: "",
     paymentDate: new Date().toISOString(),
-    documents: [], // To hold multiple documents
+    documents: [],
     errorMessage: "",
   });
 
   const [suppliers, setSuppliers] = useState([]);
-
-  // Loading state
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Fetch suppliers for dropdown
     const fetchSuppliers = async () => {
       try {
         const response = await axios.get("http://localhost:5000/suppliers");
@@ -33,7 +31,6 @@ const SupplierPayment = () => {
     fetchSuppliers();
   }, []);
 
-  // Utility function to generate a unique reference number
   const generateReferenceNumber = () => {
     const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
     return `REF ${uniqueNumber}`;
@@ -47,9 +44,37 @@ const SupplierPayment = () => {
     }));
   };
 
+  const handleSupplierChange = async (e) => {
+    const supplierId = e.target.value;
+
+    setPaymentData((prevData) => ({
+      ...prevData,
+      supplierId,
+      purchaseOrderId: "", // Reset purchase order when supplier changes
+    }));
+
+    if (supplierId) {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/suppliers/purchase_orders/${supplierId}`
+        );
+        setPurchaseOrders(
+          response.data.filter(
+            (order) => order.payment_status === "unpaid" || order.payment_status === "partial"
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching purchase orders:", error);
+        toast.error("Error fetching purchase orders.");
+      }
+    } else {
+      setPurchaseOrders([]);
+    }
+  };
+
   const handleFileChange = (e) => {
     const selectedFiles = e.target.files;
-    const maxFileSize = 4 * 1024 * 1024; // 4MB in bytes
+    const maxFileSize = 4 * 1024 * 1024;
 
     if (selectedFiles) {
       const validFiles = [];
@@ -63,26 +88,14 @@ const SupplierPayment = () => {
         }
       });
 
-      // Update state with valid files
       setPaymentData((prevData) => ({
         ...prevData,
         documents: [...prevData.documents, ...validFiles],
       }));
 
-      // Toast notification for rejected files
       if (rejectedFiles.length > 0) {
         toast.error(
-          `The following files exceed the 4MB limit and were not added: ${rejectedFiles.join(
-            ", "
-          )}`,
-          {
-            position: "top-right",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          }
+          `The following files exceed the 4MB limit: ${rejectedFiles.join(", ")}`
         );
       }
     }
@@ -92,7 +105,6 @@ const SupplierPayment = () => {
     e.preventDefault();
     setLoading(true);
 
-    // Generate a reference number for the payment
     const referenceNumber = generateReferenceNumber();
 
     setPaymentData((prevData) => ({
@@ -100,54 +112,48 @@ const SupplierPayment = () => {
       paymentReference: referenceNumber,
     }));
 
-    // Ensure payment amount is valid
     if (!paymentData.amountPaid || paymentData.amountPaid <= 0) {
       setLoading(false);
-      setPaymentData((prevData) => ({
-        ...prevData,
-        errorMessage: "Please enter a valid payment amount.",
-      }));
       toast.error("Please enter a valid payment amount.");
       return;
     }
 
     const paymentPayload = {
+      supplier_id: paymentData.supplierId,
+      purchase_order_id: paymentData.purchaseOrderId,
       reference_number: referenceNumber,
       payment_date: paymentData.paymentDate,
       amount_paid: paymentData.amountPaid,
       payment_method: paymentData.paymentMethod,
-      payment_reference: paymentData.paymentReference,
     };
 
     try {
-      // Post payment data to the server
-      const paymentResponse = await axios.post("http://localhost:5000/payments", paymentPayload);
+      const paymentResponse = await axios.post(
+        "http://localhost:5000/payments",
+        paymentPayload
+      );
 
-      // If documents are attached, post them to /documents
       if (paymentData.documents.length > 0) {
         const formData = new FormData();
-        formData.append("transaction_type", "payment"); // Define transaction type
-        formData.append("reference_number", referenceNumber); // Attach the reference number
+        formData.append("transaction_type", "payment");
+        formData.append("reference_number", referenceNumber);
 
-        // Append each document to the FormData
         paymentData.documents.forEach((file) => {
           formData.append("files", file);
         });
 
-        const documentResponse = await axios.post("http://localhost:5000/documents", formData, {
+        await axios.post("http://localhost:5000/documents", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         });
-
-        console.log("Documents uploaded successfully:", documentResponse.data);
       }
 
-      // Handle success
       if (paymentResponse.status === 201) {
         toast.success("Supplier payment processed successfully.");
         setPaymentData({
           supplierId: "",
+          purchaseOrderId: "",
           amountPaid: "",
           paymentMethod: "cash",
           paymentReference: "",
@@ -155,9 +161,10 @@ const SupplierPayment = () => {
           documents: [],
           errorMessage: "",
         });
+        setPurchaseOrders([]);
       }
     } catch (error) {
-      console.error("Error processing supplier payment:", error);
+      console.error("Error processing payment:", error);
       toast.error("Error processing payment. Please try again.");
     } finally {
       setLoading(false);
@@ -167,20 +174,18 @@ const SupplierPayment = () => {
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg space-y-6">
       <h2 className="text-2xl font-semibold text-gray-700">Supplier Payment</h2>
-      {paymentData.errorMessage && <p className="text-red-600 text-sm">{paymentData.errorMessage}</p>}
       <form onSubmit={handleSubmit} className="space-y-6">
-      <ToastContainer />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Supplier Dropdown */}
+        <ToastContainer />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col">
             <label htmlFor="supplierId" className="text-gray-600">Supplier</label>
             <select
               name="supplierId"
               id="supplierId"
               value={paymentData.supplierId}
-              onChange={handleInputChange}
+              onChange={handleSupplierChange}
               required
-              className="mt-2 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-2 p-3 border border-gray-300 rounded-md"
             >
               <option value="">Select Supplier</option>
               {suppliers.map((supplier) => (
@@ -190,8 +195,25 @@ const SupplierPayment = () => {
               ))}
             </select>
           </div>
-
-          {/* Payment Amount */}
+          <div className="flex flex-col">
+            <label htmlFor="purchaseOrderId" className="text-gray-600">Purchase Order</label>
+            <select
+              name="purchaseOrderId"
+              id="purchaseOrderId"
+              value={paymentData.purchaseOrderId}
+              onChange={handleInputChange}
+              required
+              disabled={!purchaseOrders.length}
+              className="mt-2 p-3 border border-gray-300 rounded-md"
+            >
+              <option value="">Select Purchase Order</option>
+              {purchaseOrders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  {`Order #${order.id} - Amount Due: ${order.total_amount}`}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex flex-col">
             <label htmlFor="amountPaid" className="text-gray-600">Amount Paid</label>
             <input
@@ -202,12 +224,9 @@ const SupplierPayment = () => {
               onChange={handleInputChange}
               required
               min="1"
-              step="any"
-              className="mt-2 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-2 p-3 border border-gray-300 rounded-md"
             />
           </div>
-
-          {/* Payment Method */}
           <div className="flex flex-col">
             <label htmlFor="paymentMethod" className="text-gray-600">Payment Method</label>
             <select
@@ -215,47 +234,29 @@ const SupplierPayment = () => {
               id="paymentMethod"
               value={paymentData.paymentMethod}
               onChange={handleInputChange}
-              className="mt-2 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-2 p-3 border border-gray-300 rounded-md"
             >
               <option value="cash">Cash</option>
-              <option value="credit">Credit</option>
             </select>
           </div>
-
-          {/* Payment Reference */}
           <div className="flex flex-col">
-            <label htmlFor="paymentReference" className="text-gray-600">Payment Reference (Generated)</label>
-            <input
-              type="text"
-              name="paymentReference"
-              id="paymentReference"
-              value={paymentData.paymentReference}
-              readOnly
-              className="mt-2 p-3 border border-gray-300 rounded-md bg-gray-100"
-            />
-          </div>
-
-          {/* Document Upload */}
-          <div className="flex flex-col">
-            <label htmlFor="document" className="text-gray-600">Attach Documents (Optional)</label>
+            <label htmlFor="document" className="text-gray-600">Attach Documents</label>
             <input
               type="file"
               onChange={handleFileChange}
               accept="application/pdf, image/*"
               multiple
-              className="mt-2 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-2 p-3 border border-gray-300 rounded-md"
             />
           </div>
         </div>
-
-        {/* Submit Button */}
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-300"
+            className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300"
           >
-            {loading ? "Processing..." : "Process Supplier Payment"}
+            {loading ? "Processing..." : "Submit Payment"}
           </button>
         </div>
       </form>

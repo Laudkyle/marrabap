@@ -812,6 +812,126 @@ app.post(
   }
 );
 
+// ===================== Accounts Endpoints =====================
+// Get all accounts
+app.get("/accounts", (req, res) => {
+  db.all("SELECT * FROM chart_of_accounts", [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+app.post("/accounts", (req, res) => {
+  const { account_name, account_type, balance } = req.body;
+
+  if (!account_name || !account_type) {
+    return res.status(400).json({ error: "Account name and type are required." });
+  }
+
+  // Get the next account code by finding the highest existing code and incrementing
+  const query = `SELECT MAX(CAST(account_code AS INTEGER)) as max_code FROM chart_of_accounts WHERE account_type = ?`;
+
+  db.get(query, [account_type], (err, row) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Failed to calculate account code." });
+    }
+
+    // Generate next account code
+    const maxCode = row.max_code || 0;
+    const nextCode = maxCode + 10; // Increment by 10 for organizational purposes
+
+    // Insert the new account
+    const insertQuery = `
+      INSERT INTO chart_of_accounts (account_code, account_name, account_type, balance)
+      VALUES (?, ?, ?, ?)
+    `;
+    db.run(
+      insertQuery,
+      [nextCode.toString(), account_name, account_type, balance || 0],
+      function (err) {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ error: "Failed to add account." });
+        }
+
+        // Respond with the new account
+        res.status(201).json({
+          id: this.lastID,
+          account_code: nextCode.toString(),
+          account_name,
+          account_type,
+          balance: balance || 0,
+        });
+      }
+    );
+  });
+});
+
+
+
+// Delete an account
+app.delete("/accounts/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.run("DELETE FROM chart_of_accounts WHERE id = ?", id, function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.status(204).end();
+    }
+  });
+});
+
+// Update an account by ID
+app.put("/accounts/:id", (req, res) => {
+  const { id } = req.params;
+  const { account_name, account_type, balance } = req.body;
+
+  // Prepare the update fields dynamically
+  const updates = [];
+  const params = [];
+
+  if (account_name !== undefined) {
+    updates.push("account_name = ?");
+    params.push(account_name);
+  }
+
+  if (account_type !== undefined) {
+    updates.push("account_type = ?");
+    params.push(account_type);
+  }
+
+  if (balance !== undefined) {
+    updates.push("balance = ?");
+    params.push(balance);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No fields provided to update." });
+  }
+
+  const updateQuery = `UPDATE chart_of_accounts SET ${updates.join(", ")} WHERE id = ?`;
+  params.push(id);
+
+  db.run(updateQuery, params, function (err) {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Failed to update account." });
+    }
+
+    res.json({ 
+      id, 
+      ...(account_name !== undefined && { account_name }), 
+      ...(account_type !== undefined && { account_type }), 
+      ...(balance !== undefined && { balance })
+    });
+  });
+});
+
 // ===================== Draft Endpoints =====================
 
 // Get all drafts

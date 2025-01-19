@@ -11,85 +11,26 @@ const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
 
 db.serialize(() => {
   const defaultAccounts = [
-    { account_code: "1000", account_name: "Cash", account_type: "asset" },
-    {
-      account_code: "1010",
-      account_name: "Accounts Receivable",
-      account_type: "asset",
-    },
-    {
-      account_code: "1020",
-      account_name: "Inventory",
-      account_type: "asset", // New Inventory account
-    },
-    {
-      account_code: "2000",
-      account_name: "Accounts Payable",
-      account_type: "liability",
-    },
-    {
-      account_code: "3000",
-      account_name: "Owner's Equity",
-      account_type: "equity",
-    },
-    {
-      account_code: "4000",
-      account_name: "Sales Revenue",
-      account_type: "revenue",
-    },
-    {
-      account_code: "5000",
-      account_name: "Cost of Goods Sold",
-      account_type: "expense",
-    },
-    {
-      account_code: "5010",
-      account_name: "Salaries and Wages",
-      account_type: "expense",
-    },
-    {
-      account_code: "5020",
-      account_name: "Sales Returns",
-      account_type: "expense",
-    },
-    // Added accounts for taxes:
-    {
-      account_code: "2010",
-      account_name: "Sales Tax Payable",
-      account_type: "liability",
-    },
-    {
-      account_code: "2020",
-      account_name: "Purchase Tax Recoverable",
-      account_type: "asset",
-    },
-    {
-      account_code: "2030",
-      account_name: "VAT Payable",
-      account_type: "liability",
-    },
-    {
-      account_code: "2040",
-      account_name: "VAT Receivable",
-      account_type: "asset",
-    },
-    {
-      account_code: "2050",
-      account_name: "Income Tax Payable",
-      account_type: "liability",
-    },
-    {
-      account_code: "6000",
-      account_name: "Tax Expense",
-      account_type: "expense",
-    },
-    // Added unbilled purchases:
-    {
-      account_code: "1030",
-      account_name: "Unbilled Purchases",
-      account_type: "asset",
-    },
+    { account_code: "1000", account_name: "Cash", account_type: "asset", balance: 0 },
+    { account_code: "1010", account_name: "Accounts Receivable", account_type: "asset", balance: 0 },
+    { account_code: "1020", account_name: "Inventory", account_type: "asset", balance: 0 },
+    { account_code: "2000", account_name: "Accounts Payable", account_type: "liability", balance: 0 },
+    { account_code: "3000", account_name: "Owner's Equity", account_type: "equity", balance: 0 },
+    { account_code: "4000", account_name: "Sales Revenue", account_type: "revenue", balance: 0 },
+    { account_code: "5000", account_name: "Cost of Goods Sold", account_type: "expense", balance: 0 },
+    { account_code: "5010", account_name: "Salaries and Wages", account_type: "expense", balance: 0 },
+    { account_code: "5020", account_name: "Sales Returns", account_type: "expense", balance: 0 },
+    { account_code: "2010", account_name: "Sales Tax Payable", account_type: "liability", balance: 0 },
+    { account_code: "2020", account_name: "Purchase Tax Recoverable", account_type: "asset", balance: 0 },
+    { account_code: "2030", account_name: "VAT Payable", account_type: "liability", balance: 0 },
+    { account_code: "2040", account_name: "VAT Receivable", account_type: "asset", balance: 0 },
+    { account_code: "2050", account_name: "Income Tax Payable", account_type: "liability", balance: 0 },
+    { account_code: "6000", account_name: "Tax Expense", account_type: "expense", balance: 0 },
+    { account_code: "1030", account_name: "Unbilled Purchases", account_type: "asset", balance: 0 },
+    { account_code: "1015", account_name: "Bank Account", account_type: "asset", balance: 0 }
+
   ];
+  
 
   
   db.run(`CREATE TABLE IF NOT EXISTS chart_of_accounts (
@@ -97,6 +38,7 @@ db.serialize(() => {
     account_code TEXT NOT NULL UNIQUE, -- Unique identifier for the account
     account_name TEXT NOT NULL, -- Name of the account
     account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
+    balance FLOAT DEFAULT 0,
     parent_account_id INTEGER, -- For hierarchical accounts
     FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
   )`);
@@ -104,9 +46,9 @@ db.serialize(() => {
  
   defaultAccounts.forEach((account) => {
     db.run(
-      `INSERT OR IGNORE INTO chart_of_accounts (account_code, account_name, account_type)
-       VALUES (?, ?, ?)`,
-      [account.account_code, account.account_name, account.account_type]
+      `INSERT OR IGNORE INTO chart_of_accounts (account_code, account_name, account_type,balance)
+       VALUES (?, ?, ?,?)`,
+      [account.account_code, account.account_name, account.account_type,account.balance]
     );
   });
 });
