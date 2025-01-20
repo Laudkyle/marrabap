@@ -33,7 +33,7 @@ const SupplierPayment = () => {
 
   const generateReferenceNumber = () => {
     const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
-    return `REF ${uniqueNumber}`;
+    return `SUP- ${uniqueNumber}`;
   };
 
   const handleInputChange = (e) => {
@@ -109,7 +109,7 @@ const SupplierPayment = () => {
 
     setPaymentData((prevData) => ({
       ...prevData,
-      paymentReference: referenceNumber,
+      payment_reference: referenceNumber,
     }));
 
     if (!paymentData.amountPaid || paymentData.amountPaid <= 0) {
@@ -121,7 +121,7 @@ const SupplierPayment = () => {
     const paymentPayload = {
       supplier_id: paymentData.supplierId,
       purchase_order_id: paymentData.purchaseOrderId,
-      reference_number: referenceNumber,
+      payment_reference: referenceNumber,
       payment_date: paymentData.paymentDate,
       amount_paid: paymentData.amountPaid,
       payment_method: paymentData.paymentMethod,
@@ -129,7 +129,7 @@ const SupplierPayment = () => {
 
     try {
       const paymentResponse = await axios.post(
-        "http://localhost:5000/payments",
+        "http://localhost:5000/supplier_payments",
         paymentPayload
       );
 
@@ -237,6 +237,7 @@ const SupplierPayment = () => {
               className="mt-2 p-3 border border-gray-300 rounded-md"
             >
               <option value="cash">Cash</option>
+              <option value="bank">Bank Account</option>
             </select>
           </div>
           <div className="flex flex-col">

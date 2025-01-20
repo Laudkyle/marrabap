@@ -514,248 +514,238 @@ app.get("/purchase_orders/:id", (req, res) => {
   });
 });
 
-// Update status of a purchase order by ID
 app.patch("/purchase_orders/:id/order_status", async (req, res) => {
   const { id } = req.params;
-  const { order_status, reference_number } = req.body; // Get the new status from the request body
+  const { order_status, reference_number } = req.body;
   const user_id = 1; // Replace with actual logged-in user ID
 
-  // Check if the status is valid
   if (!["pending", "received", "cancelled"].includes(order_status)) {
     return res.status(400).send("Invalid status.");
   }
 
-  db.get(
-    `SELECT order_status FROM purchase_orders WHERE id = ?`,
-    [id],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send("Error fetching purchase order.");
-      }
-
-      if (!row) {
-        return res.status(404).send("Purchase order not found.");
-      }
-
-      const oldStatus = row.order_status;
-
-      // Prevent redundant updates
-      if (oldStatus === order_status) {
-        return res.status(400).send("Status is already updated.");
-      }
-
-      // If status is being set to "received"
-      if (order_status == "received") {
-        // Fetch purchase order details
-        db.all(
-          `SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`,
+  try {
+    // Use promises for the initial status check
+    const getPurchaseOrder = () => {
+      return new Promise((resolve, reject) => {
+        db.get(
+          `SELECT order_status FROM purchase_orders WHERE id = ?`,
           [id],
-          (err, items) => {
-            if (err) {
-              console.error(err);
-              return res.status(500).send("Error fetching purchase order details.");
-            }
-
-            if (items.length === 0) {
-              return res
-                .status(404)
-                .send("No items found for this purchase order.");
-            }
-
-            // Initialize variables for updates
-            const inventoryUpdates = [];
-            const movementInserts = [];
-            const journalEntryLines = [];
-            let totalValue = 0;
-
-            // Process purchase order items
-            items.forEach(({ product_id, quantity, unit_price }) => {
-              const lineValue = quantity * unit_price;
-              totalValue += lineValue;
-
-              // Update inventory
-              inventoryUpdates.push(
-                new Promise((resolve, reject) => {
-                  db.run(
-                    `UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ?
-                     WHERE product_id = ?`,
-                    [quantity, unit_price, product_id],
-                    (err) => {
-                      if (err) return reject(err);
-                      resolve();
-                    }
-                  );
-                })
-              );
-
-              // Add inventory movement
-              movementInserts.push(
-                new Promise((resolve, reject) => {
-                  db.run(
-                    `INSERT INTO inventory_movements (product_id, movement_type, quantity, cost, reference_number)
-                     VALUES (?, 'purchase', ?, ?, ?)`,
-                    [product_id, quantity, unit_price, reference_number],
-                    (err) => {
-                      if (err) return reject(err);
-                      resolve();
-                    }
-                  );
-                })
-              );
-
-              // Prepare journal entry line for inventory
-              journalEntryLines.push({
-                account_id: "1020", // Inventory account
-                debit: lineValue,
-                credit: 0,
-              });
-            });
-
-            // Add journal entry line for accounts payable
-            journalEntryLines.push({
-              account_id: "2000", // Accounts Payable
-              debit: 0,
-              credit: totalValue,
-            });
-
-            // Wait for inventory and movement updates
-            Promise.all([...inventoryUpdates, ...movementInserts])
-              .then(() => {
-                // Insert into journal_entries table
-                db.run(
-                  `INSERT INTO journal_entries (reference_number, date, description, status)
-                   VALUES (?, date('now'), ?, 'posted')`,
-                  [reference_number, `Purchase order #${id} received`],
-                  function (err) {
-                    if (err) {
-                      console.error("Error inserting journal entry:", err);
-                      return res
-                        .status(500)
-                        .send("Error creating journal entry.");
-                    }
-
-                    const journalEntryId = this.lastID;
-
-                    // Insert journal entry lines
-                    const journalLinePromises = journalEntryLines.map(
-                      ({ account_id, debit, credit }) =>
-                        new Promise((resolve, reject) => {
-                          db.run(
-                            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-                             VALUES (?, ?, ?, ?)`,
-                            [journalEntryId, account_id, debit, credit],
-                            (err) => {
-                              if (err) return reject(err);
-                              resolve();
-                            }
-                          );
-                        })
-                    );
-
-                    Promise.all(journalLinePromises)
-                      .then(() => {
-                        // Update general ledger
-                        const ledgerUpdates = journalEntryLines.map(
-                          ({ account_id, debit, credit }) =>
-                            new Promise((resolve, reject) => {
-                              const netAmount = debit - credit;
-                              db.run(
-                                `UPDATE chart_of_accounts
-                                 SET balance = balance + ?
-                                 WHERE account_code = ?`,
-                                [netAmount, account_id],
-                                (err) => {
-                                  if (err) return reject(err);
-                                  resolve();
-                                }
-                              );
-                            })
-                        );
-
-                        Promise.all(ledgerUpdates)
-                          .then(() => {
-                            // Log the action in audit trails
-                            const changes = JSON.stringify({
-                              old_status: oldStatus,
-                              new_status: order_status,
-                            });
-
-                            db.run(
-                              `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
-                               VALUES (?, ?, ?, ?, ?)`,
-                              [user_id, "purchase_orders", id, "update", changes],
-                              (err) => {
-                                if (err) {
-                                  console.error(
-                                    "Error logging to audit_trails:",
-                                    err
-                                  );
-                                }
-                              }
-                            );
-
-                            // Update purchase order status
-                            db.run(
-                              `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
-                              [order_status, id],
-                              (err) => {
-                                if (err) {
-                                  console.error(err);
-                                  return res
-                                    .status(500)
-                                    .send("Error updating status.");
-                                }
-
-                                res.send(
-                                  "Status updated and records updated successfully."
-                                );
-                              }
-                            );
-                          })
-                          .catch((err) => {
-                            console.error(err);
-                            res
-                              .status(500)
-                              .send("Error updating chart of accounts.");
-                          });
-                      })
-                      .catch((err) => {
-                        console.error(err);
-                        res
-                          .status(500)
-                          .send("Error inserting journal entry lines.");
-                      });
-                  }
-                );
-              })
-              .catch((err) => {
-                console.error(err);
-                res
-                  .status(500)
-                  .send("Error updating inventory or inventory movements.");
-              });
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
           }
         );
-      } else {
-        // If status is not "received", just update the status
+      });
+    };
+
+    const row = await getPurchaseOrder();
+    
+    if (!row) {
+      return res.status(404).send("Purchase order not found.");
+    }
+
+    const oldStatus = row.order_status;
+
+    if (oldStatus === order_status) {
+      return res.status(400).send("Status is already updated.");
+    }
+
+    // If status is being set to "received"
+    if (order_status === "received") {
+      // Wrap db.all in a promise
+      const getOrderDetails = () => {
+        return new Promise((resolve, reject) => {
+          db.all(
+            `SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`,
+            [id],
+            (err, items) => {
+              if (err) reject(err);
+              else resolve(items);
+            }
+          );
+        });
+      };
+
+      const items = await getOrderDetails();
+
+      if (items.length === 0) {
+        return res.status(404).send("No items found for this purchase order.");
+      }
+
+      // Process items and calculate totals
+      const inventoryUpdates = [];
+      const movementInserts = [];
+      let totalValue = 0;
+
+      // Process purchase order items
+      items.forEach(({ product_id, quantity, unit_price }) => {
+        const lineValue = quantity * unit_price;
+        totalValue += lineValue;
+
+        inventoryUpdates.push(
+          new Promise((resolve, reject) => {
+            db.run(
+              `UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ?
+               WHERE product_id = ?`,
+              [quantity, unit_price, product_id],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          })
+        );
+
+        movementInserts.push(
+          new Promise((resolve, reject) => {
+            db.run(
+              `INSERT INTO inventory_movements (product_id, movement_type, quantity, cost, reference_number)
+               VALUES (?, 'purchase', ?, ?, ?)`,
+              [product_id, quantity, unit_price, reference_number],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          })
+        );
+      });
+
+      // Wait for all inventory updates and movements to complete
+      await Promise.all([...inventoryUpdates, ...movementInserts]);
+
+      // Create journal entry with proper error handling
+      const createJournalEntry = () => {
+        return new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO journal_entries (reference_number, date, description, status)
+             VALUES (?, date('now'), ?, 'posted')`,
+            [reference_number, `Purchase order #${id} received`],
+            function(err) {
+              if (err) reject(err);
+              else resolve(this.lastID);
+            }
+          );
+        });
+      };
+
+      const journalEntryId = await createJournalEntry();
+
+      // Prepare journal lines
+      const journalLines = [
+        // Inventory debit (Asset account: debit increases)
+        {
+          journal_entry_id: journalEntryId,
+          account_id: "1020",
+          debit: totalValue,
+          credit: 0,
+          isLiability: false  // Asset account
+        },
+        // Accounts Payable credit (Liability account: credit increases)
+        {
+          journal_entry_id: journalEntryId,
+          account_id: "2000",
+          debit: 0,
+          credit: totalValue,
+          isLiability: true  // Liability account
+        }
+      ];
+
+      // Insert journal entry lines and update chart of accounts
+      const processJournalLines = async () => {
+        const linePromises = journalLines.map(line => {
+          return new Promise((resolve, reject) => {
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+               VALUES (?, ?, ?, ?)`,
+              [line.journal_entry_id, line.account_id, line.debit, line.credit],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        });
+
+        // Add ledger updates for chart of accounts with correct sign conventions
+        const ledgerUpdates = journalLines.map(line => {
+          // For liability accounts, credits increase the balance and debits decrease it
+          // For asset accounts, debits increase the balance and credits decrease it
+          const netAmount = line.isLiability
+            ? (line.credit - line.debit)  // Liability accounts: credit increases, debit decreases
+            : (line.debit - line.credit); // Asset accounts: debit increases, credit decreases
+
+          return new Promise((resolve, reject) => {
+            db.run(
+              `UPDATE chart_of_accounts
+               SET balance = balance + ?
+               WHERE account_code = ?`,
+              [netAmount, line.account_id],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        });
+
+        // Execute all journal line inserts and ledger updates
+        await Promise.all([...linePromises, ...ledgerUpdates]);
+      };
+
+      await processJournalLines();
+
+      // Update purchase order status
+      await new Promise((resolve, reject) => {
         db.run(
           `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
           [order_status, id],
-          function (err) {
-            if (err) {
-              console.error(err);
-              return res.status(500).send("Error updating status.");
-            }
-
-            res.send("Status updated successfully.");
+          (err) => {
+            if (err) reject(err);
+            else resolve();
           }
         );
-      }
-    }
-  );
-});
+      });
 
+      // Log to audit trail
+      const changes = JSON.stringify({
+        old_status: oldStatus,
+        new_status: order_status
+      });
+
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+           VALUES (?, ?, ?, ?, ?)`,
+          [user_id, "purchase_orders", id, "update", changes],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      res.send("Status updated and records updated successfully.");
+    } else {
+      // For non-received statuses, just update the status
+      await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+          [order_status, id],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      res.send("Status updated successfully.");
+    }
+  } catch (error) {
+    console.error("Error processing purchase order:", error);
+    res.status(500).send("An error occurred while processing the purchase order.");
+  }
+});
 // Update a purchase order
 app.put("/purchase_orders/:id", (req, res) => {
   const { id } = req.params;
@@ -1337,6 +1327,143 @@ app.delete("/invoices/:reference_number", (req, res) => {
     } else {
       res.status(200).json({ message: "Invoice deleted successfully" });
     }
+  });
+});
+
+// ===================== Supplier Payments Endpoints =====================
+app.post("/supplier_payments", (req, res) => {
+  const {
+    supplier_id,
+    purchase_order_id,
+    amount_paid,
+    payment_method,
+    payment_reference,
+  } = req.body;
+
+  if (!supplier_id || !amount_paid) {
+    return res.status(400).send("Supplier ID and amount paid are required.");
+  }
+
+  const query = `
+    INSERT INTO supplier_payments (supplier_id, purchase_order_id, amount_paid, payment_method, payment_reference)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  const params = [
+    supplier_id,
+    purchase_order_id || null,
+    amount_paid,
+    payment_method || null,
+    payment_reference || null,
+  ];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error("Error adding supplier payment:", err.message);
+      return res.status(500).send("Failed to add supplier payment.");
+    }
+
+    // After inserting the payment, update the related tables (purchase_orders, accounts, and ledger)
+    const paymentId = this.lastID;
+
+    // 1. Update Purchase Order Status
+    if (purchase_order_id) {
+      const updatePurchaseOrderQuery = `
+        UPDATE purchase_orders
+        SET payment_status = CASE 
+          WHEN (SELECT SUM(amount_paid) FROM supplier_payments WHERE purchase_order_id = ?) >= total_amount 
+          THEN 'paid' 
+          ELSE 'partial' 
+        END
+        WHERE id = ?
+      `;
+      db.run(updatePurchaseOrderQuery, [purchase_order_id, purchase_order_id], function (err) {
+        if (err) {
+          console.error("Error updating purchase order:", err.message);
+        }
+      });
+    }
+ 
+    res.status(201).send({ id: paymentId });
+  });
+});
+
+// READ: Get all supplier payments
+app.get("/supplier_payments", (req, res) => {
+  const query = "SELECT * FROM supplier_payments";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error("Error retrieving supplier payments:", err.message);
+      return res.status(500).send("Failed to retrieve supplier payments.");
+    }
+    res.status(200).json(rows);
+  });
+});
+// READ: Get a specific supplier payment by ID
+app.get("/supplier_payments/:id", (req, res) => {
+  const query = "SELECT * FROM supplier_payments WHERE id = ?";
+  const params = [req.params.id];
+
+  db.get(query, params, (err, row) => {
+    if (err) {
+      console.error("Error retrieving supplier payment:", err.message);
+      return res.status(500).send("Failed to retrieve supplier payment.");
+    }
+    if (!row) {
+      return res.status(404).send("Supplier payment not found.");
+    }
+    res.status(200).json(row);
+  });
+});
+// UPDATE: Update a supplier payment
+app.put("/supplier_payments/:id", (req, res) => {
+  const {
+    supplier_id,
+    purchase_order_id,
+    amount_paid,
+    payment_method,
+    payment_reference,
+  } = req.body;
+
+  const query = `
+    UPDATE supplier_payments
+    SET supplier_id = ?, purchase_order_id = ?, amount_paid = ?, payment_method = ?, payment_reference = ?
+    WHERE id = ?
+  `;
+  const params = [
+    supplier_id,
+    purchase_order_id,
+    amount_paid,
+    payment_method,
+    payment_reference,
+    req.params.id,
+  ];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error("Error updating supplier payment:", err.message);
+      return res.status(500).send("Failed to update supplier payment.");
+    }
+    if (this.changes === 0) {
+      return res.status(404).send("Supplier payment not found.");
+    }
+    res.status(200).send("Supplier payment updated successfully.");
+  });
+});
+// DELETE: Delete a supplier payment
+app.delete("/supplier_payments/:id", (req, res) => {
+  const query = "DELETE FROM supplier_payments WHERE id = ?";
+  const params = [req.params.id];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error("Error deleting supplier payment:", err.message);
+      return res.status(500).send("Failed to delete supplier payment.");
+    }
+    if (this.changes === 0) {
+      return res.status(404).send("Supplier payment not found.");
+    }
+    res.status(200).send("Supplier payment deleted successfully.");
   });
 });
 

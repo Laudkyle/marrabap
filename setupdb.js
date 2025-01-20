@@ -157,7 +157,18 @@ db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
   payment_method TEXT, -- Optional (e.g., cash, credit card, etc.)
   payment_reference TEXT -- Optional payment reference number
 )`);
-
+db.run(`CREATE TABLE IF NOT EXISTS supplier_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supplier_id INTEGER NOT NULL,  -- Reference to the supplier
+  purchase_order_id INTEGER,     -- Reference to the purchase order (optional if not linked directly to PO)
+  payment_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Date and time of payment
+  amount_paid REAL NOT NULL CHECK(amount_paid > 0),      -- Payment amount (must be positive)
+  payment_method TEXT,           -- Method of payment (e.g., cash, credit card)
+  payment_reference TEXT,        -- Optional payment reference number
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id), -- Linking to the suppliers table
+  FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id)  -- Linking to the purchase orders table (optional)
+);
+`)
   db.run(`CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
@@ -410,6 +421,84 @@ BEGIN
 END;
 
 `)
+db.run(`
+CREATE TRIGGER supplier_payment_journal_entry
+AFTER INSERT ON supplier_payments
+FOR EACH ROW
+BEGIN
+  -- Insert into journal_entries table to create a new journal entry
+  INSERT INTO journal_entries (reference_number, date, description, status)
+  VALUES (
+    NEW.payment_reference,  -- Using payment_reference as the reference number
+    CURRENT_DATE,           -- Current date for the transaction
+    'Payment to supplier ' || NEW.supplier_id,  -- Description
+    'posted'                -- Mark as posted after creation
+  );
+
+  -- Insert debit entry for Accounts Payable (2000)
+  INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+  VALUES (
+    (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
+    '2000',  -- Accounts Payable (2000)
+    NEW.amount_paid,              -- Debit the Accounts Payable
+    0                             -- No credit here
+  );
+
+  -- Insert credit entry for Cash/Bank (1000 or 1015) based on payment method
+  INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+  VALUES (
+    (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
+    (SELECT account_code FROM chart_of_accounts WHERE account_code = CASE
+      WHEN NEW.payment_method = 'cash' THEN '1000'  -- Cash (1000)
+      ELSE '1015'  -- Bank (1015)
+    END),
+    NEW.amount_paid,               -- Debit the Cash/Bank
+    0                              -- No credit here
+  );
+
+  -- Update Accounts Payable balance (decrease)
+  UPDATE chart_of_accounts
+  SET balance = balance - NEW.amount_paid
+  WHERE account_code = '2000';
+
+  -- Update Cash/Bank balance (decrease)
+  UPDATE chart_of_accounts
+  SET balance = balance - NEW.amount_paid
+  WHERE account_code = CASE
+    WHEN NEW.payment_method = 'cash' THEN '1000'
+    ELSE '1015'
+  END;
+
+  -- Update Supplier's total purchase due
+  UPDATE suppliers
+  SET total_purchase_due = total_purchase_due - NEW.amount_paid
+  WHERE id = NEW.supplier_id;
+
+  -- Update Supplier Invoice (if there is an associated invoice)
+  UPDATE supplier_invoices
+  SET amount_paid = amount_paid + NEW.amount_paid,
+      status = CASE
+        WHEN amount_paid + NEW.amount_paid >= total_amount THEN 'paid'
+        WHEN amount_paid + NEW.amount_paid > 0 THEN 'partial'
+        ELSE 'unpaid'
+      END
+  WHERE purchase_order_id = NEW.purchase_order_id
+    AND supplier_id = NEW.supplier_id;
+
+  -- Insert into audit_trails table to log the action
+  INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+  VALUES (
+    1,                      -- The user who made the change
+    'supplier_payments',    -- Affected table
+    NEW.id,                 -- Affected record (supplier payment ID)
+    'insert',               -- Action (insert)
+    '{"payment_reference": "' || NEW.payment_reference || '", "amount_paid": ' || NEW.amount_paid || '}'  -- Change details in JSON format
+  );
+END;
+
+`);
+
+
 db.run(`CREATE TRIGGER after_purchase_order_insert
 AFTER INSERT ON purchase_orders
 FOR EACH ROW
