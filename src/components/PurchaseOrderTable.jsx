@@ -149,9 +149,8 @@ const PurchaseOrdersTable = () => {
                   <li
                     key={status}
                     onClick={() => {
-                        console.log(`Clicked on order with ID: ${row.id}`);
 
-                        handleStatusChange(row.id, status)}}
+                        handleStatusChange(row.id, status,row.reference_number)}}
                     className="px-2 py-2 hover:bg-gray-200 cursor-pointer"
                   >
                     {status}
@@ -201,12 +200,14 @@ const PurchaseOrdersTable = () => {
   };
 
   // Handle status change and update in the database
-  const handleStatusChange = async (id, newStatus) => {
+  const handleStatusChange = async (id, newStatus,reference_number) => {
+
     try {
       await axios.patch(
         `http://localhost:5000/purchase_orders/${id}/order_status`,
         {
           order_status: newStatus,
+          reference_number:reference_number,
         }
       );
 
@@ -219,6 +220,7 @@ const PurchaseOrdersTable = () => {
 
       toast.success(`Purchase order status updated to "${newStatus}"!`);
       setDropdownStatus(null); // Close the dropdown after selection
+
     } catch (error) {
       console.error("Error changing status:", error);
       toast.error("Failed to update purchase order status. Please try again.");

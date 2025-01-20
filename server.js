@@ -74,8 +74,23 @@ const documentUpload = multer({ storage: documentStorage });
 // ===================== Products Endpoints =====================
 
 // Get all products
+// Get all products with quantity in stock from inventory
 app.get("/products", (req, res) => {
-  db.all("SELECT * FROM products", (err, rows) => {
+  const query = `
+    SELECT 
+      products.id, 
+      products.name, 
+      products.cp, 
+      products.sp, 
+      products.image, 
+      products.suppliers_id,
+      IFNULL(SUM(inventory.quantity_in_stock), 0) AS quantity_in_stock
+    FROM products
+    LEFT JOIN inventory ON products.id = inventory.product_id
+    GROUP BY products.id
+  `;
+  
+  db.all(query, (err, rows) => {
     if (err) {
       console.error(err);
       res.status(500).send("Error fetching products");
@@ -85,10 +100,25 @@ app.get("/products", (req, res) => {
   });
 });
 
-// Get a specific product by ID
+// Get a specific product by ID with quantity in stock from inventory
 app.get("/products/:id", (req, res) => {
   const { id } = req.params;
-  db.get("SELECT * FROM products WHERE id = ?", [id], (err, row) => {
+  const query = `
+    SELECT 
+      products.id, 
+      products.name, 
+      products.cp, 
+      products.sp, 
+      products.image, 
+      products.suppliers_id,
+      IFNULL(SUM(inventory.quantity_in_stock), 0) AS quantity_in_stock
+    FROM products
+    LEFT JOIN inventory ON products.id = inventory.product_id
+    WHERE products.id = ?
+    GROUP BY products.id
+  `;
+  
+  db.get(query, [id], (err, row) => {
     if (err) {
       console.error(err.message);
       res.status(500).send("Error fetching product");
@@ -136,32 +166,65 @@ app.post("/products/bulk", (req, res) => {
 
     let errorOccurred = false;
 
+    const inventoryInserts = [];
+
     products.forEach((product) => {
       const stmt = db.prepare(
         "INSERT INTO products (name, cp, sp, suppliers_id) VALUES (?, ?, ?, ?)"
       );
 
-      stmt.run(product.name, product.cp, product.sp, suppliers_id, (err) => {
+      stmt.run(product.name, product.cp, product.sp, suppliers_id, function (err) {
         if (err) {
           console.error("Error inserting product:", err.message);
           errorOccurred = true;
+        } else {
+          const productId = this.lastID;
+
+          // Prepare inventory entry for the newly added product
+          inventoryInserts.push(
+            new Promise((resolve, reject) => {
+              db.run(
+                "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
+                [productId, 0, product.cp],
+                (err) => {
+                  if (err) {
+                    console.error("Error inserting into inventory:", err.message);
+                    return reject(err);
+                  }
+                  resolve();
+                }
+              );
+            })
+          );
         }
       });
 
       stmt.finalize();
     });
 
-    if (errorOccurred) {
-      db.run("ROLLBACK");
-      return res
-        .status(500)
-        .send("Failed to add products. Transaction rolled back.");
-    }
+    // Wait for all inventory entries to be created
+    Promise.all(inventoryInserts)
+      .then(() => {
+        if (errorOccurred) {
+          db.run("ROLLBACK");
+          return res
+            .status(500)
+            .send("Failed to add products. Transaction rolled back.");
+        }
 
-    db.run("COMMIT");
-    res.status(201).send("Products added successfully.");
+        db.run("COMMIT");
+        res.status(201).send("Products and inventory entries added successfully.");
+      })
+      .catch((err) => {
+        console.error("Error during inventory insertion:", err.message);
+        db.run("ROLLBACK");
+        res
+          .status(500)
+          .send("Failed to add inventory entries. Transaction rolled back.");
+      });
   });
 });
+
 // Add a new product
 app.post("/products", upload.single("image"), (req, res) => {
   const { name, cp, sp, suppliers_id } = req.body;
@@ -267,170 +330,93 @@ app.delete("/products/:id", (req, res) => {
   });
 });
 
-// ===================== Pos Products Endpoints =====================
-// Add a product to POS
-app.post("/pos_products", (req, res) => {
-  const { product_id } = req.body;
+// ===================== Inventoty Endpoints =====================
+/// Create Inventory
+app.post('/inventory', (req, res) => {
+  const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
-  // Validate product_id
-  if (!product_id) {
-    return res.status(400).send("Product ID is required");
+  if (!product_id || !quantity_in_stock || !cost_per_unit) {
+    return res.status(400).send("Missing required fields.");
   }
 
-  // Fetch product from the main products table
-  const query = `
-    SELECT id, name, sp AS price, stock 
-    FROM products 
-    WHERE id = ?
-  `;
+  const stmt = db.prepare(
+    `INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) 
+     VALUES (?, ?, ?)`
+  );
 
-  db.get(query, [product_id], (err, product) => {
+  stmt.run(product_id, quantity_in_stock, cost_per_unit, function(err) {
     if (err) {
-      console.error(err.message);
-      return res.status(500).send("Error fetching product");
+      return res.status(500).send("Failed to add inventory.");
     }
-
-    if (!product) {
-      return res.status(404).send("Product not found");
-    }
-
-    // Insert product into pos_products
-    const insertQuery = `
-      INSERT INTO pos_products (product_id, name, stock, price)
-      VALUES (?, ?, ?, ?)
-    `;
-
-    db.run(
-      insertQuery,
-      [product.id, product.name, product.stock, product.price],
-      function (err) {
-        if (err) {
-          console.error(err.message);
-          return res.status(500).send("Error adding product to POS");
-        }
-
-        res.status(201).json({
-          product_id: product.id,
-          name: product.name,
-          stock: product.stock,
-          price: product.price,
-        });
-      }
-    );
+    res.status(201).json({ id: this.lastID, product_id, quantity_in_stock, cost_per_unit });
   });
 });
 
-// Update POS product
-app.put("/pos_products/:product_id", (req, res) => {
-  const { product_id } = req.params;
-  const { stock, price } = req.body;
-
-  const fields = [];
-  const values = [];
-
-  if (stock !== undefined) {
-    fields.push("stock = ?");
-    values.push(stock);
-  }
-  if (price !== undefined) {
-    fields.push("price = ?");
-    values.push(price);
-  }
-
-  if (fields.length === 0) {
-    return res.status(400).send("No valid fields to update");
-  }
-
-  values.push(product_id);
-
-  const query = `UPDATE pos_products SET ${fields.join(
-    ", "
-  )} WHERE product_id = ?`;
-
-  db.run(query, values, function (err) {
+// Read All Inventory Items
+app.get('/inventory', (req, res) => {
+  db.all('SELECT * FROM inventory', [], (err, rows) => {
     if (err) {
-      console.error(err.message);
-      return res.status(500).send("Error updating POS product");
+      return res.status(500).send("Failed to retrieve inventory.");
     }
+    res.status(200).json(rows);
+  });
+});
 
+// Read Single Inventory Item by ID
+app.get('/inventory/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.get('SELECT * FROM inventory WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      return res.status(500).send("Failed to retrieve inventory item.");
+    }
+    if (!row) {
+      return res.status(404).send("Inventory item not found.");
+    }
+    res.status(200).json(row);
+  });
+});
+
+// Update Inventory
+app.put('/inventory/:id', (req, res) => {
+  const { id } = req.params;
+  const { product_id, quantity_in_stock, cost_per_unit } = req.body;
+
+  if (!product_id || !quantity_in_stock || !cost_per_unit) {
+    return res.status(400).send("Missing required fields.");
+  }
+
+  const stmt = db.prepare(
+    `UPDATE inventory 
+     SET product_id = ?, quantity_in_stock = ?, cost_per_unit = ? 
+     WHERE id = ?`
+  );
+
+  stmt.run(product_id, quantity_in_stock, cost_per_unit, id, function(err) {
+    if (err) {
+      return res.status(500).send("Failed to update inventory.");
+    }
     if (this.changes === 0) {
-      return res.status(404).send("POS product not found");
+      return res.status(404).send("Inventory item not found.");
     }
-
-    res.status(200).send("POS product updated successfully");
+    res.status(200).send("Inventory item updated successfully.");
   });
 });
 
-// Delete a POS product
-app.delete("/pos_products/:product_id", (req, res) => {
-  const { product_id } = req.params;
+// Delete Inventory Item
+app.delete('/inventory/:id', (req, res) => {
+  const { id } = req.params;
 
-  const query = "DELETE FROM pos_products WHERE product_id = ?";
-
-  db.run(query, [product_id], function (err) {
+  const stmt = db.prepare('DELETE FROM inventory WHERE id = ?');
+  
+  stmt.run(id, function(err) {
     if (err) {
-      console.error(err.message);
-      return res.status(500).send("Error deleting POS product");
+      return res.status(500).send("Failed to delete inventory item.");
     }
-
     if (this.changes === 0) {
-      return res.status(404).send("POS product not found");
+      return res.status(404).send("Inventory item not found.");
     }
-
-    res.status(204).send();
-  });
-});
-
-// Bulk sync products to POS
-app.post("/pos_products/sync", (req, res) => {
-  db.serialize(() => {
-    db.run("BEGIN TRANSACTION");
-
-    let errorOccurred = false;
-
-    // Fetch all products from the main products table
-    db.all(
-      "SELECT id, name, sp AS price, stock FROM products",
-      (err, products) => {
-        if (err) {
-          console.error(err.message);
-          errorOccurred = true;
-          return;
-        }
-
-        // Insert products into pos_products
-        products.forEach((product) => {
-          const query = `
-            INSERT INTO pos_products (product_id, name, stock, price)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(product_id) DO UPDATE SET
-              name = excluded.name,
-              stock = excluded.stock,
-              price = excluded.price
-          `;
-
-          db.run(
-            query,
-            [product.id, product.name, product.stock, product.price],
-            (err) => {
-              if (err) {
-                console.error("Error syncing product to POS:", err.message);
-                errorOccurred = true;
-              }
-            }
-          );
-        });
-      }
-    );
-
-    // Commit or rollback based on error state
-    if (errorOccurred) {
-      db.run("ROLLBACK");
-      res.status(500).send("Error syncing products to POS");
-    } else {
-      db.run("COMMIT");
-      res.status(200).send("Products synced to POS successfully");
-    }
+    res.status(200).send("Inventory item deleted successfully.");
   });
 });
 
@@ -529,11 +515,10 @@ app.get("/purchase_orders/:id", (req, res) => {
 });
 
 // Update status of a purchase order by ID
-app.patch("/purchase_orders/:id/order_status", (req, res) => {
+app.patch("/purchase_orders/:id/order_status", async (req, res) => {
   const { id } = req.params;
-  const { order_status } = req.body; // Get the new status from the request body
-  const user_id = 1; //
-  console.log("order status:", order_status);
+  const { order_status, reference_number } = req.body; // Get the new status from the request body
+  const user_id = 1; // Replace with actual logged-in user ID
 
   // Check if the status is valid
   if (!["pending", "received", "cancelled"].includes(order_status)) {
@@ -555,40 +540,218 @@ app.patch("/purchase_orders/:id/order_status", (req, res) => {
 
       const oldStatus = row.order_status;
 
-      // Log the action in the audit_trails table
-      const changes = JSON.stringify({
-        old_status: oldStatus,
-        new_status: order_status,
-      });
+      // Prevent redundant updates
+      if (oldStatus === order_status) {
+        return res.status(400).send("Status is already updated.");
+      }
 
-      // Insert a log entry into audit_trails
-      db.run(
-        `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`,
-        [user_id, "purchase_orders", id, "update", changes],
-        function (err) {
-          if (err) {
-            console.error("Error logging to audit_trails:", err);
+      // If status is being set to "received"
+      if (order_status == "received") {
+        // Fetch purchase order details
+        db.all(
+          `SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`,
+          [id],
+          (err, items) => {
+            if (err) {
+              console.error(err);
+              return res.status(500).send("Error fetching purchase order details.");
+            }
+
+            if (items.length === 0) {
+              return res
+                .status(404)
+                .send("No items found for this purchase order.");
+            }
+
+            // Initialize variables for updates
+            const inventoryUpdates = [];
+            const movementInserts = [];
+            const journalEntryLines = [];
+            let totalValue = 0;
+
+            // Process purchase order items
+            items.forEach(({ product_id, quantity, unit_price }) => {
+              const lineValue = quantity * unit_price;
+              totalValue += lineValue;
+
+              // Update inventory
+              inventoryUpdates.push(
+                new Promise((resolve, reject) => {
+                  db.run(
+                    `UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ?
+                     WHERE product_id = ?`,
+                    [quantity, unit_price, product_id],
+                    (err) => {
+                      if (err) return reject(err);
+                      resolve();
+                    }
+                  );
+                })
+              );
+
+              // Add inventory movement
+              movementInserts.push(
+                new Promise((resolve, reject) => {
+                  db.run(
+                    `INSERT INTO inventory_movements (product_id, movement_type, quantity, cost, reference_number)
+                     VALUES (?, 'purchase', ?, ?, ?)`,
+                    [product_id, quantity, unit_price, reference_number],
+                    (err) => {
+                      if (err) return reject(err);
+                      resolve();
+                    }
+                  );
+                })
+              );
+
+              // Prepare journal entry line for inventory
+              journalEntryLines.push({
+                account_id: "1020", // Inventory account
+                debit: lineValue,
+                credit: 0,
+              });
+            });
+
+            // Add journal entry line for accounts payable
+            journalEntryLines.push({
+              account_id: "2000", // Accounts Payable
+              debit: 0,
+              credit: totalValue,
+            });
+
+            // Wait for inventory and movement updates
+            Promise.all([...inventoryUpdates, ...movementInserts])
+              .then(() => {
+                // Insert into journal_entries table
+                db.run(
+                  `INSERT INTO journal_entries (reference_number, date, description, status)
+                   VALUES (?, date('now'), ?, 'posted')`,
+                  [reference_number, `Purchase order #${id} received`],
+                  function (err) {
+                    if (err) {
+                      console.error("Error inserting journal entry:", err);
+                      return res
+                        .status(500)
+                        .send("Error creating journal entry.");
+                    }
+
+                    const journalEntryId = this.lastID;
+
+                    // Insert journal entry lines
+                    const journalLinePromises = journalEntryLines.map(
+                      ({ account_id, debit, credit }) =>
+                        new Promise((resolve, reject) => {
+                          db.run(
+                            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+                             VALUES (?, ?, ?, ?)`,
+                            [journalEntryId, account_id, debit, credit],
+                            (err) => {
+                              if (err) return reject(err);
+                              resolve();
+                            }
+                          );
+                        })
+                    );
+
+                    Promise.all(journalLinePromises)
+                      .then(() => {
+                        // Update general ledger
+                        const ledgerUpdates = journalEntryLines.map(
+                          ({ account_id, debit, credit }) =>
+                            new Promise((resolve, reject) => {
+                              const netAmount = debit - credit;
+                              db.run(
+                                `UPDATE chart_of_accounts
+                                 SET balance = balance + ?
+                                 WHERE account_code = ?`,
+                                [netAmount, account_id],
+                                (err) => {
+                                  if (err) return reject(err);
+                                  resolve();
+                                }
+                              );
+                            })
+                        );
+
+                        Promise.all(ledgerUpdates)
+                          .then(() => {
+                            // Log the action in audit trails
+                            const changes = JSON.stringify({
+                              old_status: oldStatus,
+                              new_status: order_status,
+                            });
+
+                            db.run(
+                              `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+                               VALUES (?, ?, ?, ?, ?)`,
+                              [user_id, "purchase_orders", id, "update", changes],
+                              (err) => {
+                                if (err) {
+                                  console.error(
+                                    "Error logging to audit_trails:",
+                                    err
+                                  );
+                                }
+                              }
+                            );
+
+                            // Update purchase order status
+                            db.run(
+                              `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+                              [order_status, id],
+                              (err) => {
+                                if (err) {
+                                  console.error(err);
+                                  return res
+                                    .status(500)
+                                    .send("Error updating status.");
+                                }
+
+                                res.send(
+                                  "Status updated and records updated successfully."
+                                );
+                              }
+                            );
+                          })
+                          .catch((err) => {
+                            console.error(err);
+                            res
+                              .status(500)
+                              .send("Error updating chart of accounts.");
+                          });
+                      })
+                      .catch((err) => {
+                        console.error(err);
+                        res
+                          .status(500)
+                          .send("Error inserting journal entry lines.");
+                      });
+                  }
+                );
+              })
+              .catch((err) => {
+                console.error(err);
+                res
+                  .status(500)
+                  .send("Error updating inventory or inventory movements.");
+              });
           }
-        }
-      );
+        );
+      } else {
+        // If status is not "received", just update the status
+        db.run(
+          `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+          [order_status, id],
+          function (err) {
+            if (err) {
+              console.error(err);
+              return res.status(500).send("Error updating status.");
+            }
 
-      // Update the purchase order status
-      db.run(
-        `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
-        [order_status, id],
-        function (err) {
-          if (err) {
-            console.error(err);
-            return res.status(500).send("Error updating status.");
+            res.send("Status updated successfully.");
           }
-
-          if (this.changes === 0) {
-            return res.status(404).send("Purchase order not found.");
-          }
-
-          res.send("Status updated successfully.");
-        }
-      );
+        );
+      }
     }
   );
 });

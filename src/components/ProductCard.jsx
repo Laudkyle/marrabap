@@ -28,10 +28,10 @@ const ProductCard = ({ product }) => {
 
         {/* Stock Status */}
         <div className="flex items-center text-xs">
-          {product.stock > 0 ? (
+          {product.quantity_in_stock > 0 ? (
             <>
               <FaCheckCircle className="text-green-500 mr-2" />
-              <p className="text-gray-600">{product.stock} in stock</p>
+              <p className="text-gray-600">{product.quantity_in_stock} in stock</p>
             </>
           ) : (
             <>
