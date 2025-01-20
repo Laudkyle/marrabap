@@ -28,6 +28,7 @@ import {
   UsersRound,
   Group,
   Cog,
+  BookCheck
 } from "lucide-react";
 import { FaMoneyBill1 } from "react-icons/fa6";
 
@@ -171,6 +172,24 @@ const Sidebar = ({ isExpanded, companyName }) => {
       ],
     },
     {
+      name: "Accounts",
+      icon: <BookCheck className="w-4 h-4" />,
+      dropdown: "settings",
+      links: [
+        {
+          path: "/opening-balances",
+          label: "Opening Balances",
+          icon: <PlusCircle className="w-4 h-4" />,
+        },
+        {
+          path: "/account-balances",
+          label: "Account Balances",
+          icon: <BookOpen className="w-4 h-4" />, // Adjust icon as needed
+        },
+      ],
+    },
+    
+    {
       name: "Reports",
       icon: <BarChart3 className="w-4 h-4" />,
       dropdown: "reports",
@@ -288,21 +307,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Profile",
           icon: <UserCircle className="w-4 h-4" />,
         },
-        {
-          path: "/account-settings",
-          label: "Account Settings",
-          icon: <Lock className="w-4 h-4" />,
-        },
-        {
-          path: "/opening-balances",
-          label: "Opening Balances",
-          icon: <PlusCircle className="w-4 h-4" />,
-        },
-        {
-          path: "/account-balances",
-          label: "Account Balances",
-          icon: <BookOpen className="w-4 h-4" />, // Adjust icon as needed
-        },
+   
       ],
     }
     

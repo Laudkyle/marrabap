@@ -2,9 +2,10 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import DataTable from "react-data-table-component";
+import { FaEdit } from "react-icons/fa";
 import "react-toastify/dist/ReactToastify.css";
 
-const AccountBalances = () => {
+const OpeningBalances = () => {
   const [accounts, setAccounts] = useState([]);
   const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [editAccount, setEditAccount] = useState(null); // For editing account
@@ -102,11 +103,25 @@ const AccountBalances = () => {
       sortable: true,
       right: true,
     },
-   
+    {
+      name: "Actions",
+      cell: (row) => (
+        <button
+          onClick={() => handleEdit(row)}
+          className="text-blue-500 hover:text-blue-700"
+        >
+          <FaEdit />
+        </button>
+      ),
+      ignoreRowClick: true,
+      allowOverflow: true,
+      button: true,
+    },
   ];
 
   return (
     <div className="p-6 bg-white rounded shadow-md h-[calc(100vh-80px)] overflow-y-scroll">
+      <h2 className="text-lg font-bold mb-4">Manage Account Balances</h2>
 
       {/* Data Table with Search Subheader */}
       <DataTable
@@ -185,4 +200,4 @@ const AccountBalances = () => {
   );
 };
 
-export default AccountBalances;
+export default OpeningBalances;
