@@ -145,18 +145,34 @@ function Invoice({
     }
   };
   const calculateTotal = () => {
-    let subtotal = 0;
+    let actualSubtotal = 0; // Total before any discounts
+    let subtotal = 0; // Total after discounts
     let totalTax = 0;
+    let totalDiscount = 0;
     const taxBreakdown = {};
 
     cart.forEach((item) => {
       const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
       const taxName =
         taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
-      const itemTotal = item.sellingPrice * item.quantity;
-      const itemTax = (itemTotal * taxRate) / 100;
 
+      // Calculate item total before discount
+      const itemActualTotal = item.sellingPrice * item.quantity;
+      actualSubtotal += itemActualTotal;
+
+      // Calculate discount
+      const discount =
+        item.discountType === "percentage"
+          ? (itemActualTotal * item.discountAmount) / 100
+          : item.discountAmount;
+      totalDiscount += discount;
+
+      // Calculate item total after discount
+      const itemTotal = itemActualTotal - discount;
       subtotal += itemTotal;
+
+      // Calculate tax
+      const itemTax = (itemTotal * taxRate) / 100;
       totalTax += itemTax;
 
       // Add tax breakdown for each tax type
@@ -168,18 +184,28 @@ function Invoice({
     });
 
     return {
+      actualSubtotal,
       subtotal,
+      totalDiscount,
       totalTax,
       grandTotal: subtotal + totalTax,
       taxBreakdown,
     };
   };
-  const { subtotal, totalTax, grandTotal, taxBreakdown } = calculateTotal();
+
+  const {
+    subtotal,
+    actualSubtotal,
+    totalTax,
+    grandTotal,
+    totalDiscount,
+    taxBreakdown,
+  } = calculateTotal();
   return (
     <div>
       {showInvoice && (
         <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-6 w-[95%] lg:w-[70%] shadow-2xl">
+          <div className="bg-white rounded-lg p-6 w-[95%] lg:w-[70%] shadow-2xl  max-h-[calc(100vh-50px)] overflow-y-scroll">
             <div className="flex flex-col lg:flex-row gap-6">
               {/* Left Column - Sales */}
               <div className="w-full lg:w-1/2">
@@ -402,7 +428,8 @@ function Invoice({
                         <button
                           onClick={() => {
                             setSelectedProduct(null);
-                            setShowModal(false)}}
+                            setShowModal(false);
+                          }}
                           className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-600"
                         >
                           Close
@@ -504,18 +531,35 @@ function Invoice({
                 {/* Summary */}
 
                 <div className="mt-6">
+                  {/* Actual Subtotal */}
                   <div className="flex justify-between">
                     <span className="font-semibold text-gray-700">
-                      Subtotal:
+                      Item Total:
+                    </span>
+                    <span>₵{actualSubtotal.toFixed(2)}</span>
+                  </div>
+                  {/* Discount */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Discount:
+                    </span>
+                    <span>₵{totalDiscount.toFixed(2)}</span>
+                  </div>
+
+                  {/* Subtotal After Discount */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Sub Total
                     </span>
                     <span>₵{subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="mt-4">
+
+                  <div className="mt-2">
                     <h3 className="font-semibold text-gray-700">Taxes:</h3>
-                    <ul className="mt-2 space-y-1">
+                    <ul className="mt-1 space-y-1">
                       {Object.entries(taxBreakdown).map(
                         ([taxName, amount], index) => (
-                          <li key={index} className="flex justify-between">
+                          <li key={index} className="flex justify-between text-xs">
                             <span>{taxName}:</span>
                             <span>₵{amount.toFixed(2)}</span>
                           </li>
@@ -523,19 +567,22 @@ function Invoice({
                       )}
                     </ul>
                   </div>
-                  <div className="flex justify-between mt-4">
+
+                  <div className="flex justify-between mt-2">
                     <span className="font-semibold text-gray-700">
                       Total Tax:
                     </span>
                     <span>₵{totalTax.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between mt-2 border-t pt-2">
+
+                  <div className="flex justify-between mt-1 border-t pt-2">
                     <span className="font-semibold text-lg">Grand Total:</span>
                     <span className="text-xl font-bold">
                       ₵{grandTotal.toFixed(2)}
                     </span>
                   </div>
                 </div>
+
                 {showDraft && (
                   <div className="mt-6">
                     {showClearCart && (
@@ -658,7 +705,7 @@ function Invoice({
             <div className="mt-6 flex justify-between">
               <button
                 onClick={() => {
-                  if (showClearCart) {
+                  if (!showClearCart) {
                     clearCart();
                   }
                   setShowInvoice(false);

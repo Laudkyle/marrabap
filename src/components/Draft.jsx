@@ -488,25 +488,55 @@ const Draft = () => {
       console.error("Error fetching draft details:", error);
     }
   };
-  const handleAddNewItem = (product, quantity) => {
+  const handleAddNewItem = (
+    product,
+    quantity,
+    sellingPrice,
+    selectedTax,
+    discountType,
+    discountAmount,
+    description
+  ) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find(
         (item) => item.product.id === product.id
       );
+  
       if (existingItem) {
-        // Update quantity if product already exists
+        // Update quantity and other attributes if product already exists
         return prevCart.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? {
+                ...item,
+                quantity: item.quantity + quantity,
+                sellingPrice: sellingPrice || item.sellingPrice,
+                tax: selectedTax || item.tax,
+                discountType: discountType || item.discountType,
+                discountAmount: discountAmount || item.discountAmount,
+                description: description || item.description,
+              }
             : item
         );
       }
-      // Add new item to the cart
-      return [...prevCart, { product, quantity }];
+  
+      // Add new item to the cart with all attributes
+      return [
+        ...prevCart,
+        {
+          product,
+          quantity,
+          sellingPrice,
+          tax: selectedTax,
+          discountType,
+          discountAmount,
+          description,
+        },
+      ];
     });
+  
     toast.success(`${product.name} added to cart`);
   };
-
+  
   const handleQuantityChangeNew = (e, item, index) => {
     const updatedQuantity = Math.min(
       Number(e.target.value),
