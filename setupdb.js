@@ -138,16 +138,21 @@ db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
     FOREIGN KEY (product_id) REFERENCES products(id))`)
 
   db.run(`CREATE TABLE IF NOT EXISTS sales (
-    id INTEGER PRIMARY KEY,
-    reference_number TEXT NOT NULL,
-    product_id INTEGER NOT NULL,
-    customer_id INTEGER NOT NULL DEFAULT 1, -- Default to "Walk-in" customer
-    quantity INTEGER CHECK(quantity >= 0), -- Quantity must be positive
-    total_price REAL CHECK(total_price >= 0), -- Ensure total is non-negative
-    date TEXT NOT NULL, -- ISO 8601 format recommended (YYYY-MM-DD)
-    payment_method TEXT, -- e.g., 'cash', 'credit'
-    FOREIGN KEY (product_id) REFERENCES products(id),
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+  id INTEGER PRIMARY KEY,
+  reference_number TEXT NOT NULL,
+  product_id INTEGER NOT NULL,
+  customer_id INTEGER NOT NULL DEFAULT 1, -- Default to "Walk-in" customer
+  quantity INTEGER CHECK(quantity >= 0), -- Quantity must be positive
+  total_price REAL CHECK(total_price >= 0), -- Ensure total is non-negative
+  date TEXT NOT NULL, -- ISO 8601 format recommended (YYYY-MM-DD)
+  payment_method TEXT, -- e.g., 'cash', 'credit'
+  selling_price REAL CHECK(selling_price >= 0), -- Selling price for the product
+  tax REAL CHECK(tax >= 0), -- Tax applied to the sale
+  discount_type TEXT, -- 'percentage' or 'fixed' discount type
+  discount_amount REAL CHECK(discount_amount >= 0), -- Discount amount
+  description TEXT, -- Additional description/details about the sale
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
 )`);
   db.run(`CREATE TABLE IF NOT EXISTS payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -531,6 +536,59 @@ BEGIN
 
   -- No General Ledger Entry for Pending Purchase Order
 END;
+`)
+db.run(`CREATE TRIGGER handle_sales_updates
+AFTER INSERT ON sales
+FOR EACH ROW
+BEGIN
+    -- Update the Sales Revenue account (4000)
+    UPDATE chart_of_accounts
+    SET balance = balance + NEW.total_price
+    WHERE account_code = '4000'; -- Assuming '4000' is the account code for Sales Revenue
+
+    -- Update the Accounts Receivable account (1010) if the sale is on credit
+    UPDATE chart_of_accounts
+    SET balance = balance + NEW.total_price
+    WHERE account_code = '1010' AND NEW.payment_method = 'credit';
+
+    -- Update the Inventory account (1020) to reflect reduced stock
+    UPDATE chart_of_accounts
+    SET balance = balance - (
+        SELECT cost_per_unit * NEW.quantity
+        FROM inventory
+        WHERE inventory.product_id = NEW.product_id
+    )
+    WHERE account_code = '1020';
+
+    -- Update the Cost of Goods Sold account (5000) to reflect the cost of sold goods
+    UPDATE chart_of_accounts
+    SET balance = balance + (
+        SELECT cost_per_unit * NEW.quantity
+        FROM inventory
+        WHERE inventory.product_id = NEW.product_id
+    )
+    WHERE account_code = '5000';
+
+    -- Update the Tax account for the applied tax
+    UPDATE chart_of_accounts
+    SET balance = balance + (
+        SELECT 
+            CASE
+                WHEN t.tax_type = 'inclusive' THEN
+                    (NEW.total_price * t.tax_rate) / (1 + t.tax_rate)
+                WHEN t.tax_type = 'exclusive' THEN
+                    NEW.total_price * t.tax_rate
+            END
+        FROM taxes AS t
+        WHERE t.id = NEW.tax
+    )
+    WHERE id = (
+        SELECT t.account_id
+        FROM taxes AS t
+        WHERE t.id = NEW.tax
+    );
+END;
+
 `)
 });
 

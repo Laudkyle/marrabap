@@ -1605,19 +1605,19 @@ app.post("/sales", async (req, res) => {
 
         // Process each sale item in the cart
         const processSalePromises = salesData.map(
-          ({ product_id, quantity }) => {
+          ({ product_id, quantity, selling_price, tax, discount_type, discount_amount, description }) => {
             return new Promise((resolveSale, rejectSale) => {
               db.get(
-                "SELECT * FROM products WHERE id = ?",
+                "SELECT * FROM inventory WHERE product_id = ?",
                 [product_id],
-                (err, product) => {
-                  if (err || !product) {
+                (err, inventory) => {
+                  if (err || !inventory) {
                     errorOccurred = true;
-                    console.error(err ? err.message : "Product not found");
-                    return rejectSale("Product not found");
+                    console.error(err ? err.message : "Inventory not found");
+                    return rejectSale("Inventory not found");
                   }
 
-                  if (product.stock < quantity) {
+                  if (inventory.quantity_in_stock < quantity) {
                     errorOccurred = true;
                     console.error(
                       "Insufficient stock for product ID:",
@@ -1626,12 +1626,12 @@ app.post("/sales", async (req, res) => {
                     return rejectSale("Insufficient stock");
                   }
 
-                  const total_price = product.sp * quantity;
+                  const total_price = selling_price * quantity - discount_amount; // Discount applied to the total price
                   totalCartPrice += total_price; // Sum total price for the cart
 
                   // Insert the sale record for each item
                   db.run(
-                    "INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date, selling_price, tax, discount_type, discount_amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
                       customer_id,
                       product_id,
@@ -1640,6 +1640,11 @@ app.post("/sales", async (req, res) => {
                       quantity,
                       total_price,
                       new Date().toISOString(),
+                      selling_price,
+                      tax,
+                      discount_type,
+                      discount_amount,
+                      description,
                     ],
                     (err) => {
                       if (err) {
@@ -1647,12 +1652,24 @@ app.post("/sales", async (req, res) => {
                         console.error("Error: ", err.message);
                         return rejectSale("Error inserting sale items");
                       }
-                      resolveSale({
-                        customer_id,
-                        product_id,
-                        quantity,
-                        total_price,
-                      });
+
+                      // Update the inventory stock after sale
+                      db.run(
+                        "UPDATE inventory SET quantity_in_stock = quantity_in_stock - ? WHERE product_id = ?",
+                        [quantity, product_id],
+                        (err) => {
+                          if (err) {
+                            errorOccurred = true;
+                            console.error("Error updating inventory: ", err.message);
+                          }
+                          resolveSale({
+                            customer_id,
+                            product_id,
+                            quantity,
+                            total_price,
+                          });
+                        }
+                      );
                     }
                   );
                 }
@@ -1740,6 +1757,7 @@ app.post("/sales", async (req, res) => {
     });
   }
 });
+
 
 // Get all sales
 app.get("/sales", (req, res) => {

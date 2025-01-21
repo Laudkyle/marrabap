@@ -150,7 +150,6 @@ function Invoice({
     let totalTax = 0;
     let totalDiscount = 0;
     const taxBreakdown = {};
-
     cart.forEach((item) => {
       const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
       const taxName =
@@ -300,6 +299,7 @@ function Invoice({
 
                       {/* Selling Price and Quantity */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
+                        {/* Selling Price */}
                         <div>
                           <label
                             htmlFor="sellingPrice"
@@ -320,6 +320,7 @@ function Invoice({
                           />
                         </div>
 
+                        {/* Quantity */}
                         <div>
                           <label
                             htmlFor="quantity"
@@ -331,13 +332,22 @@ function Invoice({
                             id="quantity"
                             type="number"
                             value={newItemQuantity}
-                            onChange={(e) =>
-                              setNewItemQuantity(Number(e.target.value))
-                            }
+                            onChange={(e) => {
+                              const enteredQuantity = Number(e.target.value);
+                              const validQuantity = Math.min(
+                                enteredQuantity,
+                                selectedProduct.quantity_in_stock
+                              );
+                              setNewItemQuantity(validQuantity);
+                            }}
                             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             min="1"
+                            max={selectedProduct.quantity_in_stock}
                             step="1"
                           />
+                          <p className="text-sm text-gray-600 mt-1">
+                            Available stock: {selectedProduct.quantity_in_stock}
+                          </p>
                         </div>
                       </div>
 
@@ -366,6 +376,7 @@ function Invoice({
 
                       {/* Discount Type and Amount */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
+                        {/* Discount Type */}
                         <div>
                           <label
                             htmlFor="discountType"
@@ -384,6 +395,7 @@ function Invoice({
                           </select>
                         </div>
 
+                        {/* Discount Amount */}
                         <div>
                           <label
                             htmlFor="discountAmount"
@@ -559,7 +571,10 @@ function Invoice({
                     <ul className="mt-1 space-y-1">
                       {Object.entries(taxBreakdown).map(
                         ([taxName, amount], index) => (
-                          <li key={index} className="flex justify-between text-xs">
+                          <li
+                            key={index}
+                            className="flex justify-between text-xs"
+                          >
                             <span>{taxName}:</span>
                             <span>₵{amount.toFixed(2)}</span>
                           </li>
@@ -598,7 +613,7 @@ function Invoice({
                             className="w-full p-2 border rounded "
                           >
                             <option value="cash">Cash</option>
-                            <option value="bank">Bank</option>
+                            <option value="credit">Credit</option>
                           </select>
                         </div>
                       </>

@@ -84,7 +84,7 @@ export const CartProvider = ({ children }) => {
         discount_amount: item.discountAmount,
         description: item.description,
       }));
-
+console.log("sales data:", salesData)
       const response = await fetch("http://localhost:5000/sales", {
         method: "POST",
         headers: {

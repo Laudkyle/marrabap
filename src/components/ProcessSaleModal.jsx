@@ -99,19 +99,33 @@ function ProcessSaleModal({
   }, []);
 
   const calculateTotal = () => {
-    let subtotal = 0;
+    let actualSubtotal = 0; // Total before any discounts
+    let subtotal = 0; // Total after discounts
     let totalTax = 0;
+    let totalDiscount = 0;
     const taxBreakdown = {};
-
     cart.forEach((item) => {
-      const taxRate =
-        taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
+      const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
       const taxName =
         taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
-      const itemTotal = item.sellingPrice * item.quantity;
-      const itemTax = (itemTotal * taxRate) / 100;
 
+      // Calculate item total before discount
+      const itemActualTotal = item.sellingPrice * item.quantity;
+      actualSubtotal += itemActualTotal;
+
+      // Calculate discount
+      const discount =
+        item.discountType === "percentage"
+          ? (itemActualTotal * item.discountAmount) / 100
+          : item.discountAmount;
+      totalDiscount += discount;
+
+      // Calculate item total after discount
+      const itemTotal = itemActualTotal - discount;
       subtotal += itemTotal;
+
+      // Calculate tax
+      const itemTax = (itemTotal * taxRate) / 100;
       totalTax += itemTax;
 
       // Add tax breakdown for each tax type
@@ -123,14 +137,24 @@ function ProcessSaleModal({
     });
 
     return {
+      actualSubtotal,
       subtotal,
+      totalDiscount,
       totalTax,
       grandTotal: subtotal + totalTax,
       taxBreakdown,
     };
   };
 
-  const { subtotal, totalTax, grandTotal, taxBreakdown } = calculateTotal();
+  const {
+    subtotal,
+    actualSubtotal,
+    totalTax,
+    grandTotal,
+    totalDiscount,
+    taxBreakdown,
+  } = calculateTotal();
+
   const removeDocument = async (index, documentId) => {
     // Remove the document from the UI first
     const updatedDocuments = documents.filter((_, i) => i !== index);
@@ -282,18 +306,38 @@ function ProcessSaleModal({
                 {/* Summary */}
 
                 <div className="mt-6">
+                  {/* Actual Subtotal */}
                   <div className="flex justify-between">
                     <span className="font-semibold text-gray-700">
-                      Subtotal:
+                      Item Total:
+                    </span>
+                    <span>₵{actualSubtotal.toFixed(2)}</span>
+                  </div>
+                  {/* Discount */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Discount:
+                    </span>
+                    <span>₵{totalDiscount.toFixed(2)}</span>
+                  </div>
+
+                  {/* Subtotal After Discount */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Sub Total
                     </span>
                     <span>₵{subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="mt-4">
+
+                  <div className="mt-2">
                     <h3 className="font-semibold text-gray-700">Taxes:</h3>
-                    <ul className="mt-2 space-y-1">
+                    <ul className="mt-1 space-y-1">
                       {Object.entries(taxBreakdown).map(
                         ([taxName, amount], index) => (
-                          <li key={index} className="flex justify-between">
+                          <li
+                            key={index}
+                            className="flex justify-between text-xs"
+                          >
                             <span>{taxName}:</span>
                             <span>₵{amount.toFixed(2)}</span>
                           </li>
@@ -301,13 +345,15 @@ function ProcessSaleModal({
                       )}
                     </ul>
                   </div>
-                  <div className="flex justify-between mt-4">
+
+                  <div className="flex justify-between mt-2">
                     <span className="font-semibold text-gray-700">
                       Total Tax:
                     </span>
                     <span>₵{totalTax.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between mt-2 border-t pt-2">
+
+                  <div className="flex justify-between mt-1 border-t pt-2">
                     <span className="font-semibold text-lg">Grand Total:</span>
                     <span className="text-xl font-bold">
                       ₵{grandTotal.toFixed(2)}

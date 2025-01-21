@@ -165,16 +165,24 @@ function Shop({ companyName, companyAddress, email, phone }) {
     }
   };
   const handleQuantityChangeNew = (e, item, index) => {
-    const updatedQuantity = Math.min(
-      Number(e.target.value),
-      item.product.stock
-    );
-    // Update the quantity in the cart
-    const updatedCart = [...cart];
-    updatedCart[index].quantity = updatedQuantity;
-    setCart(updatedCart);
+    const updatedQuantity = Math.min(Number(e.target.value), item.product.quantity_in_stock);
+  
+    setCart((prevCart) => {
+      const updatedCart = [...prevCart];
+      updatedCart[index] = {
+        ...updatedCart[index],
+        quantity: updatedQuantity,
+        // Preserve additional attributes
+        sellingPrice: item.sellingPrice,
+        tax: item.tax,
+        discountType: item.discountType,
+        discountAmount: item.discountAmount,
+        description: item.description,
+      };
+      return updatedCart;
+    });
   };
-
+  
   // Updated handleMakeSale function
   const handleMakeSale = async () => {
     try {
@@ -228,7 +236,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       date: new Date().toISOString(), // Use ISO 8601 format for date
       status: "pending", // Default status for the draft
     };
-  
+
     try {
       const response = await fetch("http://localhost:5000/drafts", {
         method: "POST",
@@ -237,7 +245,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         },
         body: JSON.stringify(draft),
       });
-  
+
       if (response.status === 201) {
         // Successfully saved draft
         setShowInvoice(false); // Close the invoice modal
@@ -253,7 +261,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
       toast.error("An error occurred while saving the draft.");
     }
   };
-  
 
   useEffect(() => {
     setRefNum(generateReferenceNumber());
@@ -363,11 +370,22 @@ function Shop({ companyName, companyAddress, email, phone }) {
                   id="quantity"
                   type="number"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value, 10))}
+                  onChange={(e) => {
+                    const enteredQuantity = parseInt(e.target.value, 10);
+                    const validQuantity = Math.min(
+                      enteredQuantity,
+                      selectedProduct.quantity_in_stock
+                    );
+                    setQuantity(validQuantity);
+                  }}
                   className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   min="1"
+                  max={selectedProduct.quantity_in_stock}
                   step="1"
                 />
+                <p className="text-sm text-gray-600 mt-1">
+                  Available stock: {selectedProduct.quantity_in_stock}
+                </p>
               </div>
             </div>
 
@@ -463,20 +481,12 @@ function Shop({ companyName, companyAddress, email, phone }) {
               >
                 Close
               </button>
-              <div className="flex space-x-4">
-                <button
-                  onClick={handleAddToCart}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  Add to Cart
-                </button>
-                <button
-                  onClick={handleMakeSale}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  Make Sale
-                </button>
-              </div>
+              <button
+                onClick={handleAddToCart}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                Add to Cart
+              </button>
             </div>
           </div>
         </div>

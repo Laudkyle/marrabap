@@ -538,15 +538,24 @@ const Draft = () => {
   };
   
   const handleQuantityChangeNew = (e, item, index) => {
-    const updatedQuantity = Math.min(
-      Number(e.target.value),
-      item.product.stock
-    );
-    // Update the quantity in the cart
-    const updatedCart = [...cart];
-    updatedCart[index].quantity = updatedQuantity;
-    setCart(updatedCart);
+    const updatedQuantity = Math.min(Number(e.target.value), item.product.quantity_in_stock);
+  
+    setCart((prevCart) => {
+      const updatedCart = [...prevCart];
+      updatedCart[index] = {
+        ...updatedCart[index],
+        quantity: updatedQuantity,
+        // Preserve additional attributes
+        sellingPrice: item.sellingPrice,
+        tax: item.tax,
+        discountType: item.discountType,
+        discountAmount: item.discountAmount,
+        description: item.description,
+      };
+      return updatedCart;
+    });
   };
+  
   const columns = [
     {
       name: "Reference",
