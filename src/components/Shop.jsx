@@ -52,6 +52,13 @@ function Shop({ companyName, companyAddress, email, phone }) {
     fetchProducts();
   }, [saleComplete]);
 
+  useEffect(() => {
+    fetch('http://localhost:5000/taxes')
+      .then((response) => response.json())
+      .then((data) => setTaxes(data))
+      .catch((error) => console.error("Error fetching taxes:", error));
+  }, []);
+  
   const filteredProducts = products.filter(
     (product) =>
       product &&

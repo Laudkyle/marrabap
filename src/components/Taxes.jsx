@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import DataTable from "react-data-table-component"; // Install with `npm install react-data-table-component`
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify"; // Toast imports
+import "react-toastify/dist/ReactToastify.css"; // Toast styles
 
 const Taxes = () => {
   const [taxes, setTaxes] = useState([]);
@@ -18,10 +20,10 @@ const Taxes = () => {
   // Fetch Taxes
   const fetchTaxes = async () => {
     try {
-      const response = await axios.get("/taxes");
+      const response = await axios.get("http://localhost:5000/taxes");
       setTaxes(response.data);
     } catch (err) {
-      console.error("Error fetching taxes:", err);
+      toast.error("Error fetching taxes.");
     }
   };
 
@@ -31,7 +33,7 @@ const Taxes = () => {
       const response = await axios.get("http://localhost:5000/accounts"); // Adjust endpoint if necessary
       setAccounts(response.data);
     } catch (err) {
-      console.error("Error fetching accounts:", err);
+      toast.error("Error fetching accounts.");
     }
   };
 
@@ -53,12 +55,13 @@ const Taxes = () => {
     }
 
     try {
-      await axios.post("/taxes", {
+      await axios.post("http://localhost:5000/taxes", {
         tax_name: taxName,
         tax_rate: parseFloat(taxRate),
         tax_type: taxType,
         account_code: accountCode,
       });
+      toast.success("Tax added successfully!");
       setShowModal(false);
       setError("");
       fetchTaxes();
@@ -68,7 +71,7 @@ const Taxes = () => {
       setAccountCode("");
     } catch (err) {
       console.error("Error adding tax:", err);
-      setError("Failed to add tax. Please check your input.");
+      toast.error("Failed to add tax. Please check your input.");
     }
   };
 
@@ -83,6 +86,9 @@ const Taxes = () => {
 
   return (
     <div className="p-8">
+      {/* Toast Container */}
+      <ToastContainer position="top-right" autoClose={3000} />
+
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Taxes</h1>
