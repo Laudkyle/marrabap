@@ -30,7 +30,6 @@ const Draft = () => {
       console.error("Error fetching drafts:", error);
     }
   };
-  console.log("draft", drafts)
   const handleSaveDraft = async () => {
     try {
       // Map the cart items to include all necessary attributes
@@ -308,7 +307,6 @@ const Draft = () => {
       const payment_method = paymentMethod;
       // Parse draft items
       const draftItems = JSON.parse(draft.details);
-      console.log("customer id: ", customer_id);
       // Validate stock availability for each item
       const stockCheckPromises = draftItems.map(async (item) => {
         const productResponse = await axios.get(
@@ -358,7 +356,6 @@ const Draft = () => {
     setShowDraft(true);
     setShowCompleteSale(true);
     setEditDraftId(draftId);
-    console.log("draft id:", draftId);
 
     try {
       // Fetch draft details
@@ -389,7 +386,6 @@ const Draft = () => {
           };
         })
       );
-      console.log("this is draft items:", draftItems);
       setCart(draftItems);
 
       // Fetch documents
@@ -397,7 +393,6 @@ const Draft = () => {
         `http://localhost:5000/documents/by-reference/${draft.reference_number}`
       );
       setDocuments(documentsResponse.data);
-      console.log("documents:", documentsResponse.data);
     } catch (error) {
       console.error("Error fetching draft details:", error);
     }

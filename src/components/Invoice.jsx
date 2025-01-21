@@ -32,6 +32,13 @@ function Invoice({
   const { cart, setCart, clearCart } = useCart();
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(1);
+  const [sellingPrice, setSellingPrice] = useState(0); // Selling price
+  const [selectedTax, setSelectedTax] = useState(""); // Tax
+  const [discountType, setDiscountType] = useState("percentage"); // Discount type
+  const [discountAmount, setDiscountAmount] = useState(0); // Discount amount
+  const [description, setDescription] = useState(""); // Description
+  const [error, setError] = useState(""); // Error handling
+  const [showModal, setShowModal] = useState(false);
   // Fetch customers from the database
   const fetchCustomers = async () => {
     try {
@@ -143,8 +150,7 @@ function Invoice({
     const taxBreakdown = {};
 
     cart.forEach((item) => {
-      const taxRate =
-        taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
+      const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
       const taxName =
         taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
       const itemTotal = item.sellingPrice * item.quantity;
@@ -168,7 +174,6 @@ function Invoice({
       taxBreakdown,
     };
   };
-
   const { subtotal, totalTax, grandTotal, taxBreakdown } = calculateTotal();
   return (
     <div>
@@ -237,7 +242,13 @@ function Invoice({
                         const product = products.find((p) => p.id == productId);
                         if (product) {
                           setSelectedProduct(product);
-                          setNewItemQuantity(1);
+                          setSellingPrice(product.price || 0); // Set initial selling price
+                          setNewItemQuantity(1); // Set initial quantity
+                          setSelectedTax(""); // Reset tax selection
+                          setDiscountType("percentage"); // Default discount type
+                          setDiscountAmount(0); // Default discount amount
+                          setDescription(""); // Default description
+                          setShowModal(true); // Show modal
                         }
                       }}
                       className="p-2 border rounded flex-1"
@@ -249,29 +260,175 @@ function Invoice({
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
 
-                    <input
-                      type="number"
-                      min="1"
-                      value={newItemQuantity}
-                      onChange={(e) =>
-                        setNewItemQuantity(Number(e.target.value))
-                      }
-                      className="p-2 border rounded w-12"
-                    />
+                {/* Modal for Additional Attributes */}
+                {showModal && selectedProduct && (
+                  <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-8 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%]">
+                      {/* Modal Header */}
+                      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                        {selectedProduct.name}
+                      </h2>
 
-                    <button
-                      onClick={() => {
-                        if (selectedProduct) {
-                          handleAddNewItem(selectedProduct, newItemQuantity);
-                          setSelectedProduct(null);
-                          setNewItemQuantity(1);
-                        }
-                      }}
-                      className="p-2 bg-blue-600 text-white rounded"
-                    >
-                      Add Item
-                    </button>
+                      {/* Selling Price and Quantity */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label
+                            htmlFor="sellingPrice"
+                            className="block font-medium text-gray-700"
+                          >
+                            Selling Price (₵):
+                          </label>
+                          <input
+                            id="sellingPrice"
+                            type="number"
+                            value={sellingPrice}
+                            onChange={(e) =>
+                              setSellingPrice(parseFloat(e.target.value))
+                            }
+                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="quantity"
+                            className="block font-medium text-gray-700"
+                          >
+                            Quantity:
+                          </label>
+                          <input
+                            id="quantity"
+                            type="number"
+                            value={newItemQuantity}
+                            onChange={(e) =>
+                              setNewItemQuantity(Number(e.target.value))
+                            }
+                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            min="1"
+                            step="1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Tax Selection */}
+                      <div className="mb-4">
+                        <label
+                          htmlFor="tax"
+                          className="block font-medium text-gray-700"
+                        >
+                          Select Tax:
+                        </label>
+                        <select
+                          id="tax"
+                          value={selectedTax}
+                          onChange={(e) => setSelectedTax(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        >
+                          <option value="">-- Select Tax --</option>
+                          {taxRates.map((tax) => (
+                            <option key={tax.id} value={tax.id}>
+                              {tax.tax_name} ({tax.tax_rate}%)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Discount Type and Amount */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label
+                            htmlFor="discountType"
+                            className="block font-medium text-gray-700"
+                          >
+                            Discount Type:
+                          </label>
+                          <select
+                            id="discountType"
+                            value={discountType}
+                            onChange={(e) => setDiscountType(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          >
+                            <option value="percentage">Percentage</option>
+                            <option value="fixed">Fixed Amount</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="discountAmount"
+                            className="block font-medium text-gray-700"
+                          >
+                            Discount Amount (₵):
+                          </label>
+                          <input
+                            id="discountAmount"
+                            type="number"
+                            value={discountAmount}
+                            onChange={(e) =>
+                              setDiscountAmount(parseFloat(e.target.value))
+                            }
+                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <div className="mb-6">
+                        <label
+                          htmlFor="description"
+                          className="block font-medium text-gray-700"
+                        >
+                          Description:
+                        </label>
+                        <textarea
+                          id="description"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          rows="3"
+                          placeholder="Enter additional details..."
+                        />
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-between items-center space-x-4 mt-8">
+                        <button
+                          onClick={() => {
+                            setSelectedProduct(null);
+                            setShowModal(false)}}
+                          className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-600"
+                        >
+                          Close
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedProduct) {
+                              handleAddNewItem(
+                                selectedProduct,
+                                newItemQuantity,
+                                sellingPrice,
+                                selectedTax,
+                                discountType,
+                                discountAmount,
+                                description
+                              );
+                              setShowModal(false);
+                              setSelectedProduct(null);
+                            }
+                          }}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        >
+                          Add Item
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -500,7 +657,12 @@ function Invoice({
             {/* Footer Buttons */}
             <div className="mt-6 flex justify-between">
               <button
-                onClick={() => setShowInvoice(false)}
+                onClick={() => {
+                  if (showClearCart) {
+                    clearCart();
+                  }
+                  setShowInvoice(false);
+                }}
                 className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
               >
                 Close

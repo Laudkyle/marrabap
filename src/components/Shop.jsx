@@ -191,7 +191,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
 
   // Updated handleCompleteSale function
   const handleCompleteSale = async (customer_id, paymentMethod) => {
-    console.log("Customer id", customer_id);
     try {
       const referenceNumber = refNum; // Generate unique reference number
       const response = await processSale(
