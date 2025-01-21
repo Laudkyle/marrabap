@@ -17,6 +17,12 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [showCompleteSale, setShowCompleteSale] = useState(true);
+  const [sellingPrice, setSellingPrice] = useState(0);
+  const [taxes, setTaxes] = useState([]);
+  const [selectedTax, setSelectedTax] = useState("");
+  const [discountType, setDiscountType] = useState("percentage");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [description, setDescription] = useState("");
 
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
@@ -24,7 +30,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [refNum, setRefNum] = useState("");
   const [documents, setDocuments] = useState([]); // State to handle documents
   const [newDocument, setNewDocument] = useState(""); // State for new document input
-const [showClearCart, setShowClearCart] = useState(false)
+  const [showClearCart, setShowClearCart] = useState(false);
 
   const { cart, addToCart, setCart, clearCart, processSale, makeSale } =
     useCart();
@@ -136,11 +142,15 @@ const [showClearCart, setShowClearCart] = useState(false)
   };
 
   // Updated handleCompleteSale function
-  const handleCompleteSale = async (customer_id,paymentMethod) => {
-    console.log("Customer id",customer_id)
+  const handleCompleteSale = async (customer_id, paymentMethod) => {
+    console.log("Customer id", customer_id);
     try {
       const referenceNumber = refNum; // Generate unique reference number
-      const response = await processSale(referenceNumber,customer_id,paymentMethod); // Await the response from processSale
+      const response = await processSale(
+        referenceNumber,
+        customer_id,
+        paymentMethod
+      ); // Await the response from processSale
 
       if (response.status === 200 || response.status === 201) {
         // Check for 200 or 201 status
@@ -233,7 +243,7 @@ const [showClearCart, setShowClearCart] = useState(false)
                 if (cart.length === 0) return toast.info("Cart is Empty!!!");
 
                 setShowInvoice(true);
-                setShowClearCart(true)
+                setShowClearCart(true);
               }} // Show invoice modal
             />
             {cart.length > 0 && (
@@ -260,66 +270,113 @@ const [showClearCart, setShowClearCart] = useState(false)
       </div>
 
       {/* Product Details Modal */}
+      {/* Product Details Modal */}
       {selectedProduct && (
-        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%]">
+        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white rounded-lg shadow-xl p-8 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%]">
             {/* Modal Header */}
-            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
               Purchase {selectedProduct.name}
             </h2>
 
-            {/* Product Price */}
-            <div className="mb-6">
-              <p className="text-xl font-medium text-gray-900">
-                Price:{" "}
-                <span className="text-2xl font-semibold text-green-600">
-                  ₵{parseFloat(selectedProduct.sp).toFixed(2)}
-                </span>
-              </p>
-            </div>
-
-            {/* Stock Information */}
-            <div className="mb-6">
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Total in Stock:</span>
-                <span className="font-semibold text-gray-900">
-                  {selectedProduct.stock}
-                </span>
-              </p>
-            </div>
-
-            {/* Quantity Input */}
-            <div className="flex items-center mb-6">
+            {/* Selling Price */}
+            <div className="mb-4">
               <label
-                htmlFor="quantity"
-                className="mr-4 font-medium text-gray-700"
+                htmlFor="sellingPrice"
+                className="block font-medium text-gray-700"
               >
-                Quantity:
+                Selling Price (₵):
               </label>
               <input
-                id="quantity"
+                id="sellingPrice"
                 type="number"
-                value={quantity}
-                onChange={(e) =>
-                  setQuantity(
-                    Math.min(Number(e.target.value), selectedProduct.stock)
-                  )
-                }
-                className="w-20 p-3 border border-gray-300 rounded-md text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                min="1"
-                max={selectedProduct.stock}
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(parseFloat(e.target.value))}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                min="0"
+                step="0.01"
               />
             </div>
 
-            {/* Total Price Calculation */}
+            {/* Tax Selection */}
+            <div className="mb-4">
+              <label htmlFor="tax" className="block font-medium text-gray-700">
+                Select Tax:
+              </label>
+              <select
+                id="tax"
+                value={selectedTax}
+                onChange={(e) => setSelectedTax(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="">-- Select Tax --</option>
+                {taxes.map((tax) => (
+                  <option key={tax.id} value={tax.id}>
+                    {tax.tax_name} ({tax.tax_rate}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Discount Type and Amount */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              {/* Discount Type */}
+              <div>
+                <label
+                  htmlFor="discountType"
+                  className="block font-medium text-gray-700"
+                >
+                  Discount Type:
+                </label>
+                <select
+                  id="discountType"
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed Amount</option>
+                </select>
+              </div>
+
+              {/* Discount Amount */}
+              <div>
+                <label
+                  htmlFor="discountAmount"
+                  className="block font-medium text-gray-700"
+                >
+                  Discount Amount (₵):
+                </label>
+                <input
+                  id="discountAmount"
+                  type="number"
+                  value={discountAmount}
+                  onChange={(e) =>
+                    setDiscountAmount(parseFloat(e.target.value))
+                  }
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            {/* Description */}
             <div className="mb-6">
-              <p className="text-sm text-gray-700">
-                Total Price for <span className="font-medium">{quantity}</span>{" "}
-                {selectedProduct.name}:
-                <span className="font-semibold text-gray-900">
-                  ₵{parseFloat(quantity * selectedProduct.sp).toFixed(2)}
-                </span>
-              </p>
+              <label
+                htmlFor="description"
+                className="block font-medium text-gray-700"
+              >
+                Description:
+              </label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                rows="3"
+                placeholder="Enter additional details..."
+              />
             </div>
 
             {/* Error Message */}
@@ -371,7 +428,6 @@ const [showClearCart, setShowClearCart] = useState(false)
         setNewDocument={setDocuments}
         showClearCart={showClearCart}
         setShowClearCart={setShowClearCart}
-        
       />
 
       <style jsx>

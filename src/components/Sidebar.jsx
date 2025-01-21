@@ -254,6 +254,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
       dropdown: "tax",
       links: [
         {
+          path: "/taxes",
+          label: "Taxes",
+          icon: <List className="w-4 h-4" />,
+        },
+        {
           path: "/tax-settings",
           label: "Tax Settings",
           icon: <Settings className="w-4 h-4" />,

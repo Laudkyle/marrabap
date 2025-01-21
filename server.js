@@ -2567,6 +2567,212 @@ app.patch("/customer_groups/:id", (req, res) => {
 });
 
 // ===================== Server Initialization =====================
+// CREATE - Add a new tax
+app.post('/taxes', async (req, res) => {
+  const { tax_name, tax_rate, tax_type, account_code } = req.body;
+
+  // Validate required fields
+  if (!tax_name || tax_rate === undefined || !tax_type || !account_code) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Validate tax_type
+  if (!['inclusive', 'exclusive'].includes(tax_type)) {
+    return res.status(400).json({ error: "Invalid tax type. Must be 'inclusive' or 'exclusive'" });
+  }
+
+  // Validate tax_rate is non-negative
+  if (tax_rate < 0) {
+    return res.status(400).json({ error: "Tax rate cannot be negative" });
+  }
+
+  try {
+    // First check if the account exists
+    const accountExists = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT account_code FROM chart_of_accounts WHERE account_code = ?',
+        [account_code],
+        (err, row) => {
+          if (err) reject(err);
+          resolve(row !== undefined);
+        }
+      );
+    });
+
+    if (!accountExists) {
+      return res.status(400).json({ error: "Invalid account_code" });
+    }
+
+    // Insert the new tax record
+    db.run(
+      `INSERT INTO taxes (tax_name, tax_rate, tax_type, account_id)
+       SELECT ?, ?, ?, id
+       FROM chart_of_accounts
+       WHERE account_code = ?`,
+      [tax_name, tax_rate, tax_type, account_code],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(409).json({ error: "Tax name already exists" });
+          }
+          console.error(err);
+          return res.status(500).json({ error: "Failed to create tax" });
+        }
+        
+        res.status(201).json({
+          id: this.lastID,
+          tax_name,
+          tax_rate,
+          tax_type,
+          account_code
+        });
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// READ - Get all taxes
+app.get('/taxes', (req, res) => {
+  db.all(
+    `SELECT t.id, t.tax_name, t.tax_rate, t.tax_type, coa.account_code, coa.account_name, coa.account_type
+     FROM taxes t
+     JOIN chart_of_accounts coa ON t.account_id = coa.id
+     ORDER BY t.tax_name`,
+    [],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to fetch taxes" });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// READ - Get a single tax by ID
+app.get('/taxes/:id', (req, res) => {
+  const { id } = req.params;
+  
+  db.get(
+    `SELECT t.id, t.tax_name, t.tax_rate, t.tax_type, coa.account_code, coa.account_name, coa.account_type
+     FROM taxes t
+     JOIN chart_of_accounts coa ON t.account_id = coa.id
+     WHERE t.id = ?`,
+    [id],
+    (err, row) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to fetch tax" });
+      }
+      if (!row) {
+        return res.status(404).json({ error: "Tax not found" });
+      }
+      res.json(row);
+    }
+  );
+});
+
+// UPDATE - Update a tax
+app.put('/taxes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { tax_name, tax_rate, tax_type, account_code } = req.body;
+
+  // Validate required fields
+  if (!tax_name || tax_rate === undefined || !tax_type || !account_code) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Validate tax_type
+  if (!['inclusive', 'exclusive'].includes(tax_type)) {
+    return res.status(400).json({ error: "Invalid tax type. Must be 'inclusive' or 'exclusive'" });
+  }
+
+  // Validate tax_rate is non-negative
+  if (tax_rate < 0) {
+    return res.status(400).json({ error: "Tax rate cannot be negative" });
+  }
+
+  try {
+    // Check if the account exists
+    const accountExists = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT account_code FROM chart_of_accounts WHERE account_code = ?',
+        [account_code],
+        (err, row) => {
+          if (err) reject(err);
+          resolve(row !== undefined);
+        }
+      );
+    });
+
+    if (!accountExists) {
+      return res.status(400).json({ error: "Invalid account_code" });
+    }
+
+    // Update the tax record
+    db.run(
+      `UPDATE taxes
+       SET tax_name = ?,
+           tax_rate = ?,
+           tax_type = ?,
+           account_id = (SELECT id FROM chart_of_accounts WHERE account_code = ?)
+       WHERE id = ?`,
+      [tax_name, tax_rate, tax_type, account_code, id],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(409).json({ error: "Tax name already exists" });
+          }
+          console.error(err);
+          return res.status(500).json({ error: "Failed to update tax" });
+        }
+        
+        if (this.changes === 0) {
+          return res.status(404).json({ error: "Tax not found" });
+        }
+        
+        res.json({
+          id: parseInt(id),
+          tax_name,
+          tax_rate,
+          tax_type,
+          account_code
+        });
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// DELETE - Delete a tax
+app.delete('/taxes/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.run(
+    'DELETE FROM taxes WHERE id = ?',
+    [id],
+    function(err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to delete tax" });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: "Tax not found" });
+      }
+      
+      res.json({ message: "Tax deleted successfully" });
+    }
+  );
+});
+
+
+// ===================== Server Initialization =====================
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
