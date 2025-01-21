@@ -18,26 +18,50 @@ export const CartProvider = ({ children }) => {
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart,setCart]);
+  }, [cart]);
 
-  const addToCart = (product, quantity) => {
+  const addToCart = (
+    product,
+    quantity,
+    sellingPrice,
+    tax,
+    discountType,
+    discountAmount,
+    description
+  ) => {
     setCart((prevCart) => {
       const existingItemIndex = prevCart.findIndex(
         (item) => item.product.id === product.id
       );
 
       if (existingItemIndex !== -1) {
-        // Update the quantity of the existing item, ensuring the product data remains intact
+        // Update the quantity and other details of the existing item
         const updatedCart = [...prevCart];
         updatedCart[existingItemIndex] = {
           ...updatedCart[existingItemIndex],
           quantity: updatedCart[existingItemIndex].quantity + quantity,
+          sellingPrice, // Update price
+          tax,
+          discountType,
+          discountAmount,
+          description,
         };
         return updatedCart;
       }
 
-      // If the product is not in the cart, add it with the specified quantity
-      return [...prevCart, { product, quantity }];
+      // If the product is not in the cart, add it with the specified details
+      return [
+        ...prevCart,
+        {
+          product,
+          quantity,
+          sellingPrice,
+          tax,
+          discountType,
+          discountAmount,
+          description,
+        },
+      ];
     });
   };
 
@@ -46,17 +70,21 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem("cart");
   };
 
-  const processSale = async (referenceNumber,customer_id,payment_method) => {
+  const processSale = async (referenceNumber, customerId, paymentMethod) => {
     try {
       const salesData = cart.map((item) => ({
         product_id: item.product.id,
         quantity: item.quantity,
         reference_number: referenceNumber,
-        customer_id:customer_id,
-        payment_method:payment_method
+        customer_id: customerId,
+        payment_method: paymentMethod,
+        selling_price: item.sellingPrice,
+        tax: item.tax,
+        discount_type: item.discountType,
+        discount_amount: item.discountAmount,
+        description: item.description,
       }));
-  console.log("this is sales data:", salesData)
-      // Sending the request
+
       const response = await fetch("http://localhost:5000/sales", {
         method: "POST",
         headers: {
@@ -64,65 +92,26 @@ export const CartProvider = ({ children }) => {
         },
         body: JSON.stringify(salesData),
       });
-  
-      // Check if the response is successful
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Error response text:", errorText); // Log the raw response
+        console.error("Error response text:", errorText);
         throw new Error(`Failed to process sale: ${errorText}`);
       }
-  
-      // Attempt to parse the response if successful
+
       const responseData = await response.json();
       console.log("Sales logged:", responseData);
-      
-      return response; // Return the response for further handling
 
+      return response;
     } catch (error) {
       console.error("Error logging sales:", error.message);
-      throw error; // Rethrow to propagate the error for higher-level handling
+      throw error;
     }
   };
-  const makeSale = async (selectedProduct, quantity, referenceNumber) => {
-    try {
-      // Log the sale with the reference number
-      const saleResponse = await fetch("http://localhost:5000/sales", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product_id: selectedProduct.id,
-          quantity: quantity,
-          reference_number: referenceNumber, // Add reference number to sale
-          customer_id:1,
-          payment_method:'cash'
-        }),
-      });
-  
-      // Check if the response is OK (200 or 201)
-      if (!saleResponse.ok) {
-        const errorMessage = await saleResponse.text();
-        console.error("Error response text:", errorMessage); // Log the raw response
-        throw new Error(`Failed to log sale: ${errorMessage}`);
-      }
-  
-      // Attempt to parse the response if the request is successful
-      const saleDetails = await saleResponse.json();
-      console.log("Sale logged successfully:", saleDetails);
-  
-      return saleResponse; // Return the saleResponse for further validation if needed
-  
-    } catch (error) {
-      console.error("Error processing sale:", error.message);
-      throw error; // Rethrow the error to be handled at a higher level
-    }
-  };
-  
 
   return (
     <CartContext.Provider
-      value={{ cart, setCart, addToCart, processSale, makeSale, clearCart }}
+      value={{ cart, setCart, addToCart, processSale, clearCart }}
     >
       {children}
     </CartContext.Provider>

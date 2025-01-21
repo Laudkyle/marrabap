@@ -28,8 +28,8 @@ function Invoice({
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState("cash");
-
-  const { cart, clearCart } = useCart();
+  const [taxRates, setTaxRates] = useState([]);
+  const { cart, setCart, clearCart } = useCart();
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(1);
   // Fetch customers from the database
@@ -47,12 +47,53 @@ function Invoice({
   useEffect(() => {
     fetchCustomers();
   }, []);
+
+  // Fetch taxes
+  const fetchTaxes = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/taxes", {
+        timeout: 5000,
+      });
+      setTaxRates(response.data); // Assume response.data is an array of taxes
+    } catch (error) {
+      console.error("Failed to fetch taxes:", error);
+      toast.error("Failed to fetch tax rates. Please try again.");
+    }
+  };
+
+  // Call fetchTaxes in a useEffect
+  useEffect(() => {
+    fetchTaxes();
+  }, []);
   const fetchProducts = async () => {
     try {
       const response = await axios.get("http://localhost:5000/products", {
         timeout: 5000,
       });
-      setProducts(response.data);
+      const fetchedProducts = response.data;
+
+      // Update products state
+      setProducts(fetchedProducts);
+
+      // Sync fetched products with cart
+      setCart((prevCart) =>
+        prevCart.map((cartItem) => {
+          const updatedProduct = fetchedProducts.find(
+            (product) => product.id === cartItem.product.id
+          );
+
+          if (updatedProduct) {
+            return {
+              ...cartItem,
+              product: updatedProduct, // Update product details in cart
+            };
+          }
+
+          // If the product is no longer available, retain the current cart item
+          return cartItem;
+        })
+      );
+
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -63,9 +104,6 @@ function Invoice({
   useEffect(() => {
     fetchProducts();
   }, []);
-
-  const calculateTotal = () =>
-    cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
 
   const removeDocument = async (index, documentId) => {
     // Remove the document from the UI first
@@ -99,7 +137,39 @@ function Invoice({
       }
     }
   };
+  const calculateTotal = () => {
+    let subtotal = 0;
+    let totalTax = 0;
+    const taxBreakdown = {};
 
+    cart.forEach((item) => {
+      const taxRate =
+        taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
+      const taxName =
+        taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
+      const itemTotal = item.sellingPrice * item.quantity;
+      const itemTax = (itemTotal * taxRate) / 100;
+
+      subtotal += itemTotal;
+      totalTax += itemTax;
+
+      // Add tax breakdown for each tax type
+      if (taxBreakdown[taxName]) {
+        taxBreakdown[taxName] += itemTax;
+      } else {
+        taxBreakdown[taxName] = itemTax;
+      }
+    });
+
+    return {
+      subtotal,
+      totalTax,
+      grandTotal: subtotal + totalTax,
+      taxBreakdown,
+    };
+  };
+
+  const { subtotal, totalTax, grandTotal, taxBreakdown } = calculateTotal();
   return (
     <div>
       {showInvoice && (
@@ -248,11 +318,11 @@ function Invoice({
                             />
                           </td>
                           <td className="p-2 text-center text-gray-600 border-r">
-                            {parseFloat(item.product.sp).toFixed(2)}
+                            {parseFloat(item.sellingPrice).toFixed(2)}
                           </td>
                           <td className="p-2 text-center text-gray-600 border-r">
                             {parseFloat(
-                              item.quantity * item.product.sp
+                              item.quantity * item.sellingPrice
                             ).toFixed(2)}
                           </td>
                           {showDraft && (
@@ -281,18 +351,31 @@ function Invoice({
                     <span className="font-semibold text-gray-700">
                       Subtotal:
                     </span>
-                    <span>₵{calculateTotal().toFixed(2)}</span>
+                    <span>₵{subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="mt-4">
+                    <h3 className="font-semibold text-gray-700">Taxes:</h3>
+                    <ul className="mt-2 space-y-1">
+                      {Object.entries(taxBreakdown).map(
+                        ([taxName, amount], index) => (
+                          <li key={index} className="flex justify-between">
+                            <span>{taxName}:</span>
+                            <span>₵{amount.toFixed(2)}</span>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                  <div className="flex justify-between mt-4">
                     <span className="font-semibold text-gray-700">
-                      Tax (10%):
+                      Total Tax:
                     </span>
-                    <span>₵{(calculateTotal() * 0.1).toFixed(2)}</span>
+                    <span>₵{totalTax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between mt-2 border-t pt-2">
                     <span className="font-semibold text-lg">Grand Total:</span>
                     <span className="text-xl font-bold">
-                      ₵{(calculateTotal() * 1.1).toFixed(2)}
+                      ₵{grandTotal.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -311,7 +394,7 @@ function Invoice({
                             className="w-full p-2 border rounded "
                           >
                             <option value="cash">Cash</option>
-                            <option value="credit">Credit</option>
+                            <option value="bank">Bank</option>
                           </select>
                         </div>
                       </>
@@ -446,7 +529,7 @@ function Invoice({
               {showDraft && (
                 <button
                   onClick={() => {
-                    handleSaleDraft(selectedCustomer,paymentMethod);
+                    handleSaleDraft(selectedCustomer, paymentMethod);
                   }}
                   className="px-4 py-2  bg-blue-500 text-white rounded hover:bg-blue-600"
                 >

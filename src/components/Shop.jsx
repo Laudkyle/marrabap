@@ -53,12 +53,12 @@ function Shop({ companyName, companyAddress, email, phone }) {
   }, [saleComplete]);
 
   useEffect(() => {
-    fetch('http://localhost:5000/taxes')
+    fetch("http://localhost:5000/taxes")
       .then((response) => response.json())
       .then((data) => setTaxes(data))
       .catch((error) => console.error("Error fetching taxes:", error));
   }, []);
-  
+
   const filteredProducts = products.filter(
     (product) =>
       product &&
@@ -79,14 +79,55 @@ function Shop({ companyName, companyAddress, email, phone }) {
   };
 
   const handleAddToCart = () => {
+    if (!selectedProduct) {
+      setError("No product selected");
+      return;
+    }
+
+    if (!quantity || quantity <= 0) {
+      setError("Please enter a valid quantity");
+      return;
+    }
+
     if (quantity > selectedProduct.stock) {
       setError("Quantity exceeds available stock");
-    } else {
-      addToCart(selectedProduct, quantity);
-      setSelectedProduct(null);
-      toast.success(`${selectedProduct.name} added to cart`);
+      return;
     }
+
+    if (!sellingPrice || sellingPrice <= 0) {
+      setError("Please enter a valid selling price");
+      return;
+    }
+
+    if (!selectedTax) {
+      setError("Please select a tax option");
+      return;
+    }
+
+    addToCart(
+      selectedProduct,
+      quantity,
+      sellingPrice,
+      selectedTax,
+      discountType,
+      discountAmount,
+      description
+    );
+
+    // Clear form state and close modal
+    setSelectedProduct(null);
+    setQuantity(1);
+    setSellingPrice("");
+    setSelectedTax("");
+    setDiscountType("percentage");
+    setDiscountAmount(0);
+    setDescription("");
+    setError("");
+
+    // Toast notification
+    toast.success(`${selectedProduct.name} added to cart`);
   };
+
   const handleAddNewItem = (product, quantity) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find(
@@ -173,18 +214,22 @@ function Shop({ companyName, companyAddress, email, phone }) {
       toast.error("An error occurred while processing the sale.");
     }
   };
-
   const handleSaveDraft = async () => {
     const draft = {
       referenceNumber: refNum, // Unique reference number for the draft
       details: cart.map((item) => ({
-        product_id: item.product.id, // Use product ID instead of name
+        product_id: item.product.id, // Use product ID
         quantity: item.quantity,
+        sellingPrice: item.sellingPrice, // Selling price of the product
+        tax: item.tax, // Tax applied
+        discountType: item.discountType, // Type of discount (e.g., fixed, percentage)
+        discountAmount: item.discountAmount, // Amount of discount
+        description: item.description, // Optional description for the item
       })),
       date: new Date().toISOString(), // Use ISO 8601 format for date
       status: "pending", // Default status for the draft
     };
-
+  
     try {
       const response = await fetch("http://localhost:5000/drafts", {
         method: "POST",
@@ -193,11 +238,11 @@ function Shop({ companyName, companyAddress, email, phone }) {
         },
         body: JSON.stringify(draft),
       });
-
+  
       if (response.status === 201) {
         // Successfully saved draft
         setShowInvoice(false); // Close the invoice modal
-        clearCart();
+        clearCart(); // Clear the cart after saving the draft
         toast.success("Draft saved successfully!");
       } else {
         // Handle any issues with the response
@@ -209,6 +254,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       toast.error("An error occurred while saving the draft.");
     }
   };
+  
 
   useEffect(() => {
     setRefNum(generateReferenceNumber());
@@ -277,32 +323,53 @@ function Shop({ companyName, companyAddress, email, phone }) {
       </div>
 
       {/* Product Details Modal */}
-      {/* Product Details Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%]">
             {/* Modal Header */}
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-              Purchase {selectedProduct.name}
+              {selectedProduct.name}
             </h2>
 
-            {/* Selling Price */}
-            <div className="mb-4">
-              <label
-                htmlFor="sellingPrice"
-                className="block font-medium text-gray-700"
-              >
-                Selling Price (₵):
-              </label>
-              <input
-                id="sellingPrice"
-                type="number"
-                value={sellingPrice}
-                onChange={(e) => setSellingPrice(parseFloat(e.target.value))}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                min="0"
-                step="0.01"
-              />
+            {/* Selling Price and Quantity */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              {/* Selling Price */}
+              <div>
+                <label
+                  htmlFor="sellingPrice"
+                  className="block font-medium text-gray-700"
+                >
+                  Selling Price (₵):
+                </label>
+                <input
+                  id="sellingPrice"
+                  type="number"
+                  value={sellingPrice}
+                  onChange={(e) => setSellingPrice(parseFloat(e.target.value))}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label
+                  htmlFor="quantity"
+                  className="block font-medium text-gray-700"
+                >
+                  Quantity:
+                </label>
+                <input
+                  id="quantity"
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value, 10))}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  min="1"
+                  step="1"
+                />
+              </div>
             </div>
 
             {/* Tax Selection */}
