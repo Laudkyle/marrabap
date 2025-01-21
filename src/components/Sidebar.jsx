@@ -174,7 +174,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
     {
       name: "Accounts",
       icon: <BookCheck className="w-4 h-4" />,
-      dropdown: "settings",
+      dropdown: "accounts",
       links: [
         {
           path: "/opening-balances",
