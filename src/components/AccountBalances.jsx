@@ -98,7 +98,7 @@ const AccountBalances = () => {
     },
     {
       name: "Balance",
-      selector: (row) => row.balance.toFixed(2),
+      selector: (row) => row.balance.toFixed(2) || 0,
       sortable: true,
       right: true,
     },

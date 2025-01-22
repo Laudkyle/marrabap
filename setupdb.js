@@ -11,28 +11,110 @@ const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
 
 db.serialize(() => {
   const defaultAccounts = [
-    { account_code: "1000", account_name: "Cash", account_type: "asset", balance: 0 },
-    { account_code: "1015", account_name: "Bank Account", account_type: "asset", balance: 0 },
-    { account_code: "1020", account_name: "Inventory", account_type: "asset", balance: 0 },
-    { account_code: "1010", account_name: "Accounts Receivable", account_type: "asset", balance: 0 },
-    { account_code: "2000", account_name: "Accounts Payable", account_type: "liability", balance: 0 },
-    { account_code: "5000", account_name: "Cost of Goods Sold", account_type: "expense", balance: 0 },
-    { account_code: "4000", account_name: "Sales Revenue", account_type: "revenue", balance: 0 },
-    { account_code: "2030", account_name: "VAT Payable", account_type: "liability", balance: 0 },
-    { account_code: "2040", account_name: "VAT Receivable", account_type: "asset", balance: 0 },
-    { account_code: "3000", account_name: "Owner's Equity", account_type: "equity", balance: 0 },
-    { account_code: "5010", account_name: "Salaries and Wages", account_type: "expense", balance: 0 },
-    { account_code: "5020", account_name: "Sales Returns", account_type: "expense", balance: 0 },
-    { account_code: "2010", account_name: "Sales Tax Payable", account_type: "liability", balance: 0 },
-    { account_code: "2020", account_name: "Purchase Tax Recoverable", account_type: "asset", balance: 0 },
-    { account_code: "2050", account_name: "Income Tax Payable", account_type: "liability", balance: 0 },
-    { account_code: "6000", account_name: "Tax Expense", account_type: "expense", balance: 0 },
-    { account_code: "1030", account_name: "Unbilled Purchases", account_type: "asset", balance: 0 },
-
+    {
+      account_code: "1000",
+      account_name: "Cash",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "1015",
+      account_name: "Bank Account",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "1020",
+      account_name: "Inventory",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "1010",
+      account_name: "Accounts Receivable",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "2000",
+      account_name: "Accounts Payable",
+      account_type: "liability",
+      balance: 0,
+    },
+    {
+      account_code: "5000",
+      account_name: "Cost of Goods Sold",
+      account_type: "expense",
+      balance: 0,
+    },
+    {
+      account_code: "4000",
+      account_name: "Sales Revenue",
+      account_type: "revenue",
+      balance: 0,
+    },
+    {
+      account_code: "2030",
+      account_name: "VAT Payable",
+      account_type: "liability",
+      balance: 0,
+    },
+    {
+      account_code: "2040",
+      account_name: "VAT Receivable",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "3000",
+      account_name: "Owner's Equity",
+      account_type: "equity",
+      balance: 0,
+    },
+    {
+      account_code: "5010",
+      account_name: "Salaries and Wages",
+      account_type: "expense",
+      balance: 0,
+    },
+    {
+      account_code: "5020",
+      account_name: "Sales Returns",
+      account_type: "expense",
+      balance: 0,
+    },
+    {
+      account_code: "2010",
+      account_name: "Sales Tax Payable",
+      account_type: "liability",
+      balance: 0,
+    },
+    {
+      account_code: "2020",
+      account_name: "Purchase Tax Recoverable",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "2050",
+      account_name: "Income Tax Payable",
+      account_type: "liability",
+      balance: 0,
+    },
+    {
+      account_code: "6000",
+      account_name: "Tax Expense",
+      account_type: "expense",
+      balance: 0,
+    },
+    {
+      account_code: "1030",
+      account_name: "Unbilled Purchases",
+      account_type: "asset",
+      balance: 0,
+    },
   ];
-  
 
-  
   db.run(`CREATE TABLE IF NOT EXISTS chart_of_accounts (
     id INTEGER PRIMARY KEY,
     account_code TEXT NOT NULL UNIQUE, -- Unique identifier for the account
@@ -43,12 +125,16 @@ db.serialize(() => {
     FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
   )`);
 
- 
   defaultAccounts.forEach((account) => {
     db.run(
       `INSERT OR IGNORE INTO chart_of_accounts (account_code, account_name, account_type,balance)
        VALUES (?, ?, ?,?)`,
-      [account.account_code, account.account_name, account.account_type,account.balance]
+      [
+        account.account_code,
+        account.account_name,
+        account.account_type,
+        account.balance,
+      ]
     );
   });
 });
@@ -62,8 +148,8 @@ db.serialize(() => {
     image TEXT, -- Optional, for product image URL or file path
     suppliers_id INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (suppliers_id) REFERENCES suppliers(id)
-);`)
-db.run(`
+);`);
+  db.run(`
 
     CREATE TABLE IF NOT EXISTS purchase_orders (
   id INTEGER PRIMARY KEY,
@@ -74,8 +160,8 @@ db.run(`
   payment_status TEXT DEFAULT 'unpaid' CHECK(payment_status IN ('unpaid', 'partial', 'paid')),
   date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-);`)
-db.run(`
+);`);
+  db.run(`
 CREATE TABLE IF NOT EXISTS purchase_order_details (
   id INTEGER PRIMARY KEY,
   purchase_order_id INTEGER NOT NULL,
@@ -86,16 +172,16 @@ CREATE TABLE IF NOT EXISTS purchase_order_details (
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
 
-`)
+`);
 
-db.run(`
+  db.run(`
 CREATE TABLE temp_purchase_order_items (
   product_id INTEGER NOT NULL,
   quantity INTEGER NOT NULL,
   unit_price REAL NOT NULL CHECK(unit_price >= 0)
 );
-`)
-db.run(`
+`);
+  db.run(`
 CREATE TRIGGER update_purchase_order_details
 AFTER INSERT ON purchase_orders
 FOR EACH ROW
@@ -110,23 +196,23 @@ BEGIN
 END;
 
 )`);
-db.run(`CREATE TRIGGER IF NOT EXISTS delete_purchase_order_details
+  db.run(`CREATE TRIGGER IF NOT EXISTS delete_purchase_order_details
   AFTER DELETE ON purchase_orders
   FOR EACH ROW
   BEGIN
     DELETE FROM purchase_order_details WHERE purchase_order_id = OLD.id;
   END;
-  `)
-db.run(`CREATE TABLE IF NOT EXISTS inventory (
+  `);
+  db.run(`CREATE TABLE IF NOT EXISTS inventory (
   id INTEGER PRIMARY KEY AUTOINCREMENT, -- Unique inventory record ID
   product_id INTEGER NOT NULL, -- Foreign key to Products table
   quantity_in_stock INTEGER NOT NULL DEFAULT 0 CHECK(quantity_in_stock >= 0), -- Stock quantity (cannot be negative)
   cost_per_unit REAL NOT NULL CHECK(cost_per_unit >= 0), -- Cost per unit (cannot be negative)
   FOREIGN KEY (product_id) REFERENCES products(id) -- Linking to the products table
 );
-`)
+`);
 
-db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
+  db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL, -- References the product being adjusted
     date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Movement date
@@ -135,7 +221,7 @@ db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
     movement_type TEXT NOT NULL CHECK(movement_type IN ('purchase', 'sale', 'return', 'adjustment')), -- Type of movement
     cost REAL NOT NULL CHECK(cost >= 0), -- Unit cost (important for COGS calculations)
     description TEXT, -- Additional details (optional)
-    FOREIGN KEY (product_id) REFERENCES products(id))`)
+    FOREIGN KEY (product_id) REFERENCES products(id))`);
 
   db.run(`CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY,
@@ -162,7 +248,7 @@ db.run(`CREATE TABLE IF NOT EXISTS inventory_movements (
   payment_method TEXT, -- Optional (e.g., cash, credit card, etc.)
   payment_reference TEXT -- Optional payment reference number
 )`);
-db.run(`CREATE TABLE IF NOT EXISTS supplier_payments (
+  db.run(`CREATE TABLE IF NOT EXISTS supplier_payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   supplier_id INTEGER NOT NULL,  -- Reference to the supplier
   purchase_order_id INTEGER,     -- Reference to the purchase order (optional if not linked directly to PO)
@@ -173,7 +259,7 @@ db.run(`CREATE TABLE IF NOT EXISTS supplier_payments (
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id), -- Linking to the suppliers table
   FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id)  -- Linking to the purchase orders table (optional)
 );
-`)
+`);
   db.run(`CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
@@ -187,7 +273,7 @@ db.run(`CREATE TABLE IF NOT EXISTS supplier_payments (
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 )
 `);
-db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
+  db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- Unique invoice ID
     reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
     supplier_id INTEGER NOT NULL, -- Links the invoice to a supplier
@@ -201,7 +287,7 @@ db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE, -- Supplier reference
     FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE SET NULL -- Link to purchase order (optional)
 );
-`)
+`);
   db.run(`CREATE TABLE IF NOT EXISTS returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL,
@@ -351,8 +437,7 @@ db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
   account_id INTEGER NOT NULL,
   debit REAL DEFAULT 0 CHECK(debit >= 0),
   credit REAL DEFAULT 0 CHECK(credit >= 0),
-  FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id),
-  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
+  FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id)
 )`);
   db.run(`CREATE TABLE IF NOT EXISTS audit_trails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -380,9 +465,8 @@ db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
     1                      -- Active status: 1 means active
 );`);
 
-
-// Triggers
-db.run(`CREATE TRIGGER after_supplier_insert
+  // Triggers
+  db.run(`CREATE TRIGGER after_supplier_insert
 AFTER INSERT ON suppliers
 FOR EACH ROW
 BEGIN
@@ -425,86 +509,10 @@ BEGIN
     END;
 END;
 
-`)
-db.run(`
-CREATE TRIGGER supplier_payment_journal_entry
-AFTER INSERT ON supplier_payments
-FOR EACH ROW
-BEGIN
-  -- Insert into journal_entries table to create a new journal entry
-  INSERT INTO journal_entries (reference_number, date, description, status)
-  VALUES (
-    NEW.payment_reference,  -- Using payment_reference as the reference number
-    CURRENT_DATE,           -- Current date for the transaction
-    'Payment to supplier ' || NEW.supplier_id,  -- Description
-    'posted'                -- Mark as posted after creation
-  );
-
-  -- Insert debit entry for Accounts Payable (2000)
-  INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-  VALUES (
-    (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
-    '2000',  -- Accounts Payable (2000)
-    NEW.amount_paid,              -- Debit the Accounts Payable
-    0                             -- No credit here
-  );
-
-  -- Insert credit entry for Cash/Bank (1000 or 1015) based on payment method
-  INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-  VALUES (
-    (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
-    (SELECT account_code FROM chart_of_accounts WHERE account_code = CASE
-      WHEN NEW.payment_method = 'cash' THEN '1000'  -- Cash (1000)
-      ELSE '1015'  -- Bank (1015)
-    END),
-    NEW.amount_paid,               -- Debit the Cash/Bank
-    0                              -- No credit here
-  );
-
-  -- Update Accounts Payable balance (decrease)
-  UPDATE chart_of_accounts
-  SET balance = balance - NEW.amount_paid
-  WHERE account_code = '2000';
-
-  -- Update Cash/Bank balance (decrease)
-  UPDATE chart_of_accounts
-  SET balance = balance - NEW.amount_paid
-  WHERE account_code = CASE
-    WHEN NEW.payment_method = 'cash' THEN '1000'
-    ELSE '1015'
-  END;
-
-  -- Update Supplier's total purchase due
-  UPDATE suppliers
-  SET total_purchase_due = total_purchase_due - NEW.amount_paid
-  WHERE id = NEW.supplier_id;
-
-  -- Update Supplier Invoice (if there is an associated invoice)
-  UPDATE supplier_invoices
-  SET amount_paid = amount_paid + NEW.amount_paid,
-      status = CASE
-        WHEN amount_paid + NEW.amount_paid >= total_amount THEN 'paid'
-        WHEN amount_paid + NEW.amount_paid > 0 THEN 'partial'
-        ELSE 'unpaid'
-      END
-  WHERE purchase_order_id = NEW.purchase_order_id
-    AND supplier_id = NEW.supplier_id;
-
-  -- Insert into audit_trails table to log the action
-  INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
-  VALUES (
-    1,                      -- The user who made the change
-    'supplier_payments',    -- Affected table
-    NEW.id,                 -- Affected record (supplier payment ID)
-    'insert',               -- Action (insert)
-    '{"payment_reference": "' || NEW.payment_reference || '", "amount_paid": ' || NEW.amount_paid || '}'  -- Change details in JSON format
-  );
-END;
-
 `);
+  
 
-
-db.run(`CREATE TRIGGER after_purchase_order_insert
+  db.run(`CREATE TRIGGER after_purchase_order_insert
 AFTER INSERT ON purchase_orders
 FOR EACH ROW
 BEGIN
@@ -536,12 +544,95 @@ BEGIN
 
   -- No General Ledger Entry for Pending Purchase Order
 END;
-`)
-db.run(`CREATE TRIGGER handle_sales_updates
+`);
+  db.run(`CREATE TRIGGER handle_sales_updates
 AFTER INSERT ON sales
 FOR EACH ROW
 BEGIN
-    -- Update the Sales Revenue account (4000)
+    -- Create a new journal entry (you could customize the reference or description)
+    INSERT INTO journal_entries (reference_number, date, description, status)
+    VALUES (
+        'SALE-' || NEW.id,  -- Custom reference number
+        CURRENT_DATE,       -- Sale date
+        'Sale of product ' || NEW.product_id,  -- Description
+        'posted'           -- Status (or 'pending' if you want to post later)
+    );
+
+    -- Sales Revenue (4000): Credit
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
+        (SELECT id FROM chart_of_accounts WHERE account_code = '4000'),  -- Sales Revenue
+        0,  -- Debit
+        NEW.total_price  -- Credit
+    );
+
+    -- Accounts Receivable (1010) if the sale is on credit: Debit
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),  -- Accounts Receivable
+        NEW.total_price,  -- Debit
+        0  -- Credit
+    WHERE NEW.payment_method = 'credit';
+
+    -- Bank Account (1015) if it's a cash sale: Debit
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1015'),  -- Bank Account (Cash Sale)
+        NEW.total_price,  -- Debit
+        0  -- Credit
+    WHERE NEW.payment_method = 'cash';
+
+    -- Cost of Goods Sold (5000): Debit
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
+        (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),  -- Cost of Goods Sold
+        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id),  -- Debit
+        0  -- Credit
+    );
+
+    -- Inventory (1020): Credit (decrease inventory)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),  -- Inventory
+        0,  -- Debit
+        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id)  -- Credit
+    );
+
+    -- Tax (if applicable): Debit or Credit based on tax type
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
+        (SELECT account_id FROM taxes WHERE id = NEW.tax),  -- Tax Account (link via tax)
+        (SELECT 
+            CASE
+                WHEN t.tax_type = 'inclusive' THEN
+                    (((NEW.selling_price * NEW.quantity) - 
+                      CASE 
+                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                          ELSE 0
+                      END) 
+                      * (t.tax_rate / 100)) 
+                      / (1 + (t.tax_rate / 100))
+                WHEN t.tax_type = 'exclusive' THEN
+                    ((NEW.selling_price * NEW.quantity) - 
+                      CASE 
+                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                          ELSE 0
+                      END) 
+                      * (t.tax_rate / 100)
+            END
+        FROM taxes AS t
+        WHERE t.id = NEW.tax),  -- Debit (tax amount)
+        0  -- Credit
+    WHERE NEW.tax IS NOT NULL;
+     -- Update the Sales Revenue account (4000)
     UPDATE chart_of_accounts
     SET balance = balance + NEW.total_price
     WHERE account_code = '4000'; -- Assuming '4000' is the account code for Sales Revenue
@@ -604,10 +695,9 @@ BEGIN
         WHERE t.id = NEW.tax
     );
 END;
+`);
 
-
-`)
-db.run(`CREATE TRIGGER update_chart_of_accounts_after_payment
+  db.run(`CREATE TRIGGER update_chart_of_accounts_after_payment
 AFTER INSERT ON payments
 FOR EACH ROW
 BEGIN
@@ -625,8 +715,8 @@ BEGIN
   SET balance = balance - NEW.amount_paid
   WHERE account_code = '1010'; -- Accounts Receivable account
 END;
-`)
-db.run(`CREATE TRIGGER update_invoice_status_and_customer_sale_due
+`);
+  db.run(`CREATE TRIGGER update_invoice_status_and_customer_sale_due
 AFTER INSERT ON payments
 FOR EACH ROW
 BEGIN
@@ -645,8 +735,8 @@ BEGIN
   SET total_sale_due = total_sale_due - NEW.amount_paid
   WHERE id = (SELECT customer_id FROM invoices WHERE reference_number = NEW.reference_number);
 END;
-`)
-db.run(`
+`);
+  db.run(`
   CREATE TABLE IF NOT EXISTS payment_methods (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -660,13 +750,90 @@ db.run(`
     
   );
 `);
-db.run(`INSERT OR IGNORE INTO payment_methods (name, account_id, description, is_active)
+db.run(`
+CREATE TRIGGER supplier_payment_journal_entry
+AFTER INSERT ON supplier_payments
+FOR EACH ROW
+BEGIN
+  -- Insert into journal_entries table to create a new journal entry
+  INSERT INTO journal_entries (reference_number, date, description, status)
+  VALUES (
+    NEW.payment_reference,  -- Using payment_reference as the reference number
+    CURRENT_DATE,           -- Current date for the transaction
+    'Payment to supplier ' || NEW.supplier_id,  -- Description
+    'posted'                -- Mark as posted after creation
+  );
+
+  -- Insert debit entry for Accounts Payable (2000)
+  INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+  VALUES (
+    (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
+    '5',  -- Accounts Payable (2000)
+    NEW.amount_paid,              -- Debit the Accounts Payable
+    0                             -- No credit here
+  );
+
+  -- Insert credit entry for Cash/Bank (1000 or 1015) based on payment method
+  INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+  VALUES (
+    (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
+    (SELECT id FROM chart_of_accounts WHERE account_code = CASE
+      WHEN NEW.payment_method = 'cash' THEN '1000'  -- Cash (1000)
+      ELSE '1015'  -- Bank (1015)
+    END),
+    NEW.amount_paid,               -- Debit the Cash/Bank
+    0                              -- No credit here
+  );
+
+  -- Update Accounts Payable balance (decrease)
+  UPDATE chart_of_accounts
+  SET balance = balance - NEW.amount_paid
+  WHERE account_code = '2000';
+
+  -- Update Cash/Bank balance (decrease)
+  UPDATE chart_of_accounts
+  SET balance = balance - NEW.amount_paid
+  WHERE account_code = CASE
+    WHEN NEW.payment_method = 'cash' THEN '1000'
+    ELSE '1015'
+  END;
+
+  -- Update Supplier's total purchase due
+  UPDATE suppliers
+  SET total_purchase_due = total_purchase_due - NEW.amount_paid
+  WHERE id = NEW.supplier_id;
+
+  -- Update Supplier Invoice (if there is an associated invoice)
+  UPDATE supplier_invoices
+  SET amount_paid = amount_paid + NEW.amount_paid,
+      status = CASE
+        WHEN amount_paid + NEW.amount_paid >= total_amount THEN 'paid'
+        WHEN amount_paid + NEW.amount_paid > 0 THEN 'partial'
+        ELSE 'unpaid'
+      END
+  WHERE purchase_order_id = NEW.purchase_order_id
+    AND supplier_id = NEW.supplier_id;
+
+  -- Insert into audit_trails table to log the action
+  INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+  VALUES (
+    1,                      -- The user who made the change
+    'supplier_payments',    -- Affected table
+    NEW.id,                 -- Affected record (supplier payment ID)
+    'insert',               -- Action (insert)
+    '{"payment_reference": "' || NEW.payment_reference || '", "amount_paid": ' || NEW.amount_paid || '}'  -- Change details in JSON format
+  );
+END;
+)
+`);
+  db.run(`INSERT OR IGNORE INTO payment_methods (name, account_id, description, is_active)
     VALUES 
       ('Cash', 1, 'Payment using cash', 1), -- Linked to Cash account (ID: 1)
-      ('Bank', 2, 'Payment through bank account', 1); -- Linked to Bank account (ID: 2)`)
-
+      ('Bank', 2, 'Payment through bank account', 1); -- Linked to Bank account (ID: 2)`);
 });
-
+db.run(`INSERT INTO taxes (tax_name, tax_rate, tax_type, account_id)
+VALUES ('No Tax', 0, 'exclusive', (SELECT id FROM chart_of_accounts WHERE account_code = '2010'));
+`);
 // Close the database connection
 db.close((err) => {
   if (err) {

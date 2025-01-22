@@ -30,6 +30,8 @@ import OpeningBalances from "./components/OpeningBalances";
 import Taxes from "./components/Taxes";
 import AddPaymentMethod from "./components/AddPaymentMethod";
 import TaxSettings from "./components/TaxSettings";
+import IncomeStatement from "./components/IncomeStatement";
+import BalanceSheet from "./components/BalanceSheet";
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor";
@@ -99,6 +101,8 @@ const App = () => {
             <Route path="/taxes" element={<Taxes />} />
             <Route path="/tax-settings" element={<TaxSettings />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/income-statement" element={<IncomeStatement />} />
+            <Route path="/balance-sheet" element={<BalanceSheet />} />
           </Routes>
         </div>
       </div>

@@ -636,7 +636,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
         // Inventory debit (Asset account: debit increases)
         {
           journal_entry_id: journalEntryId,
-          account_id: "1020",
+          account_id: 3,
           debit: totalValue,
           credit: 0,
           isLiability: false  // Asset account
@@ -644,7 +644,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
         // Accounts Payable credit (Liability account: credit increases)
         {
           journal_entry_id: journalEntryId,
-          account_id: "2000",
+          account_id: 5,
           debit: 0,
           credit: totalValue,
           isLiability: true  // Liability account
@@ -1613,7 +1613,6 @@ app.delete("/payment-methods/:id", (req, res) => {
 });
 
 // ===================== Payments Endpoints =====================
-// CREATE: Add a new payment
 app.post("/payments", (req, res) => {
   const {
     reference_number,
@@ -1629,11 +1628,12 @@ app.post("/payments", (req, res) => {
       .send("Reference number and amount paid are required.");
   }
 
-  const query = `
+  // Insert the payment
+  const paymentQuery = `
     INSERT INTO payments (reference_number, payment_date, amount_paid, payment_method, payment_reference)
     VALUES (?, ?, ?, ?, ?)
   `;
-  const params = [
+  const paymentParams = [
     reference_number,
     payment_date || new Date().toISOString(),
     amount_paid,
@@ -1641,14 +1641,85 @@ app.post("/payments", (req, res) => {
     payment_reference || null,
   ];
 
-  db.run(query, params, function (err) {
+  db.run(paymentQuery, paymentParams, function (err) {
     if (err) {
       console.error("Error adding payment:", err.message);
       return res.status(500).send("Failed to add payment.");
     }
-    res.status(201).send({ id: this.lastID });
+
+    const paymentId = this.lastID;
+
+    // Insert into journal_entries
+    const journalEntryQuery = `
+      INSERT INTO journal_entries (reference_number, date, description, status)
+      VALUES (?, ?, ?, 'posted')
+    `;
+    const journalEntryParams = [
+      reference_number,
+      payment_date || new Date().toISOString(),
+      `Payment received (${payment_method || "unknown"})`,
+    ];
+
+    db.run(journalEntryQuery, journalEntryParams, function (err) {
+      if (err) {
+        console.error("Error adding journal entry:", err.message);
+        return res.status(500).send("Failed to add journal entry.");
+      }
+
+      const journalEntryId = this.lastID;
+
+      // Insert into journal_entry_lines
+      const journalEntryLinesQuery = `
+        INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+        VALUES (?, ?, ?, ?), (?, ?, ?, ?)
+      `;
+      const cashOrBankAccountId =
+        payment_method === "cash" ? 1 : payment_method === "credit" ? 2 : null;
+      const journalEntryLinesParams = [
+        journalEntryId,
+        cashOrBankAccountId, // Cash or Bank Account
+        parseFloat(amount_paid), // Debit
+        0, // No credit
+
+        journalEntryId,
+        4, // Accounts Receivable
+        0, // No debit
+        parseFloat(amount_paid), // Credit
+      ];
+
+      db.run(journalEntryLinesQuery, journalEntryLinesParams, function (err) {
+        if (err) {
+          console.error("Error adding journal entry lines:", err.message);
+          return res.status(500).send("Failed to add journal entry lines.");
+        }
+
+        // Insert into audit_trails
+        const auditTrailQuery = `
+          INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+          VALUES (?, ?, ?, ?, ?)
+        `;
+        const auditTrailParams = [
+          1, // Assuming `req.user` contains the logged-in user's details
+          "payments",
+          paymentId,
+          "insert",
+          JSON.stringify({ reference_number, payment_date, amount_paid, payment_method, payment_reference }),
+        ];
+
+        db.run(auditTrailQuery, auditTrailParams, function (err) {
+          if (err) {
+            console.error("Error adding to audit trail:", err.message);
+            return res.status(500).send("Failed to record audit trail.");
+          }
+
+          // Successfully processed payment
+          res.status(201).send({ id: paymentId });
+        });
+      });
+    });
   });
 });
+
 
 // READ: Get all payments
 app.get("/payments", (req, res) => {
@@ -2944,6 +3015,150 @@ app.delete('/taxes/:id', (req, res) => {
   );
 });
 
+
+// ===================== income statement =====================
+app.get("/reports/income-statement", (req, res) => {
+  try {
+    // Query for revenue accounts
+    const revenueQuery = `
+      SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
+      FROM journal_entry_lines jel
+      INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+      WHERE coa.account_type = 'revenue'
+      GROUP BY coa.account_name
+    `;
+
+    // Query for expense accounts
+    const expenseQuery = `
+      SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
+      FROM journal_entry_lines jel
+      INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+      WHERE coa.account_type = 'expense'
+      GROUP BY coa.account_name
+    `;
+
+    // Run both queries
+    db.all(revenueQuery, [], (err, revenue) => {
+      if (err) throw err;
+
+      db.all(expenseQuery, [], (err, expenses) => {
+        if (err) throw err;
+
+        // Calculate totals
+        const totalRevenue = revenue.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const netIncome = totalRevenue - totalExpenses;
+
+        // Respond with the income statement data
+        res.json({
+          revenue,
+          expenses,
+          totalRevenue,
+          totalExpenses,
+          netIncome,
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Error generating income statement:", error.message);
+    res.status(500).send("Failed to generate income statement.");
+  }
+});
+app.get("/reports/balance-sheet", async (req, res) => {
+  try {
+    // Define queries
+    const queries = {
+      currentAssetsQuery: `
+        SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        WHERE coa.account_type = 'asset'
+        GROUP BY coa.account_name
+      `,
+      nonCurrentAssetsQuery: `
+        SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        WHERE coa.account_type = 'asset'
+        GROUP BY coa.account_name
+      `,
+      currentLiabilitiesQuery: `
+        SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        WHERE coa.account_type = 'liability'
+        GROUP BY coa.account_name
+      `,
+      nonCurrentLiabilitiesQuery: `
+        SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        WHERE coa.account_type = 'liability'
+        GROUP BY coa.account_name
+      `,
+      equityQuery: `
+        SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        WHERE coa.account_type = 'equity'
+        GROUP BY coa.account_name
+      `,
+    };
+
+    // Prepare statements for each query
+    const currentAssetsStmt = db.prepare(queries.currentAssetsQuery);
+    const nonCurrentAssetsStmt = db.prepare(queries.nonCurrentAssetsQuery);
+    const currentLiabilitiesStmt = db.prepare(queries.currentLiabilitiesQuery);
+    const nonCurrentLiabilitiesStmt = db.prepare(queries.nonCurrentLiabilitiesQuery);
+    const equityStmt = db.prepare(queries.equityQuery);
+
+    // Run queries in parallel using stmt.all()
+    const [currentAssets, nonCurrentAssets, currentLiabilities, nonCurrentLiabilities, equity] = await Promise.all([
+      new Promise((resolve, reject) => {
+        currentAssetsStmt.all([], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        nonCurrentAssetsStmt.all([], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        currentLiabilitiesStmt.all([], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        nonCurrentLiabilitiesStmt.all([], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        equityStmt.all([], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+    ]);
+
+    // Structure the response
+    res.json({
+      currentAssets,
+      nonCurrentAssets,
+      currentLiabilities,
+      nonCurrentLiabilities,
+      equity,
+    });
+  } catch (error) {
+    console.error("Error generating balance sheet:", error.message);
+    res.status(500).send("Failed to generate balance sheet.");
+  }
+});
 
 // ===================== Server Initialization =====================
 app.listen(port, () => {

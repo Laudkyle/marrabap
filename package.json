@@ -21,6 +21,7 @@
     "react-scripts": "^5.0.1",
     "react-toastify": "^10.0.6",
     "react-tooltip": "^5.28.0",
+    "reactstrap": "^9.2.3",
     "sqlite3": "^5.1.7",
     "typeface-inter": "^3.18.1"
   },
