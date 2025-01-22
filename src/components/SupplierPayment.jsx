@@ -7,7 +7,7 @@ const SupplierPayment = () => {
     supplierId: "",
     purchaseOrderId: "",
     amountPaid: "",
-    paymentMethod: "cash",
+    paymentMethod: "",
     paymentReference: "",
     paymentDate: new Date().toISOString(),
     documents: [],
@@ -16,8 +16,10 @@ const SupplierPayment = () => {
 
   const [suppliers, setSuppliers] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]); // State for payment methods
   const [loading, setLoading] = useState(false);
 
+  // Fetch suppliers
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -29,6 +31,20 @@ const SupplierPayment = () => {
       }
     };
     fetchSuppliers();
+  }, []);
+
+  // Fetch payment methods
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/payment-methods");
+        setPaymentMethods(response.data);
+      } catch (error) {
+        console.error("Error fetching payment methods:", error);
+        toast.error("Error fetching payment methods.");
+      }
+    };
+    fetchPaymentMethods();
   }, []);
 
   const generateReferenceNumber = () => {
@@ -50,7 +66,7 @@ const SupplierPayment = () => {
     setPaymentData((prevData) => ({
       ...prevData,
       supplierId,
-      purchaseOrderId: "", 
+      purchaseOrderId: "",
     }));
 
     if (supplierId) {
@@ -104,20 +120,15 @@ const SupplierPayment = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
+  
     const referenceNumber = generateReferenceNumber();
-
-    setPaymentData((prevData) => ({
-      ...prevData,
-      payment_reference: referenceNumber,
-    }));
-
+  
     if (!paymentData.amountPaid || paymentData.amountPaid <= 0) {
       setLoading(false);
       toast.error("Please enter a valid payment amount.");
       return;
     }
-
+  
     const paymentPayload = {
       supplier_id: paymentData.supplierId,
       purchase_order_id: paymentData.purchaseOrderId,
@@ -126,36 +137,39 @@ const SupplierPayment = () => {
       amount_paid: paymentData.amountPaid,
       payment_method: paymentData.paymentMethod,
     };
-
+  
     try {
+      // Send payment data to the backend
       const paymentResponse = await axios.post(
         "http://localhost:5000/supplier_payments",
         paymentPayload
       );
-
+  
+      // If there are documents to upload, handle file uploads
       if (paymentData.documents.length > 0) {
         const formData = new FormData();
         formData.append("transaction_type", "payment");
         formData.append("reference_number", referenceNumber);
-
+  
         paymentData.documents.forEach((file) => {
           formData.append("files", file);
         });
-
+  
         await axios.post("http://localhost:5000/documents", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         });
       }
-
+  
+      // Check if the payment was successful
       if (paymentResponse.status === 201) {
         toast.success("Supplier payment processed successfully.");
         setPaymentData({
           supplierId: "",
           purchaseOrderId: "",
           amountPaid: "",
-          paymentMethod: "cash",
+          paymentMethod: "",
           paymentReference: "",
           paymentDate: new Date().toISOString(),
           documents: [],
@@ -164,13 +178,18 @@ const SupplierPayment = () => {
         setPurchaseOrders([]);
       }
     } catch (error) {
-      console.error("Error processing payment:", error);
-      toast.error("Error processing payment. Please try again.");
+      if (error.response && error.response.data) {
+        // Display backend error message, such as insufficient balance
+        toast.error(error.response.data);
+      } else {
+        console.error("Error processing payment:", error);
+        toast.error("Error processing payment. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg space-y-6">
       <h2 className="text-2xl font-semibold text-gray-700">Supplier Payment</h2>
@@ -236,8 +255,12 @@ const SupplierPayment = () => {
               onChange={handleInputChange}
               className="mt-2 p-3 border border-gray-300 rounded-md"
             >
-              <option value="cash">Cash</option>
-              <option value="bank">Bank Account</option>
+              <option value="">Select Payment Method</option>
+              {paymentMethods.map((method) => (
+                <option key={method.id} value={method.name}>
+                  {method.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex flex-col">

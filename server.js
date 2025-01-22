@@ -1340,52 +1340,95 @@ app.post("/supplier_payments", (req, res) => {
     payment_reference,
   } = req.body;
 
-  if (!supplier_id || !amount_paid) {
-    return res.status(400).send("Supplier ID and amount paid are required.");
+  if (!supplier_id || !amount_paid || !payment_method) {
+    return res
+      .status(400)
+      .send("Supplier ID, amount paid, and payment method are required.");
   }
 
-  const query = `
-    INSERT INTO supplier_payments (supplier_id, purchase_order_id, amount_paid, payment_method, payment_reference)
-    VALUES (?, ?, ?, ?, ?)
+  // Step 1: Check the balance of the selected payment method's account
+  const getAccountBalanceQuery = `
+    SELECT c.id AS account_id, c.balance 
+    FROM payment_methods p 
+    JOIN chart_of_accounts c ON p.account_id = c.id 
+    WHERE p.name = ? AND p.is_active = 1
   `;
-  const params = [
-    supplier_id,
-    purchase_order_id || null,
-    amount_paid,
-    payment_method || null,
-    payment_reference || null,
-  ];
 
-  db.run(query, params, function (err) {
+  db.get(getAccountBalanceQuery, [payment_method], (err, account) => {
     if (err) {
-      console.error("Error adding supplier payment:", err.message);
-      return res.status(500).send("Failed to add supplier payment.");
+      console.error("Error fetching account balance:", err.message);
+      return res.status(500).send("Failed to fetch account balance.");
     }
 
-    // After inserting the payment, update the related tables (purchase_orders, accounts, and ledger)
-    const paymentId = this.lastID;
+    if (!account) {
+      return res.status(400).send("Invalid or inactive payment method.");
+    }
 
-    // 1. Update Purchase Order Status
-    if (purchase_order_id) {
-      const updatePurchaseOrderQuery = `
-        UPDATE purchase_orders
-        SET payment_status = CASE 
-          WHEN (SELECT SUM(amount_paid) FROM supplier_payments WHERE purchase_order_id = ?) >= total_amount 
-          THEN 'paid' 
-          ELSE 'partial' 
-        END
+    if (account.balance < amount_paid) {
+      return res
+        .status(400)
+        .send(
+          `Insufficient balance in the selected payment method (${payment_method}). Available balance: ${account.balance}`
+        );
+    }
+
+    // Step 2: Insert the supplier payment into the database
+    const insertPaymentQuery = `
+      INSERT INTO supplier_payments (supplier_id, purchase_order_id, amount_paid, payment_method, payment_reference)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+    const params = [
+      supplier_id,
+      purchase_order_id || null,
+      amount_paid,
+      payment_method || null,
+      payment_reference || null,
+    ];
+
+    db.run(insertPaymentQuery, params, function (err) {
+      if (err) {
+        console.error("Error adding supplier payment:", err.message);
+        return res.status(500).send("Failed to add supplier payment.");
+      }
+
+      const paymentId = this.lastID;
+
+      // Step 3: Deduct the amount from the account's balance
+      const updateAccountBalanceQuery = `
+        UPDATE chart_of_accounts
+        SET balance = balance - ?
         WHERE id = ?
       `;
-      db.run(updatePurchaseOrderQuery, [purchase_order_id, purchase_order_id], function (err) {
+      db.run(updateAccountBalanceQuery, [amount_paid, account.account_id], (err) => {
         if (err) {
-          console.error("Error updating purchase order:", err.message);
+          console.error("Error updating account balance:", err.message);
         }
       });
-    }
- 
-    res.status(201).send({ id: paymentId });
+
+      // Step 4: Update the purchase order's payment status if applicable
+      if (purchase_order_id) {
+        const updatePurchaseOrderQuery = `
+          UPDATE purchase_orders
+          SET payment_status = CASE 
+            WHEN (SELECT SUM(amount_paid) FROM supplier_payments WHERE purchase_order_id = ?) >= total_amount 
+            THEN 'paid' 
+            ELSE 'partial' 
+          END
+          WHERE id = ?
+        `;
+        db.run(updatePurchaseOrderQuery, [purchase_order_id, purchase_order_id], (err) => {
+          if (err) {
+            console.error("Error updating purchase order:", err.message);
+          }
+        });
+      }
+
+      // Step 5: Send success response
+      res.status(201).send({ id: paymentId });
+    });
   });
 });
+
 
 // READ: Get all supplier payments
 app.get("/supplier_payments", (req, res) => {
@@ -1464,6 +1507,108 @@ app.delete("/supplier_payments/:id", (req, res) => {
       return res.status(404).send("Supplier payment not found.");
     }
     res.status(200).send("Supplier payment deleted successfully.");
+  });
+});
+
+// ===================== Payments Methods Endpoints =====================
+app.post("/payment-methods", (req, res) => {
+  const { name, account_id, description } = req.body;
+
+  if (!name || !account_id) {
+    return res.status(400).send("Name and account_id are required.");
+  }
+
+  const query = `
+    INSERT INTO payment_methods (name, account_id, description)
+    VALUES (?, ?, ?)
+  `;
+  db.run(query, [name, account_id, description || null], function (err) {
+    if (err) {
+      console.error("Error adding payment method:", err.message);
+      return res.status(500).send("Failed to add payment method.");
+    }
+    res.status(201).send({ id: this.lastID, message: "Payment method created." });
+  });
+});
+app.get("/payment-methods", (req, res) => {
+  const query = `
+    SELECT 
+      pm.id, 
+      pm.name, 
+      pm.description, 
+      pm.is_active, 
+      pm.created_at, 
+      pm.updated_at, 
+      ca.account_name AS linked_account 
+    FROM payment_methods pm
+    JOIN chart_of_accounts ca ON pm.account_id = ca.id
+  `;
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error("Error retrieving payment methods:", err.message);
+      return res.status(500).send("Failed to retrieve payment methods.");
+    }
+    res.status(200).json(rows);
+  });
+});
+app.get("/payment-methods/:id", (req, res) => {
+  const query = `
+    SELECT 
+      pm.id, 
+      pm.name, 
+      pm.description, 
+      pm.is_active, 
+      pm.created_at, 
+      pm.updated_at, 
+      ca.account_name AS linked_account 
+    FROM payment_methods pm
+    JOIN chart_of_accounts ca ON pm.account_id = ca.id
+    WHERE pm.id = ?
+  `;
+  db.get(query, [req.params.id], (err, row) => {
+    if (err) {
+      console.error("Error retrieving payment method:", err.message);
+      return res.status(500).send("Failed to retrieve payment method.");
+    }
+    if (!row) return res.status(404).send("Payment method not found.");
+    res.status(200).json(row);
+  });
+});
+app.put("/payment-methods/:id", (req, res) => {
+  const { name, account_id, description, is_active } = req.body;
+
+  if (!name && !account_id && !description && is_active == null) {
+    return res.status(400).send("Nothing to update.");
+  }
+
+  const query = `
+    UPDATE payment_methods
+    SET 
+      name = COALESCE(?, name),
+      account_id = COALESCE(?, account_id),
+      description = COALESCE(?, description),
+      is_active = COALESCE(?, is_active),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `;
+  db.run(query, [name, account_id, description, is_active, req.params.id], function (err) {
+    if (err) {
+      console.error("Error updating payment method:", err.message);
+      return res.status(500).send("Failed to update payment method.");
+    }
+    if (this.changes === 0) return res.status(404).send("Payment method not found.");
+    res.status(200).send("Payment method updated.");
+  });
+});
+app.delete("/payment-methods/:id", (req, res) => {
+  const query = "DELETE FROM payment_methods WHERE id = ?";
+  db.run(query, [req.params.id], function (err) {
+    if (err) {
+      console.error("Error deleting payment method:", err.message);
+      return res.status(500).send("Failed to delete payment method.");
+    }
+    if (this.changes === 0) return res.status(404).send("Payment method not found.");
+    res.status(200).send("Payment method deleted.");
   });
 });
 

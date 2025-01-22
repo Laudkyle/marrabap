@@ -12,22 +12,22 @@ const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
 db.serialize(() => {
   const defaultAccounts = [
     { account_code: "1000", account_name: "Cash", account_type: "asset", balance: 0 },
-    { account_code: "1010", account_name: "Accounts Receivable", account_type: "asset", balance: 0 },
+    { account_code: "1015", account_name: "Bank Account", account_type: "asset", balance: 0 },
     { account_code: "1020", account_name: "Inventory", account_type: "asset", balance: 0 },
+    { account_code: "1010", account_name: "Accounts Receivable", account_type: "asset", balance: 0 },
     { account_code: "2000", account_name: "Accounts Payable", account_type: "liability", balance: 0 },
-    { account_code: "3000", account_name: "Owner's Equity", account_type: "equity", balance: 0 },
-    { account_code: "4000", account_name: "Sales Revenue", account_type: "revenue", balance: 0 },
     { account_code: "5000", account_name: "Cost of Goods Sold", account_type: "expense", balance: 0 },
+    { account_code: "4000", account_name: "Sales Revenue", account_type: "revenue", balance: 0 },
+    { account_code: "2030", account_name: "VAT Payable", account_type: "liability", balance: 0 },
+    { account_code: "2040", account_name: "VAT Receivable", account_type: "asset", balance: 0 },
+    { account_code: "3000", account_name: "Owner's Equity", account_type: "equity", balance: 0 },
     { account_code: "5010", account_name: "Salaries and Wages", account_type: "expense", balance: 0 },
     { account_code: "5020", account_name: "Sales Returns", account_type: "expense", balance: 0 },
     { account_code: "2010", account_name: "Sales Tax Payable", account_type: "liability", balance: 0 },
     { account_code: "2020", account_name: "Purchase Tax Recoverable", account_type: "asset", balance: 0 },
-    { account_code: "2030", account_name: "VAT Payable", account_type: "liability", balance: 0 },
-    { account_code: "2040", account_name: "VAT Receivable", account_type: "asset", balance: 0 },
     { account_code: "2050", account_name: "Income Tax Payable", account_type: "liability", balance: 0 },
     { account_code: "6000", account_name: "Tax Expense", account_type: "expense", balance: 0 },
     { account_code: "1030", account_name: "Unbilled Purchases", account_type: "asset", balance: 0 },
-    { account_code: "1015", account_name: "Bank Account", account_type: "asset", balance: 0 }
 
   ];
   
@@ -646,6 +646,25 @@ BEGIN
   WHERE id = (SELECT customer_id FROM invoices WHERE reference_number = NEW.reference_number);
 END;
 `)
+db.run(`
+  CREATE TABLE IF NOT EXISTS payment_methods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    account_id INTEGER NOT NULL,
+    description TEXT,
+    is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES chart_of_accounts (id) ON DELETE CASCADE
+
+    
+  );
+`);
+db.run(`INSERT OR IGNORE INTO payment_methods (name, account_id, description, is_active)
+    VALUES 
+      ('Cash', 1, 'Payment using cash', 1), -- Linked to Cash account (ID: 1)
+      ('Bank', 2, 'Payment through bank account', 1); -- Linked to Bank account (ID: 2)`)
+
 });
 
 // Close the database connection

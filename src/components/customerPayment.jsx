@@ -31,14 +31,22 @@ const CustomerPayment = () => {
     };
     fetchCustomers();
   }, []);
-
   useEffect(() => {
     // Fetch invoices when a customer is selected
     const fetchInvoices = async (customerId) => {
       if (customerId) {
         try {
-          const response = await axios.get(`http://localhost:5000/invoices?customerId=${customerId}`);
-          setInvoices(response.data);
+          const response = await axios.get(
+            `http://localhost:5000/invoices?customerId=${customerId}`
+          );
+
+          // Filter invoices to show only 'partial' or 'unpaid' statuses
+          const filteredInvoices = response.data.filter(
+            (invoice) =>
+              invoice.status === "partial" || invoice.status === "unpaid"
+          );
+
+          setInvoices(filteredInvoices);
         } catch (error) {
           console.error("Error fetching invoices:", error);
           toast.error("Error fetching invoices.");
@@ -58,9 +66,13 @@ const CustomerPayment = () => {
     setPaymentData((prevData) => {
       const newData = { ...prevData, [name]: value };
       // Automatically set payment reference when an invoice is selected
-      if (name === "invoiceId") {
-        const selectedInvoice = invoices.find((invoice) => invoice.id === parseInt(value));
-        newData.paymentReference = selectedInvoice ? selectedInvoice.reference_number : "";
+      if (name == "invoiceId") {
+        const selectedInvoice = invoices.find(
+          (invoice) => invoice.id === parseInt(value)
+        );
+        newData.paymentReference = selectedInvoice
+          ? selectedInvoice.reference_number
+          : "";
       }
       return newData;
     });
@@ -69,6 +81,17 @@ const CustomerPayment = () => {
   const handleFileChange = (e) => {
     const selectedFiles = e.target.files;
     const maxFileSize = 4 * 1024 * 1024; // 4MB in bytes
+    const totalSize = Array.from(selectedFiles).reduce(
+      (acc, file) => acc + file.size,
+      0
+    );
+    const maxTotalSize = 10 * 1024 * 1024; // 10MB in bytes
+
+    if (totalSize > maxTotalSize) {
+      toast.error("Total file size exceeds the 10MB limit.");
+      return;
+    }
+
     if (selectedFiles) {
       const validFiles = [];
       const rejectedFiles = [];
@@ -76,12 +99,22 @@ const CustomerPayment = () => {
         if (file.size <= maxFileSize) validFiles.push(file);
         else rejectedFiles.push(file.name);
       });
-      setPaymentData((prevData) => ({
-        ...prevData,
-        documents: [...prevData.documents, ...validFiles],
-      }));
+
+      setPaymentData((prevData) => {
+        const existingFiles = prevData.documents.map((file) => file.name);
+        const uniqueFiles = validFiles.filter(
+          (file) => !existingFiles.includes(file.name)
+        );
+        return {
+          ...prevData,
+          documents: [...prevData.documents, ...uniqueFiles],
+        };
+      });
+
       if (rejectedFiles.length > 0) {
-        toast.error(`Files rejected (exceeding 4MB): ${rejectedFiles.join(", ")}`);
+        toast.error(
+          `Files rejected (exceeding 4MB): ${rejectedFiles.join(", ")}`
+        );
       }
     }
   };
@@ -101,9 +134,11 @@ const CustomerPayment = () => {
       setLoading(false);
       return;
     }
-
+console.log(invoices)
     // Find the selected invoice
-    const selectedInvoice = invoices.find((invoice) => invoice.id === parseInt(paymentData.invoiceId));
+    const selectedInvoice = invoices.find(
+      (invoice) => invoice.id == parseInt(paymentData.invoiceId)
+    );
     if (!selectedInvoice) {
       toast.error("Invoice not found.");
       setLoading(false);
@@ -111,13 +146,21 @@ const CustomerPayment = () => {
     }
 
     // Determine new invoice status based on payment
-    const remainingBalance = selectedInvoice.total_amount - selectedInvoice.amount_paid;
+    const remainingBalance =
+      selectedInvoice.total_amount - selectedInvoice.amount_paid;
     const updatedStatus =
-      parseFloat(paymentData.amountPaid) >= remainingBalance
+      parseFloat(paymentData.amountPaid) > remainingBalance
         ? "paid"
         : parseFloat(paymentData.amountPaid) > 0
         ? "partial"
-        : selectedInvoice.status;
+        : selectedInvoice.status || "unpaid";
+
+    // Ensure payment doesn't exceed remaining balance
+    if (parseFloat(paymentData.amountPaid) > remainingBalance) {
+      toast.error("Payment amount exceeds the remaining balance.");
+      setLoading(false);
+      return;
+    }
 
     // Payload for the payment
     const paymentPayload = {
@@ -147,11 +190,16 @@ const CustomerPayment = () => {
       // Update invoice status
       const invoiceUpdatePayload = {
         total_amount: selectedInvoice.total_amount,
-        amount_paid: parseFloat(selectedInvoice.amount_paid) + parseFloat(paymentData.amountPaid),
+        amount_paid:
+          parseFloat(selectedInvoice.amount_paid) +
+          parseFloat(paymentData.amountPaid),
         due_date: selectedInvoice.due_date,
         status: updatedStatus,
       };
-      await axios.put(`http://localhost:5000/invoices/${selectedInvoice.id}`, invoiceUpdatePayload);
+      await axios.put(
+        `http://localhost:5000/invoices/${selectedInvoice.reference_number}`,
+        invoiceUpdatePayload
+      );
 
       toast.success("Payment processed and invoice updated.");
       setPaymentData({
@@ -165,8 +213,11 @@ const CustomerPayment = () => {
         errorMessage: "",
       });
     } catch (error) {
-      console.error("Error processing payment:", error);
-      toast.error("Error processing payment.");
+      if (error.response && error.response.data) {
+        toast.error(error.response.data.message || "Error processing payment.");
+      } else {
+        toast.error("Error processing payment.");
+      }
     } finally {
       setLoading(false);
     }
@@ -180,7 +231,9 @@ const CustomerPayment = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Customer Dropdown */}
           <div>
-            <label htmlFor="customerId" className="block text-gray-600">Customer</label>
+            <label htmlFor="customerId" className="block text-gray-600">
+              Customer
+            </label>
             <select
               name="customerId"
               value={paymentData.customerId}
@@ -198,7 +251,9 @@ const CustomerPayment = () => {
           </div>
           {/* Invoice Dropdown */}
           <div>
-            <label htmlFor="invoiceId" className="block text-gray-600">Invoice</label>
+            <label htmlFor="invoiceId" className="block text-gray-600">
+              Invoice
+            </label>
             <select
               name="invoiceId"
               value={paymentData.invoiceId}
@@ -209,14 +264,19 @@ const CustomerPayment = () => {
               <option value="">Select Invoice</option>
               {invoices.map((invoice) => (
                 <option key={invoice.id} value={invoice.id}>
-                  {invoice.reference_number} - {invoice.status.toUpperCase()} - ₵{invoice.total_amount - invoice.amount_paid}
+                  {invoice.reference_number} - {invoice.status.toUpperCase()} -
+                  ₵{(invoice.total_amount - invoice.amount_paid).toFixed(2)}(
+                  {invoice.due_date})
                 </option>
               ))}
             </select>
           </div>
+
           {/* Payment Amount */}
           <div>
-            <label htmlFor="amountPaid" className="block text-gray-600">Amount Paid</label>
+            <label htmlFor="amountPaid" className="block text-gray-600">
+              Amount Paid
+            </label>
             <input
               type="number"
               name="amountPaid"
@@ -228,7 +288,9 @@ const CustomerPayment = () => {
           </div>
           {/* Payment Method */}
           <div>
-            <label htmlFor="paymentMethod" className="block text-gray-600">Payment Method</label>
+            <label htmlFor="paymentMethod" className="block text-gray-600">
+              Payment Method
+            </label>
             <select
               name="paymentMethod"
               value={paymentData.paymentMethod}
@@ -236,12 +298,13 @@ const CustomerPayment = () => {
               className="w-full mt-2 p-2 border rounded"
             >
               <option value="cash">Cash</option>
-              <option value="credit">Credit</option>
             </select>
           </div>
           {/* Document Upload */}
           <div>
-            <label htmlFor="document" className="block text-gray-600">Attach Documents (Optional)</label>
+            <label htmlFor="document" className="block text-gray-600">
+              Attach Documents (Optional)
+            </label>
             <input
               type="file"
               onChange={handleFileChange}
