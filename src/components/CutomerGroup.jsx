@@ -240,7 +240,7 @@ const CustomerGroup = () => {
       {isFormVisible && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex justify-center items-center">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
-            <h2 className="text-2xl font-medium text-gray-800 mb-6 text-center">
+            <h2 className="text-2xl font-medium text-gray-800 mb-4 text-center">
               {editingGroupId ? "Edit Customer Group" : "Create Customer Group"}
             </h2>
             <form

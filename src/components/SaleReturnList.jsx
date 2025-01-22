@@ -61,7 +61,7 @@ const SaleReturnList = () => {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl px-6 font-semibold text-gray-700 mb-4">
+      <h2 className="text-2xl px-6 font-semibold text-gray-800 mb-4">
         Sale Return List
       </h2>
       <ToastContainer />

@@ -28,9 +28,10 @@ import {
   UsersRound,
   Group,
   Cog,
-  BookCheck
+  BookCheck,
+
 } from "lucide-react";
-import { FaMoneyBill1 } from "react-icons/fa6";
+import { FaMoneyBill1,FaMoneyBill } from "react-icons/fa6";
 
 const Sidebar = ({ isExpanded, companyName }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -132,11 +133,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
       icon: <FaMoneyBill1 className="w-4 h-4" />,
       dropdown: "payments",
       links: [
-        {
-          path: "/add-payment",
-          label: "Process Payment",
-          icon: <PlusCircle className="w-4 h-4" />,
-        },
+        
         {
           path: "/supplier-payment",
           label: "Supplier Payment",
@@ -144,8 +141,8 @@ const Sidebar = ({ isExpanded, companyName }) => {
         },
         {
           path: "/customer-payment",
-          label: "Customer Payment",
-          icon: <CreditCard className="w-4 h-4" />,
+          label: "Receive Customer Payment",
+          icon: <FaMoneyBill className="w-4 h-4" />,
         },
         {
           path: "/payment-history",
@@ -298,6 +295,10 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/profile",
           label: "Profile",
           icon: <UserCircle className="w-4 h-4" />,
+        },{
+          path: "/add-payment-method",
+          label: "Add Payment Method",
+          icon: <PlusCircle className="w-4 h-4" />,
         },
    
       ],

@@ -658,7 +658,7 @@ const Draft = () => {
       />
 
       <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">Draft List</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Draft List</h2>
         <DataTable
           className="z-0"
           columns={columns}

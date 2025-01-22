@@ -91,7 +91,7 @@ const Taxes = () => {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Taxes</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Taxes</h1>
         <button
           onClick={() => setShowModal(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none"

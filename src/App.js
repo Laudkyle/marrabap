@@ -28,6 +28,8 @@ import { ToastContainer } from "react-toastify";
 import AccountBalances from "./components/AccountBalances";
 import OpeningBalances from "./components/OpeningBalances";
 import Taxes from "./components/Taxes";
+import AddPaymentMethod from "./components/AddPaymentMethod";
+import TaxSettings from "./components/TaxSettings";
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor";
@@ -90,10 +92,12 @@ const App = () => {
               element={<PurchaseOrdersTable />}
             />
             <Route path="/add-payment" element={<ProcessPayment />} />
+            <Route path="/add-payment-method" element={<AddPaymentMethod />} />
             <Route path="/supplier-payment" element={<SupplierPayment />} />
             <Route path="/customer-payment" element={<CustomerPayment />} />
             <Route path="/payment-history" element={<PaymentList />} />
             <Route path="/taxes" element={<Taxes />} />
+            <Route path="/tax-settings" element={<TaxSettings />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>

@@ -138,6 +138,7 @@ const handleSubmit = async (e) => {
   return (
     <div className="p-6 bg-white shadow-md rounded-lg">
       <ToastContainer />
+      <h2 className="text-2xl font-bold  text-gray-800 mb-4">Add purchase Order</h2>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-8 gap-8">
         {/* Left Column: Products List */}

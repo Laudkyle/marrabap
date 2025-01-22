@@ -99,7 +99,7 @@ const ProcessPayment = () => {
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg space-y-6">
-      <h2 className="text-2xl font-semibold text-gray-700">Process Payment</h2>
+      <h2 className="text-2xl font-semibold text-gray-800">Process Payment</h2>
       {paymentData.errorMessage && <p className="text-red-600 text-sm">{paymentData.errorMessage}</p>}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Reference Number */}

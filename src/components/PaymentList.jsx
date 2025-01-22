@@ -122,10 +122,10 @@ const PaymentList = () => {
 
   // Custom subheader with search
   const customSubHeader = (
-    <div className="w-full flex justify-between items-center">
+    <div className="w-full flex justify-end items-center">
       <input
         type="text"
-        placeholder="Search by reference number"
+        placeholder="Search by any attribute"
         className="p-2 border border-gray-300 rounded-md w-1/3"
         value={searchText}
         onChange={(e) => setSearchText(e.target.value)}
@@ -135,7 +135,7 @@ const PaymentList = () => {
 
   return (
     <div className="container mx-auto p-6 bg-gray-100 shadow-lg rounded-lg">
-      <h2 className="text-3xl font-semibold text-gray-800 mb-6">Payment List</h2>
+      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Payment List</h2>
 
       <DataTable
         title="Payments"

@@ -121,7 +121,7 @@ const OpeningBalances = () => {
 
   return (
     <div className="p-6 bg-white rounded shadow-md h-[calc(100vh-80px)] overflow-y-scroll">
-      <h2 className="text-lg font-bold mb-4">Manage Account Balances</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">Manage Account Balances</h2>
 
       {/* Data Table with Search Subheader */}
       <DataTable

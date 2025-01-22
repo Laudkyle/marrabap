@@ -132,7 +132,7 @@ const AccountBalances = () => {
       {modalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded shadow-lg w-full max-w-sm">
-            <h3 className="text-lg font-bold mb-4">Edit Account Balance</h3>
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">Edit Account Balance</h3>
             <form onSubmit={handleUpdateAccount}>
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2" htmlFor="account_name">
