@@ -223,6 +223,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/accounts-payable",
           label: "Accounts Payable",
           icon: <List className="w-4 h-4" />,
+        },   
+        {
+          path: "/tax-reports",
+          label: "Tax Reports",
+          icon: <List className="w-4 h-4" />,
         },
       ],
     },
@@ -263,11 +268,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Tax Settings",
           icon: <Settings className="w-4 h-4" />,
         },
-        {
-          path: "/tax-reports",
-          label: "Tax Reports",
-          icon: <List className="w-4 h-4" />,
-        },
+        
       ],
     },
     {
@@ -285,21 +286,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Journal Entries",
           icon: <Edit className="w-4 h-4" />,
         },
-        {
-          path: "/trial-balance",
-          label: "Trial Balance",
-          icon: <Scale className="w-4 h-4" />,
-        },
-        {
-          path: "/income-statement",
-          label: "Income Statement",
-          icon: <Receipt className="w-4 h-4" />,
-        },
-        {
-          path: "/balance-sheet",
-          label: "Balance Sheet",
-          icon: <FileSpreadsheet className="w-4 h-4" />,
-        },
+     
       ],
     },
     {
@@ -400,7 +387,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
             <div
               className={`overflow-hidden transition-all duration-300 ${
                 openDropdown === dropdown
-                  ? "max-h-60 opacity-100"
+                  ? "max-h-64 opacity-100"
                   : "max-h-0 opacity-0"
               }`}
             >
