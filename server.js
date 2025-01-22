@@ -1619,10 +1619,7 @@ app.post("/sales", async (req, res) => {
 
                   if (inventory.quantity_in_stock < quantity) {
                     errorOccurred = true;
-                    console.error(
-                      "Insufficient stock for product ID:",
-                      product_id
-                    );
+                    console.error("Insufficient stock for product ID:", product_id);
                     return rejectSale("Insufficient stock");
                   }
 
@@ -1708,6 +1705,20 @@ app.post("/sales", async (req, res) => {
                   }
                 }
               );
+
+              // Update the customer's total_sale_due for credit sales
+              if (payment_method === "credit") {
+                db.run(
+                  "UPDATE customers SET total_sale_due = total_sale_due + ? WHERE id = ?",
+                  [totalCartPrice, customer_id],
+                  (err) => {
+                    if (err) {
+                      errorOccurred = true;
+                      console.error("Error updating customer's total_sale_due: ", err.message);
+                    }
+                  }
+                );
+              }
             }
 
             // If any error occurred, rollback transaction
@@ -1757,7 +1768,6 @@ app.post("/sales", async (req, res) => {
     });
   }
 });
-
 
 // Get all sales
 app.get("/sales", (req, res) => {

@@ -156,14 +156,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
     const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
     return `REF ${uniqueNumber}`;
   };
-  const handleQuantityChange = (e, item, index) => {
-    const newQuantity = parseInt(e.target.value, 10);
-    if (newQuantity >= 1) {
-      const updatedCart = [...cart];
-      updatedCart[index].quantity = newQuantity;
-      setCart(updatedCart); // Update the cart with the new quantity
-    }
-  };
+
   const handleQuantityChangeNew = (e, item, index) => {
     const updatedQuantity = Math.min(Number(e.target.value), item.product.quantity_in_stock);
   

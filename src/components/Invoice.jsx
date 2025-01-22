@@ -150,10 +150,13 @@ function Invoice({
     let totalTax = 0;
     let totalDiscount = 0;
     const taxBreakdown = {};
+
     cart.forEach((item) => {
       const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
       const taxName =
         taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
+      const taxType =
+        taxRates.find((tax) => tax.id == item.tax)?.tax_type || "exclusive"; // Default to exclusive
 
       // Calculate item total before discount
       const itemActualTotal = item.sellingPrice * item.quantity;
@@ -166,13 +169,20 @@ function Invoice({
           : item.discountAmount;
       totalDiscount += discount;
 
-      // Calculate item total after discount
-      const itemTotal = itemActualTotal - discount;
-      subtotal += itemTotal;
+      let itemTotal = itemActualTotal - discount; // Default to exclusive tax scenario
+      let itemTax = 0;
 
-      // Calculate tax
-      const itemTax = (itemTotal * taxRate) / 100;
+      if (taxType === "exclusive") {
+        // Tax is added to the item total after discount
+        itemTax = (itemTotal * taxRate) / 100;
+      } else if (taxType === "inclusive") {
+        // Tax is included in the selling price, extract it
+        itemTax = itemTotal - itemTotal / (1 + taxRate / 100);
+        itemTotal -= itemTax; // Adjust item total to exclude tax
+      }
+
       totalTax += itemTax;
+      subtotal += itemTotal;
 
       // Add tax breakdown for each tax type
       if (taxBreakdown[taxName]) {
@@ -187,11 +197,12 @@ function Invoice({
       subtotal,
       totalDiscount,
       totalTax,
-      grandTotal: subtotal + totalTax,
+      grandTotal: subtotal + totalTax, // For inclusive taxes, `subtotal` already includes tax
       taxBreakdown,
     };
   };
 
+  // Use the updated function to calculate totals
   const {
     subtotal,
     actualSubtotal,
@@ -200,6 +211,7 @@ function Invoice({
     totalDiscount,
     taxBreakdown,
   } = calculateTotal();
+
   return (
     <div>
       {showInvoice && (
@@ -550,6 +562,7 @@ function Invoice({
                     </span>
                     <span>₵{actualSubtotal.toFixed(2)}</span>
                   </div>
+
                   {/* Discount */}
                   <div className="flex justify-between mt-2">
                     <span className="font-semibold text-gray-700">
@@ -561,11 +574,12 @@ function Invoice({
                   {/* Subtotal After Discount */}
                   <div className="flex justify-between mt-2">
                     <span className="font-semibold text-gray-700">
-                      Sub Total
+                      Sub Total:
                     </span>
                     <span>₵{subtotal.toFixed(2)}</span>
                   </div>
 
+                  {/* Taxes Breakdown */}
                   <div className="mt-2">
                     <h3 className="font-semibold text-gray-700">Taxes:</h3>
                     <ul className="mt-1 space-y-1">
@@ -583,6 +597,7 @@ function Invoice({
                     </ul>
                   </div>
 
+                  {/* Total Tax */}
                   <div className="flex justify-between mt-2">
                     <span className="font-semibold text-gray-700">
                       Total Tax:
@@ -590,12 +605,29 @@ function Invoice({
                     <span>₵{totalTax.toFixed(2)}</span>
                   </div>
 
+                  {/* Grand Total */}
                   <div className="flex justify-between mt-1 border-t pt-2">
                     <span className="font-semibold text-lg">Grand Total:</span>
                     <span className="text-xl font-bold">
                       ₵{grandTotal.toFixed(2)}
                     </span>
                   </div>
+
+                  {/* Note for Inclusive Tax */}
+                  {totalTax > 0 && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      <p>
+                        <em>
+                          Note: Taxes shown above are{" "}
+                          {Object.values(taxBreakdown).some(
+                            (amount) => amount > 0
+                          )
+                            ? "calculated based on the tax type (inclusive or exclusive) applied to the items."
+                            : "inclusive of the item prices where applicable."}
+                        </em>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {showDraft && (

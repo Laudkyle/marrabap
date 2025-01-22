@@ -569,15 +569,31 @@ BEGIN
     )
     WHERE account_code = '5000';
 
+
     -- Update the Tax account for the applied tax
     UPDATE chart_of_accounts
     SET balance = balance + (
         SELECT 
             CASE
                 WHEN t.tax_type = 'inclusive' THEN
-                    (NEW.total_price * t.tax_rate) / (1 + t.tax_rate)
+                    -- Inclusive tax: Tax is part of the selling price after discount
+                    (((NEW.selling_price * NEW.quantity) - 
+                      CASE 
+                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                          ELSE 0
+                      END) 
+                      * (t.tax_rate / 100)) 
+                      / (1 + (t.tax_rate / 100))
                 WHEN t.tax_type = 'exclusive' THEN
-                    NEW.total_price * t.tax_rate
+                    -- Exclusive tax: Tax is applied on the selling price after discount
+                    ((NEW.selling_price * NEW.quantity) - 
+                      CASE 
+                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                          ELSE 0
+                      END) 
+                      * (t.tax_rate / 100)
             END
         FROM taxes AS t
         WHERE t.id = NEW.tax
@@ -589,6 +605,46 @@ BEGIN
     );
 END;
 
+
+`)
+db.run(`CREATE TRIGGER update_chart_of_accounts_after_payment
+AFTER INSERT ON payments
+FOR EACH ROW
+BEGIN
+  -- Update the Cash/Bank Account based on payment method
+  UPDATE chart_of_accounts
+  SET balance = balance + NEW.amount_paid
+  WHERE account_code = CASE
+    WHEN NEW.payment_method = 'cash' THEN '1000' -- Cash account
+    WHEN NEW.payment_method = 'credit' THEN '1015' -- Bank Account
+    ELSE NULL
+  END;
+
+  -- Update Accounts Receivable (decrease the outstanding amount)
+  UPDATE chart_of_accounts
+  SET balance = balance - NEW.amount_paid
+  WHERE account_code = '1010'; -- Accounts Receivable account
+END;
+`)
+db.run(`CREATE TRIGGER update_invoice_status_and_customer_sale_due
+AFTER INSERT ON payments
+FOR EACH ROW
+BEGIN
+  -- Update the invoice status based on the amount paid
+  UPDATE invoices
+  SET amount_paid = amount_paid + NEW.amount_paid,
+      status = CASE
+        WHEN amount_paid + NEW.amount_paid >= total_amount THEN 'paid'
+        WHEN amount_paid + NEW.amount_paid > 0 THEN 'partial'
+        ELSE status
+      END
+  WHERE reference_number = NEW.reference_number;
+
+  -- Update the customer's total_sale_due after payment is made
+  UPDATE customers
+  SET total_sale_due = total_sale_due - NEW.amount_paid
+  WHERE id = (SELECT customer_id FROM invoices WHERE reference_number = NEW.reference_number);
+END;
 `)
 });
 
