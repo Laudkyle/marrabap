@@ -36,7 +36,7 @@ const IncomeStatement = () => {
   const { revenue, expenses, totalRevenue, totalExpenses, netIncome } = incomeStatementData;
 
   return (
-    <div className="max-w-4xl max-h-[calc(100vh-120px)] overflow-y-scroll mx-auto p-6 bg-white shadow rounded-md">
+    <div className="max-w-4xl max-h-[calc(100vh-100px)] overflow-y-scroll mx-auto p-6 bg-white shadow rounded-md">
       <h2 className="text-2xl font-bold mb-6">Income Statement</h2>
 
       {/* Revenue Section */}

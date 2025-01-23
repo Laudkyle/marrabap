@@ -158,8 +158,11 @@ function Shop({ companyName, companyAddress, email, phone }) {
   };
 
   const handleQuantityChangeNew = (e, item, index) => {
-    const updatedQuantity = Math.min(Number(e.target.value), item.product.quantity_in_stock);
-  
+    const updatedQuantity = Math.min(
+      Number(e.target.value),
+      item.product.quantity_in_stock
+    );
+
     setCart((prevCart) => {
       const updatedCart = [...prevCart];
       updatedCart[index] = {
@@ -175,7 +178,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       return updatedCart;
     });
   };
-  
+
   // Updated handleMakeSale function
   const handleMakeSale = async () => {
     try {
@@ -277,8 +280,8 @@ function Shop({ companyName, companyAddress, email, phone }) {
       <div className="sticky top-0 z-2 p-4 bg-gray-800 text-white">
         <div className="flex justify-end items-center">
           <div className="relative w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-              <FiSearch className="h-5 w-5" />
+            <span className="absolute top-1/3 transform -translate-y-1/2 text-gray-400">
+              <FiSearch className="h-6 w-6" />
             </span>
             <input
               type="text"
@@ -320,7 +323,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
           )}
         </div>
       </div>
-
       {/* Product Details Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">

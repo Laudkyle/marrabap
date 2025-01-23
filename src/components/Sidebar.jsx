@@ -210,17 +210,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/trial-balance",
           label: "Trial Balance",
           icon: <Scale className="w-4 h-4" />,
-        },
-        {
-          path: "/accounts-receivable",
-          label: "Accounts Receivable",
-          icon: <List className="w-4 h-4" />,
-        },
-        {
-          path: "/accounts-payable",
-          label: "Accounts Payable",
-          icon: <List className="w-4 h-4" />,
-        },   
+        }, 
         {
           path: "/tax-reports",
           label: "Tax Reports",

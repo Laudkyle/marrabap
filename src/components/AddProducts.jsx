@@ -107,7 +107,7 @@ const AddProducts = ({ onProductsAdded }) => {
   
 
   return (
-    <div className="max-w-4xl mx-auto mt-8 p-6 bg-white shadow-md rounded-lg">
+    <div className="max-w-4xl max-h-[calc(100vh-100px)] overflow-y-scroll mx-auto mt-8 p-6 bg-white shadow-md rounded-lg">
       <ToastContainer />
       <h2 className="text-2xl font-bold mb-4 text-gray-800">Add Products</h2>
       <form onSubmit={handleSubmit}>
