@@ -401,14 +401,16 @@ END;
   created_on TEXT DEFAULT CURRENT_TIMESTAMP -- Timestamp
 )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS taxes (
+db.run(`CREATE TABLE IF NOT EXISTS taxes (
   id INTEGER PRIMARY KEY,
   tax_name TEXT NOT NULL UNIQUE, -- Name of the tax
   tax_rate REAL NOT NULL CHECK(tax_rate >= 0), -- Tax rate
   tax_type TEXT CHECK(tax_type IN ('inclusive', 'exclusive')), -- How tax is applied
   account_id INTEGER NOT NULL, -- Linked to the chart of accounts
+  created_on TEXT DEFAULT CURRENT_TIMESTAMP, -- Timestamp when the tax is created
   FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
 );`);
+
 
   db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
   id INTEGER PRIMARY KEY,

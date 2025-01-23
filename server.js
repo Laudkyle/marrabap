@@ -3159,6 +3159,35 @@ app.get("/reports/balance-sheet", async (req, res) => {
     res.status(500).send("Failed to generate balance sheet.");
   }
 });
+app.get("/reports/trial-balance", (req, res) => {
+  try {
+    // Query to calculate total debits and credits for each account
+    const query = `
+      SELECT
+        c.account_name,
+        SUM(jel.debit) AS debit,
+        SUM(jel.credit) AS credit
+      FROM
+        journal_entry_lines jel
+      JOIN
+        chart_of_accounts c ON jel.account_id = c.id
+      GROUP BY
+        c.account_name
+    `;
+
+    db.all(query, [], (err, rows) => {
+      if (err) {
+        console.error("Error fetching trial balance:", err.message);
+        return res.status(500).send("Error fetching trial balance.");
+      }
+
+      res.json(rows);
+    });
+  } catch (error) {
+    console.error("Error generating trial balance:", error.message);
+    res.status(500).send("Failed to generate trial balance.");
+  }
+});
 
 // ===================== Server Initialization =====================
 app.listen(port, () => {
