@@ -566,27 +566,29 @@ BEGIN
         (SELECT last_insert_rowid()),  -- Last inserted journal entry
         (SELECT id FROM chart_of_accounts WHERE account_code = '4000'),  -- Sales Revenue Account
         0,  -- Debit
-        CASE
-            WHEN NEW.tax IS NULL THEN
-                NEW.selling_price * NEW.quantity  -- No tax, use simple total price
-            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
-                -- Exclusive tax: apply discount first and then calculate the sales revenue
-                (NEW.selling_price * NEW.quantity) - 
-                CASE 
-                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                    ELSE 0
-                END
-            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
-                -- Inclusive tax: reverse tax to get the net amount
-                ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
-                CASE 
-                    WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
-                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                    ELSE 0
-                END
-            ELSE 0
-        END  -- Credit
+        ROUND(
+            CASE
+                WHEN NEW.tax IS NULL THEN
+                    NEW.selling_price * NEW.quantity  -- No tax, use simple total price
+                WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
+                    -- Exclusive tax: apply discount first and then calculate the sales revenue
+                    (NEW.selling_price * NEW.quantity) - 
+                    CASE 
+                        WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                        WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                        ELSE 0
+                    END
+                WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
+                    -- Inclusive tax: reverse tax to get the net amount
+                    ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
+                    CASE 
+                        WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
+                        WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                        ELSE 0
+                    END
+                ELSE 0
+            END, 2  -- Credit (rounded to 2 decimal places)
+        )
     );
 
     -- Accounts Receivable (if credit sale)
@@ -594,32 +596,34 @@ BEGIN
     SELECT 
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),  -- Accounts Receivable Account
-        CASE
-            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
-                -- For exclusive tax, calculate the net amount (after discount and tax)
-                (NEW.selling_price * NEW.quantity) - 
-                CASE 
-                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                    ELSE 0
-                END + 
-                ((NEW.selling_price * NEW.quantity) - 
+        ROUND(
+            CASE
+                WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
+                    -- For exclusive tax, calculate the net amount (after discount and tax)
+                    (NEW.selling_price * NEW.quantity) - 
                     CASE 
                         WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
                         WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
                         ELSE 0
-                    END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)  -- Add exclusive tax
-            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
-                -- For inclusive tax, calculate the price excluding tax and apply discount
-                ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
-                CASE 
-                    WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
-                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                    ELSE 0
-                END
-            ELSE
-                NEW.total_price  -- For non-taxed items, just use the total price
-        END,
+                    END + 
+                    ((NEW.selling_price * NEW.quantity) - 
+                        CASE 
+                            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                            ELSE 0
+                        END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)  -- Add exclusive tax
+                WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
+                    -- For inclusive tax, calculate the price excluding tax and apply discount
+                    ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
+                    CASE 
+                        WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
+                        WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                        ELSE 0
+                    END
+                ELSE
+                    NEW.total_price  -- For non-taxed items, just use the total price
+            END, 2  -- Debit (rounded to 2 decimal places)
+        ),
         0  -- Credit
     WHERE NEW.payment_method = 'credit';
 
@@ -628,32 +632,34 @@ BEGIN
     SELECT 
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT id FROM chart_of_accounts WHERE account_code = '1015'),  -- Bank Account (for cash sales)
-        CASE
-            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
-                -- Exclusive tax: calculate the net amount (after discount and tax)
-                (NEW.selling_price * NEW.quantity) - 
-                CASE 
-                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                    ELSE 0
-                END + 
-                ((NEW.selling_price * NEW.quantity) - 
+        ROUND(
+            CASE
+                WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
+                    -- Exclusive tax: calculate the net amount (after discount and tax)
+                    (NEW.selling_price * NEW.quantity) - 
                     CASE 
                         WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
                         WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
                         ELSE 0
-                    END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)  -- Add exclusive tax
-            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
-                -- For inclusive tax, calculate the price excluding tax and apply discount
-                ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
-                CASE 
-                    WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
-                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                    ELSE 0
-                END
-            ELSE
-                NEW.total_price  -- For non-taxed items, just use the total price
-        END,
+                    END + 
+                    ((NEW.selling_price * NEW.quantity) - 
+                        CASE 
+                            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                            ELSE 0
+                        END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)  -- Add exclusive tax
+                WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
+                    -- For inclusive tax, calculate the price excluding tax and apply discount
+                    ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
+                    CASE 
+                        WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
+                        WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                        ELSE 0
+                    END
+                ELSE
+                    NEW.total_price  -- For non-taxed items, just use the total price
+            END, 2  -- Debit (rounded to 2 decimal places)
+        ),
         0  -- Credit
     WHERE NEW.payment_method = 'cash';
 
@@ -662,7 +668,7 @@ BEGIN
     VALUES (
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),  -- Cost of Goods Sold Account
-        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id),  -- Debit cost based on product
+        ROUND((SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id), 2),  -- Debit cost (rounded to 2 decimal places)
         0  -- Credit
     );
 
@@ -672,7 +678,7 @@ BEGIN
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),  -- Inventory Account
         0,  -- Debit
-        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id)  -- Credit inventory value
+        ROUND((SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id), 2)  -- Credit inventory value (rounded to 2 decimal places)
     );
 
     -- Tax Liability (debit or credit)
@@ -680,42 +686,46 @@ BEGIN
     SELECT 
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT account_id FROM taxes WHERE id = NEW.tax),  -- Tax Account
-        CASE
-            WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('asset', 'expense') THEN
-                -- Debit if tax account is asset or expense
-                CASE
-                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
-                        -- Exclusive tax: apply tax on discounted value
-                        ((NEW.selling_price * NEW.quantity) - 
-                            CASE 
-                                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                                ELSE 0
-                            END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
-                    ELSE
-                        0
-                END
-            ELSE
-                0
-        END AS debit,
-        CASE
-            WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('liability', 'income') THEN
-                -- Credit if tax account is liability or income
-                CASE
-                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
-                        -- Exclusive tax: apply tax on discounted value
-                        ((NEW.selling_price * NEW.quantity) - 
-                            CASE 
-                                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                                ELSE 0
-                            END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
-                    ELSE
-                        0
-                END
-            ELSE
-                0
-        END AS credit
+        ROUND(
+            CASE
+                WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('asset', 'expense') THEN
+                    -- Debit if tax account is asset or expense
+                    CASE
+                        WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                            -- Exclusive tax: apply tax on discounted value
+                            ((NEW.selling_price * NEW.quantity) - 
+                                CASE 
+                                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                                    ELSE 0
+                                END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
+                        ELSE
+                            0
+                    END
+                ELSE
+                    0
+            END, 2  -- Debit (rounded to 2 decimal places)
+        ) AS debit,
+        ROUND(
+            CASE
+                WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('liability', 'income') THEN
+                    -- Credit if tax account is liability or income
+                    CASE
+                        WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                            -- Exclusive tax: apply tax on discounted value
+                            ((NEW.selling_price * NEW.quantity) - 
+                                CASE 
+                                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                                    ELSE 0
+                                END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
+                        ELSE
+                            0
+                    END
+                ELSE
+                    0
+            END, 2  -- Credit (rounded to 2 decimal places)
+        ) AS credit
     WHERE NEW.tax IS NOT NULL;
 
     -- Discount Entries (debit)
@@ -723,11 +733,13 @@ BEGIN
     SELECT 
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT id FROM chart_of_accounts WHERE account_code = '6000'),  -- Discounts Account
-        CASE 
-            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-            ELSE 0
-        END AS debit,
+        ROUND(
+            CASE 
+                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                ELSE 0
+            END, 2  -- Debit (rounded to 2 decimal places)
+        ),
         0 AS credit
     WHERE NEW.discount_amount > 0;
 
@@ -737,11 +749,13 @@ BEGIN
         (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
         (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),  -- Accounts Receivable
         0,  -- Debit
-        CASE 
-            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-            ELSE 0
-        END AS credit
+        ROUND(
+            CASE 
+                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                ELSE 0
+            END, 2  -- Credit (rounded to 2 decimal places)
+        )
     WHERE NEW.discount_amount > 0;
 
 END;
