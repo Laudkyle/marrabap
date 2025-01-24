@@ -132,7 +132,6 @@ const TrialBalance = () => {
         </span>
       </div>
 
-      {/* Check if Trial Balance is Balanced */}
       <div className="mt-4">
         <span
           className={`text-lg font-bold ${
@@ -141,7 +140,7 @@ const TrialBalance = () => {
         >
           {Math.round(netBalance) === 0
             ? "Trial Balance is Balanced"
-            : "Trial Balance is Unbalanced"}
+            : `Trial Balance is Unbalanced: ${Math.round(netBalance)}`}
         </span>
       </div>
     </div>
