@@ -9,7 +9,9 @@ const OpeningBalances = () => {
   const [accounts, setAccounts] = useState([]);
   const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [editAccount, setEditAccount] = useState(null); // For editing account
-  const [modalOpen, setModalOpen] = useState(false); // Modal state
+  const [addAccount, setAddAccount] = useState({ account_name: "", account_type: "", balance: "" }); // For adding a new account
+  const [editModalOpen, setEditModalOpen] = useState(false); // Edit modal state
+  const [addModalOpen, setAddModalOpen] = useState(false); // Add modal state
   const [searchText, setSearchText] = useState(""); // Search text
   const accountTypes = ["asset", "liability", "equity", "revenue", "expense"];
 
@@ -46,13 +48,18 @@ const OpeningBalances = () => {
   // Open modal to edit an account
   const handleEdit = (account) => {
     setEditAccount(account);
-    setModalOpen(true);
+    setEditModalOpen(true);
   };
 
-  // Close modal
-  const handleCloseModal = () => {
+  // Close modals
+  const handleCloseEditModal = () => {
     setEditAccount(null);
-    setModalOpen(false);
+    setEditModalOpen(false);
+  };
+
+  const handleCloseAddModal = () => {
+    setAddAccount({ account_name: "", account_type: "", balance: "" });
+    setAddModalOpen(false);
   };
 
   // Update account balance
@@ -78,10 +85,37 @@ const OpeningBalances = () => {
         )
       );
       toast.success("Account updated successfully!");
-      handleCloseModal();
+      handleCloseEditModal();
     } catch (error) {
       console.error("Error updating account:", error);
       toast.error("Failed to update account.");
+    }
+  };
+
+  // Add a new account
+  const handleAddAccount = async (e) => {
+    e.preventDefault();
+    const { account_name, account_type, balance } = addAccount;
+
+    if (!account_name || !account_type || balance === "") {
+      toast.error("All fields are required.");
+      return;
+    }
+
+    try {
+      const response = await axios.post("http://localhost:5000/accounts", {
+        account_name,
+        account_type,
+        balance: parseFloat(balance),
+      });
+
+      setAccounts((prev) => [...prev, response.data]);
+      setFilteredAccounts((prev) => [...prev, response.data]);
+      toast.success("Account added successfully!");
+      handleCloseAddModal();
+    } catch (error) {
+      console.error("Error adding account:", error);
+      toast.error("Failed to add account.");
     }
   };
 
@@ -123,7 +157,22 @@ const OpeningBalances = () => {
     <div className="p-6 bg-white rounded shadow-md h-[calc(100vh-80px)] overflow-y-scroll">
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Manage Account Balances</h2>
 
-      {/* Data Table with Search Subheader */}
+      <div className="mb-4 flex justify-between items-center">
+        <button
+          onClick={() => setAddModalOpen(true)}
+          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+        >
+          Add Account
+        </button>
+        <input
+          type="text"
+          value={searchText}
+          onChange={handleSearch}
+          placeholder="Search by account name or type..."
+          className="border border-gray-300 rounded px-3 py-2 w-full max-w-md"
+        />
+      </div>
+
       <DataTable
         title="Current Account Balances"
         columns={columns}
@@ -131,20 +180,10 @@ const OpeningBalances = () => {
         pagination
         highlightOnHover
         responsive
-        subHeader
-        subHeaderComponent={
-          <input
-            type="text"
-            value={searchText}
-            onChange={handleSearch}
-            placeholder="Search by account name or type..."
-            className="border border-gray-300 rounded px-3 py-2 w-full max-w-md"
-          />
-        }
       />
 
       {/* Modal for editing account balance */}
-      {modalOpen && (
+      {editModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded shadow-lg w-full max-w-sm">
             <h3 className="text-lg font-bold mb-4">Edit Account Balance</h3>
@@ -156,7 +195,6 @@ const OpeningBalances = () => {
                 <input
                   type="text"
                   id="account_name"
-                  name="account_name"
                   value={editAccount.account_name}
                   disabled
                   className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
@@ -169,7 +207,6 @@ const OpeningBalances = () => {
                 <input
                   type="number"
                   id="account_balance"
-                  name="balance"
                   value={editAccount.balance}
                   onChange={(e) =>
                     setEditAccount({ ...editAccount, balance: e.target.value })
@@ -180,7 +217,7 @@ const OpeningBalances = () => {
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={handleCloseModal}
+                  onClick={handleCloseEditModal}
                   className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
                 >
                   Cancel
@@ -190,6 +227,80 @@ const OpeningBalances = () => {
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 >
                   Update
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for adding a new account */}
+      {addModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded shadow-lg w-full max-w-sm">
+            <h3 className="text-lg font-bold mb-4">Add New Account</h3>
+            <form onSubmit={handleAddAccount}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" htmlFor="account_name">
+                  Account Name
+                </label>
+                <input
+                  type="text"
+                  id="account_name"
+                  value={addAccount.account_name}
+                  onChange={(e) =>
+                    setAddAccount({ ...addAccount, account_name: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" htmlFor="account_type">
+                  Account Type
+                </label>
+                <select
+                  id="account_type"
+                  value={addAccount.account_type}
+                  onChange={(e) =>
+                    setAddAccount({ ...addAccount, account_type: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                >
+                  <option value="">Select Type</option>
+                  {accountTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" htmlFor="balance">
+                  Opening Balance
+                </label>
+                <input
+                  type="number"
+                  id="balance"
+                  value={addAccount.balance}
+                  onChange={(e) =>
+                    setAddAccount({ ...addAccount, balance: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseAddModal}
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                >
+                  Add
                 </button>
               </div>
             </form>

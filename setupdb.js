@@ -401,7 +401,7 @@ END;
   created_on TEXT DEFAULT CURRENT_TIMESTAMP -- Timestamp
 )`);
 
-db.run(`CREATE TABLE IF NOT EXISTS taxes (
+  db.run(`CREATE TABLE IF NOT EXISTS taxes (
   id INTEGER PRIMARY KEY,
   tax_name TEXT NOT NULL UNIQUE, -- Name of the tax
   tax_rate REAL NOT NULL CHECK(tax_rate >= 0), -- Tax rate
@@ -410,7 +410,6 @@ db.run(`CREATE TABLE IF NOT EXISTS taxes (
   created_on TEXT DEFAULT CURRENT_TIMESTAMP, -- Timestamp when the tax is created
   FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
 );`);
-
 
   db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
   id INTEGER PRIMARY KEY,
@@ -440,6 +439,7 @@ db.run(`CREATE TABLE IF NOT EXISTS taxes (
   debit REAL DEFAULT 0 CHECK(debit >= 0),
   credit REAL DEFAULT 0 CHECK(credit >= 0),
   FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id)
+
 )`);
   db.run(`CREATE TABLE IF NOT EXISTS audit_trails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -512,7 +512,6 @@ BEGIN
 END;
 
 `);
-  
 
   db.run(`CREATE TRIGGER after_purchase_order_insert
 AFTER INSERT ON purchase_orders
@@ -547,157 +546,207 @@ BEGIN
   -- No General Ledger Entry for Pending Purchase Order
 END;
 `);
-  db.run(`CREATE TRIGGER handle_sales_updates
+db.run(`CREATE TRIGGER handle_sales_updates
 AFTER INSERT ON sales
 FOR EACH ROW
 BEGIN
-    -- Create a new journal entry (you could customize the reference or description)
+    -- Create a new journal entry for the sale
     INSERT INTO journal_entries (reference_number, date, description, status)
     VALUES (
-        'SALE-' || NEW.id,  -- Custom reference number
+        'SALE-' || NEW.id,  -- Reference number
         CURRENT_DATE,       -- Sale date
         'Sale of product ' || NEW.product_id,  -- Description
-        'posted'           -- Status (or 'pending' if you want to post later)
+        'posted'           -- Status
     );
 
-    -- Sales Revenue (4000): Credit
+    -- Calculate the net sales revenue based on tax type
+    -- Sales Revenue (without tax)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     VALUES (
-        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
-        (SELECT id FROM chart_of_accounts WHERE account_code = '4000'),  -- Sales Revenue
+        (SELECT last_insert_rowid()),  -- Last inserted journal entry
+        (SELECT id FROM chart_of_accounts WHERE account_code = '4000'),  -- Sales Revenue Account
         0,  -- Debit
-        NEW.total_price  -- Credit
+        CASE
+            WHEN NEW.tax IS NULL THEN
+                NEW.selling_price * NEW.quantity  -- No tax, use simple total price
+            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
+                -- Exclusive tax: apply discount first and then calculate the sales revenue
+                (NEW.selling_price * NEW.quantity) - 
+                CASE 
+                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                    ELSE 0
+                END
+            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
+                -- Inclusive tax: reverse tax to get the net amount
+                ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
+                CASE 
+                    WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
+                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                    ELSE 0
+                END
+            ELSE 0
+        END  -- Credit
     );
 
-    -- Accounts Receivable (1010) if the sale is on credit: Debit
+    -- Accounts Receivable (if credit sale)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT 
-        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
-        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),  -- Accounts Receivable
-        NEW.total_price,  -- Debit
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),  -- Accounts Receivable Account
+        CASE
+            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
+                -- For exclusive tax, calculate the net amount (after discount and tax)
+                (NEW.selling_price * NEW.quantity) - 
+                CASE 
+                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                    ELSE 0
+                END + 
+                ((NEW.selling_price * NEW.quantity) - 
+                    CASE 
+                        WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                        WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                        ELSE 0
+                    END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)  -- Add exclusive tax
+            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
+                -- For inclusive tax, calculate the price excluding tax and apply discount
+                ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
+                CASE 
+                    WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
+                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                    ELSE 0
+                END
+            ELSE
+                NEW.total_price  -- For non-taxed items, just use the total price
+        END,
         0  -- Credit
     WHERE NEW.payment_method = 'credit';
 
-    -- Bank Account (1015) if it's a cash sale: Debit
+    -- Bank Account (if cash sale)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT 
-        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
-        (SELECT id FROM chart_of_accounts WHERE account_code = '1015'),  -- Bank Account (Cash Sale)
-        NEW.total_price,  -- Debit
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1015'),  -- Bank Account (for cash sales)
+        CASE
+            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'exclusive') THEN
+                -- Exclusive tax: calculate the net amount (after discount and tax)
+                (NEW.selling_price * NEW.quantity) - 
+                CASE 
+                    WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                    ELSE 0
+                END + 
+                ((NEW.selling_price * NEW.quantity) - 
+                    CASE 
+                        WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                        WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                        ELSE 0
+                    END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)  -- Add exclusive tax
+            WHEN EXISTS (SELECT 1 FROM taxes WHERE id = NEW.tax AND tax_type = 'inclusive') THEN
+                -- For inclusive tax, calculate the price excluding tax and apply discount
+                ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) - 
+                CASE 
+                    WHEN NEW.discount_type = 'percentage' THEN ((NEW.selling_price * NEW.quantity) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))) * NEW.discount_amount / 100
+                    WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                    ELSE 0
+                END
+            ELSE
+                NEW.total_price  -- For non-taxed items, just use the total price
+        END,
         0  -- Credit
     WHERE NEW.payment_method = 'cash';
 
-    -- Cost of Goods Sold (5000): Debit
+    -- Cost of Goods Sold (debit)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     VALUES (
-        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
-        (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),  -- Cost of Goods Sold
-        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id),  -- Debit
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),  -- Cost of Goods Sold Account
+        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id),  -- Debit cost based on product
         0  -- Credit
     );
 
-    -- Inventory (1020): Credit (decrease inventory)
+    -- Inventory (credit - for decrease in stock)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     VALUES (
-        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
-        (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),  -- Inventory
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),  -- Inventory Account
         0,  -- Debit
-        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id)  -- Credit
+        (SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id)  -- Credit inventory value
     );
 
-    -- Tax (if applicable): Debit or Credit based on tax type
+    -- Tax Liability (debit or credit)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT 
-        (SELECT last_insert_rowid()),  -- Get the ID of the last inserted journal entry
-        (SELECT account_id FROM taxes WHERE id = NEW.tax),  -- Tax Account (link via tax)
-        (SELECT 
-            CASE
-                WHEN t.tax_type = 'inclusive' THEN
-                    (((NEW.selling_price * NEW.quantity) - 
-                      CASE 
-                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                          ELSE 0
-                      END) 
-                      * (t.tax_rate / 100)) 
-                      / (1 + (t.tax_rate / 100))
-                WHEN t.tax_type = 'exclusive' THEN
-                    ((NEW.selling_price * NEW.quantity) - 
-                      CASE 
-                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                          ELSE 0
-                      END) 
-                      * (t.tax_rate / 100)
-            END
-        FROM taxes AS t
-        WHERE t.id = NEW.tax),  -- Debit (tax amount)
-        0  -- Credit
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT account_id FROM taxes WHERE id = NEW.tax),  -- Tax Account
+        CASE
+            WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('asset', 'expense') THEN
+                -- Debit if tax account is asset or expense
+                CASE
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                        -- Exclusive tax: apply tax on discounted value
+                        ((NEW.selling_price * NEW.quantity) - 
+                            CASE 
+                                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                                ELSE 0
+                            END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
+                    ELSE
+                        0
+                END
+            ELSE
+                0
+        END AS debit,
+        CASE
+            WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('liability', 'income') THEN
+                -- Credit if tax account is liability or income
+                CASE
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                        -- Exclusive tax: apply tax on discounted value
+                        ((NEW.selling_price * NEW.quantity) - 
+                            CASE 
+                                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+                                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                                ELSE 0
+                            END) * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
+                    ELSE
+                        0
+                END
+            ELSE
+                0
+        END AS credit
     WHERE NEW.tax IS NOT NULL;
-     -- Update the Sales Revenue account (4000)
-    UPDATE chart_of_accounts
-    SET balance = balance + NEW.total_price
-    WHERE account_code = '4000'; -- Assuming '4000' is the account code for Sales Revenue
 
-    -- Update the Accounts Receivable account (1010) if the sale is on credit
-    UPDATE chart_of_accounts
-    SET balance = balance + NEW.total_price
-    WHERE account_code = '1010' AND NEW.payment_method = 'credit';
+    -- Discount Entries (debit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '6000'),  -- Discounts Account
+        CASE 
+            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+            ELSE 0
+        END AS debit,
+        0 AS credit
+    WHERE NEW.discount_amount > 0;
 
-    -- Update the Inventory account (1020) to reflect reduced stock
-    UPDATE chart_of_accounts
-    SET balance = balance - (
-        SELECT cost_per_unit * NEW.quantity
-        FROM inventory
-        WHERE inventory.product_id = NEW.product_id
-    )
-    WHERE account_code = '1020';
+    -- Credit the Accounts Receivable for the discount amount (adjustment)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),  -- Accounts Receivable
+        0,  -- Debit
+        CASE 
+            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
+            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+            ELSE 0
+        END AS credit
+    WHERE NEW.discount_amount > 0;
 
-    -- Update the Cost of Goods Sold account (5000) to reflect the cost of sold goods
-    UPDATE chart_of_accounts
-    SET balance = balance + (
-        SELECT cost_per_unit * NEW.quantity
-        FROM inventory
-        WHERE inventory.product_id = NEW.product_id
-    )
-    WHERE account_code = '5000';
-
-
-    -- Update the Tax account for the applied tax
-    UPDATE chart_of_accounts
-    SET balance = balance + (
-        SELECT 
-            CASE
-                WHEN t.tax_type = 'inclusive' THEN
-                    -- Inclusive tax: Tax is part of the selling price after discount
-                    (((NEW.selling_price * NEW.quantity) - 
-                      CASE 
-                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                          ELSE 0
-                      END) 
-                      * (t.tax_rate / 100)) 
-                      / (1 + (t.tax_rate / 100))
-                WHEN t.tax_type = 'exclusive' THEN
-                    -- Exclusive tax: Tax is applied on the selling price after discount
-                    ((NEW.selling_price * NEW.quantity) - 
-                      CASE 
-                          WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.quantity * NEW.discount_amount / 100)
-                          WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                          ELSE 0
-                      END) 
-                      * (t.tax_rate / 100)
-            END
-        FROM taxes AS t
-        WHERE t.id = NEW.tax
-    )
-    WHERE id = (
-        SELECT t.account_id
-        FROM taxes AS t
-        WHERE t.id = NEW.tax
-    );
 END;
-`);
+
+`)
 
   db.run(`CREATE TRIGGER update_chart_of_accounts_after_payment
 AFTER INSERT ON payments
@@ -752,7 +801,7 @@ END;
     
   );
 `);
-db.run(`
+  db.run(`
 CREATE TRIGGER supplier_payment_journal_entry
 AFTER INSERT ON supplier_payments
 FOR EACH ROW
@@ -780,11 +829,11 @@ BEGIN
   VALUES (
     (SELECT last_insert_rowid()),  -- Get the last inserted journal entry id
     (SELECT id FROM chart_of_accounts WHERE account_code = CASE
-      WHEN NEW.payment_method = 'cash' THEN '1000'  -- Cash (1000)
+      WHEN NEW.payment_method = 'Cash' THEN '1000'  -- Cash (1000)
       ELSE '1015'  -- Bank (1015)
     END),
-    NEW.amount_paid,               -- Debit the Cash/Bank
-    0                              -- No credit here
+    0,                              -- Debit the Cash/Bank
+    NEW.amount_paid                 -- No credit here
   );
 
   -- Update Accounts Payable balance (decrease)
@@ -796,7 +845,7 @@ BEGIN
   UPDATE chart_of_accounts
   SET balance = balance - NEW.amount_paid
   WHERE account_code = CASE
-    WHEN NEW.payment_method = 'cash' THEN '1000'
+    WHEN NEW.payment_method = 'Cash' THEN '1000'
     ELSE '1015'
   END;
 
@@ -835,6 +884,12 @@ END;
 });
 db.run(`INSERT INTO taxes (tax_name, tax_rate, tax_type, account_id)
 VALUES ('No Tax', 0, 'exclusive', (SELECT id FROM chart_of_accounts WHERE account_code = '2010'));
+`);
+db.run(`INSERT INTO taxes (tax_name, tax_rate, tax_type, account_id)
+VALUES ('NHIL', 3.2, 'exclusive', (SELECT id FROM chart_of_accounts WHERE account_code = '2010'));
+`);
+db.run(`INSERT INTO taxes (tax_name, tax_rate, tax_type, account_id)
+VALUES ('VAT', 1.5, 'inclusive', (SELECT id FROM chart_of_accounts WHERE account_code = '2010'));
 `);
 // Close the database connection
 db.close((err) => {

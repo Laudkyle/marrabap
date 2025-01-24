@@ -202,11 +202,6 @@ const Sidebar = ({ isExpanded, companyName }) => {
           icon: <FileSpreadsheet className="w-4 h-4" />,
         },
         {
-          path: "/cash-flow",
-          label: "Cash Flow Statement",
-          icon: <Coins className="w-4 h-4" />,
-        },
-        {
           path: "/trial-balance",
           label: "Trial Balance",
           icon: <Scale className="w-4 h-4" />,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ChevronRight, ChevronDown, Printer, Download, RefreshCw,Menu } from "lucide-react";
-
+import { formatCurrency } from "../utils/helpers";
 const BalanceSheet = () => {
   const [balanceSheetData, setBalanceSheetData] = useState({
     currentAssets: [],
@@ -53,12 +53,7 @@ const BalanceSheet = () => {
     }));
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+ 
   const totals = {
     totalAssets: calculateTotal(balanceSheetData.currentAssets) + calculateTotal(balanceSheetData.nonCurrentAssets),
     totalLiabilities: calculateTotal(balanceSheetData.currentLiabilities) + calculateTotal(balanceSheetData.nonCurrentLiabilities),
