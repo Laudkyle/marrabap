@@ -19,7 +19,7 @@ const OpeningBalances = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/accounts");
+        const response = await axios.get("http://localhost:5000/chart-of-accounts");
         setAccounts(response.data);
         setFilteredAccounts(response.data); // Initialize filtered accounts
       } catch (error) {

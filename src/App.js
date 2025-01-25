@@ -34,6 +34,9 @@ import IncomeStatement from "./components/IncomeStatement";
 import BalanceSheet from "./components/BalanceSheet";
 import TrailBalance from "./components/TrailBalance";
 import TaxReport from "./components/TaxReport";
+import ExpenseComponent from "./components/Expense";
+
+
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor";
@@ -104,6 +107,7 @@ const App = () => {
             <Route path="/tax-settings" element={<TaxSettings />} />
             <Route path="/tax-reports" element={<TaxReport />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/expense" element={<ExpenseComponent />} />
             <Route path="/income-statement" element={<IncomeStatement />} />
             <Route path="/balance-sheet" element={<BalanceSheet />} />
             <Route path="/trial-balance" element={<TrailBalance />} />

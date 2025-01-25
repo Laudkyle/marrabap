@@ -3120,6 +3120,313 @@ app.delete('/taxes/:id', (req, res) => {
   );
 });
 
+/// ==================== CREATE EXPENSE ====================
+app.post("/expenses", (req, res) => {
+  const {
+    expense_date,
+    amount,
+    expense_account_id,
+    description,
+    payment_method_id,
+    payment_method,
+  } = req.body;
+
+  // Step 1: Create a journal entry for the expense
+  const reference_number = `EXP${Date.now()}`;
+  const date = expense_date;
+  const journal_entry_description = description || "Expense entry";
+
+  db.run(
+    `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+    [reference_number, date, journal_entry_description],
+    function (err) {
+      if (err) {
+        console.error("Error creating journal entry:", err.message);
+        return res.status(500).send("Error creating journal entry");
+      }
+
+      const journal_entry_id = this.lastID;
+
+      // Step 2: Create journal entry lines
+      // Debit the expense account
+      db.run(
+        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+        [journal_entry_id, expense_account_id, amount, 0],
+        function (err) {
+          if (err) {
+            console.error("Error creating journal entry line:", err.message);
+            return res.status(500).send("Error creating journal entry line");
+          }
+
+          // Step 3: Handle credit based on payment method
+          if (payment_method === "credit") {
+            // Credit "Accounts Payable" for credit expenses
+            const accountsPayableId = 5; // Replace with the actual account ID for "Accounts Payable"
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+              [journal_entry_id, accountsPayableId, 0, amount],
+              function (err) {
+                if (err) {
+                  console.error(
+                    "Error creating Accounts Payable journal entry line:",
+                    err.message
+                  );
+                  return res
+                    .status(500)
+                    .send("Error creating Accounts Payable journal entry line");
+                }
+
+                // Create the expense record
+                createExpenseRecord(
+                  expense_date,
+                  amount,
+                  expense_account_id,
+                  description,
+                  journal_entry_id,
+                  res
+                );
+              }
+            );
+          } else {
+            // Credit the selected payment method for non-credit expenses
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+              [journal_entry_id, payment_method_id, 0, amount],
+              function (err) {
+                if (err) {
+                  console.error(
+                    "Error creating payment method journal entry line:",
+                    err.message
+                  );
+                  return res
+                    .status(500)
+                    .send("Error creating payment method journal entry line");
+                }
+
+                // Create the expense record
+                createExpenseRecord(
+                  expense_date,
+                  amount,
+                  expense_account_id,
+                  description,
+                  journal_entry_id,
+                  res
+                );
+              }
+            );
+          }
+        }
+      );
+    }
+  );
+});
+
+// Function to create the expense record
+function createExpenseRecord(
+  expense_date,
+  amount,
+  expense_account_id,
+  description,
+  journal_entry_id,
+  res
+) {
+  db.run(
+    `INSERT INTO expenses (expense_date, amount, expense_account_id, description, journal_entry_id) VALUES (?, ?, ?, ?, ?)`,
+    [expense_date, amount, expense_account_id, description, journal_entry_id],
+    function (err) {
+      if (err) {
+        console.error("Error creating expense:", err.message);
+        return res.status(500).send("Error creating expense");
+      }
+
+      res.status(201).json({
+        message: "Expense created successfully",
+        expense_id: this.lastID,
+      });
+    }
+  );
+}
+
+// ==================== READ EXPENSES ====================
+app.get("/expenses", (req, res) => {
+  const query = `SELECT * FROM expenses`;
+  
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error("Error fetching expenses:", err.message);
+      return res.status(500).send("Error fetching expenses");
+    }
+
+    res.json(rows);
+  });
+});
+
+// ==================== READ SINGLE EXPENSE ====================
+app.get("/expenses/:id", (req, res) => {
+  const { id } = req.params;
+  const query = `SELECT * FROM expenses WHERE id = ?`;
+
+  db.get(query, [id], (err, row) => {
+    if (err) {
+      console.error("Error fetching expense:", err.message);
+      return res.status(500).send("Error fetching expense");
+    }
+
+    if (!row) {
+      return res.status(404).send("Expense not found");
+    }
+
+    res.json(row);
+  });
+});
+
+// ==================== UPDATE EXPENSE ====================
+app.put("/expenses/:id", (req, res) => {
+  const { id } = req.params;
+  const { expense_date, amount, expense_account_id, payment_method, description } = req.body;
+
+  // Step 1: Update the journal entry for the expense
+  const query = `UPDATE journal_entries SET date = ?, description = ? WHERE id = (SELECT journal_entry_id FROM expenses WHERE id = ?)`;
+
+  db.run(query, [expense_date, description, id], function (err) {
+    if (err) {
+      console.error("Error updating journal entry:", err.message);
+      return res.status(500).send("Error updating journal entry");
+    }
+
+    // Step 2: Update the expense record
+    const updateExpenseQuery = `
+      UPDATE expenses 
+      SET expense_date = ?, amount = ?, expense_account_id = ?, payment_method = ?, description = ?
+      WHERE id = ?
+    `;
+
+    db.run(updateExpenseQuery, [expense_date, amount, expense_account_id, payment_method, description, id], function (err) {
+      if (err) {
+        console.error("Error updating expense:", err.message);
+        return res.status(500).send("Error updating expense");
+      }
+
+      res.status(200).json({ message: "Expense updated successfully" });
+    });
+  });
+});
+
+app.patch("/expenses/payment/:id", (req, res) => {
+  const { id } = req.params;
+  const { payment_method_id, amount } = req.body;
+
+  // Step 1: Update the journal entry's status to "posted"
+  const updateJournalStatusQuery = `
+    UPDATE journal_entries 
+    SET status = 'posted' 
+    WHERE id = (SELECT journal_entry_id FROM expenses WHERE id = ?)
+  `;
+
+  db.run(updateJournalStatusQuery, [id], function (err) {
+    if (err) {
+      console.error("Error updating journal status:", err.message);
+      return res.status(500).send("Error updating journal status");
+    }
+
+    // Step 2: Insert debit and credit lines for the payment
+    // 2.1: Get the expense details (expense account id, payment method account id)
+    const getExpenseDetailsQuery = `
+      SELECT expense_account_id, payment_method FROM expenses WHERE id = ?
+    `;
+
+    db.get(getExpenseDetailsQuery, [id], (err, row) => {
+      if (err) {
+        console.error("Error fetching expense details:", err.message);
+        return res.status(500).send("Error fetching expense details");
+      }
+
+      const { expense_account_id, payment_method } = row;
+
+      // Step 2.2: Create the debit and credit journal entries for the payment
+      const insertDebitQuery = `
+        INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+        VALUES ((SELECT journal_entry_id FROM expenses WHERE id = ?), ?, ?, 0)
+      `;
+      
+      const insertCreditQuery = `
+        INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+        VALUES ((SELECT journal_entry_id FROM expenses WHERE id = ?), ?, 0, ?)
+      `;
+
+      // Debit the expense account
+      db.run(insertDebitQuery, [id, expense_account_id, amount], function (err) {
+        if (err) {
+          console.error("Error inserting debit journal line:", err.message);
+          return res.status(500).send("Error inserting debit journal line");
+        }
+
+        // Credit the payment method account
+        db.run(insertCreditQuery, [id, payment_method, amount], function (err) {
+          if (err) {
+            console.error("Error inserting credit journal line:", err.message);
+            return res.status(500).send("Error inserting credit journal line");
+          }
+
+          res.status(200).json({ message: "Payment recorded successfully and journal updated" });
+        });
+      });
+    });
+  });
+});
+
+// ==================== DELETE EXPENSE ====================
+app.delete("/expenses/:id", (req, res) => {
+  const { id } = req.params;
+
+  // Step 1: Get the journal entry ID for the expense
+  const getJournalEntryIdQuery = `SELECT journal_entry_id FROM expenses WHERE id = ?`;
+
+  db.get(getJournalEntryIdQuery, [id], (err, row) => {
+    if (err) {
+      console.error("Error fetching journal entry ID:", err.message);
+      return res.status(500).send("Error fetching journal entry ID");
+    }
+
+    if (!row) {
+      return res.status(404).send("Expense not found");
+    }
+
+    const journal_entry_id = row.journal_entry_id;
+
+    // Step 2: Delete the journal entry lines
+    const deleteJournalEntryLinesQuery = `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`;
+
+    db.run(deleteJournalEntryLinesQuery, [journal_entry_id], (err) => {
+      if (err) {
+        console.error("Error deleting journal entry lines:", err.message);
+        return res.status(500).send("Error deleting journal entry lines");
+      }
+
+      // Step 3: Delete the journal entry itself
+      const deleteJournalEntryQuery = `DELETE FROM journal_entries WHERE id = ?`;
+
+      db.run(deleteJournalEntryQuery, [journal_entry_id], (err) => {
+        if (err) {
+          console.error("Error deleting journal entry:", err.message);
+          return res.status(500).send("Error deleting journal entry");
+        }
+
+        // Step 4: Delete the expense record
+        const deleteExpenseQuery = `DELETE FROM expenses WHERE id = ?`;
+
+        db.run(deleteExpenseQuery, [id], (err) => {
+          if (err) {
+            console.error("Error deleting expense:", err.message);
+            return res.status(500).send("Error deleting expense");
+          }
+
+          res.status(200).json({ message: "Expense deleted successfully" });
+        });
+      });
+    });
+  });
+});
 
 // ===================== income statement =====================
 app.get("/reports/income-statement", (req, res) => {
@@ -3291,6 +3598,53 @@ app.get("/reports/trial-balance", (req, res) => {
   } catch (error) {
     console.error("Error generating trial balance:", error.message);
     res.status(500).send("Failed to generate trial balance.");
+  }
+});
+
+
+// API endpoint to fetch chart of accounts with balances
+app.get("/chart-of-accounts", (req, res) => {
+  try {
+    const query = `
+      SELECT coa.id, coa.account_name, coa.account_code, coa.account_type, 
+             SUM(jel.debit) AS total_debit, SUM(jel.credit) AS total_credit
+      FROM chart_of_accounts coa
+      LEFT JOIN journal_entry_lines jel ON coa.id = jel.account_id
+      GROUP BY coa.id
+    `;
+
+    db.all(query, [], (err, accounts) => {
+      if (err) {
+        console.error("Error fetching chart of accounts with balances:", err.message);
+        return res.status(500).send("Error fetching chart of accounts.");
+      }
+
+      // Adjust balance calculation based on account type
+      const accountsWithBalances = accounts.map((account) => {
+        let balance = 0;
+
+        // Adjust balance calculation based on account type
+        switch (account.account_type) {
+          case 'asset':
+          case 'expense':
+            balance = account.total_debit - account.total_credit;
+            break;
+          case 'liability':
+          case 'income':
+            balance = account.total_credit - account.total_debit;
+            break;
+          default:
+            balance = 0;
+        }
+
+        return { ...account, balance };
+      });
+
+      res.json(accountsWithBalances);
+    });
+  } catch (error) {
+    console.error("Error fetching chart of accounts with balances:", error.message);
+    res.status(500).send("Failed to fetch chart of accounts.");
   }
 });
 

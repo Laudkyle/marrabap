@@ -10,13 +10,12 @@ const AccountBalances = () => {
   const [editAccount, setEditAccount] = useState(null); // For editing account
   const [modalOpen, setModalOpen] = useState(false); // Modal state
   const [searchText, setSearchText] = useState(""); // Search text
-  const accountTypes = ["asset", "liability", "equity", "revenue", "expense"];
 
   // Fetch accounts from the backend
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/accounts");
+        const response = await axios.get("http://localhost:5000/chart-of-accounts");
         setAccounts(response.data);
         setFilteredAccounts(response.data); // Initialize filtered accounts
       } catch (error) {
@@ -128,59 +127,7 @@ const AccountBalances = () => {
         }
       />
 
-      {/* Modal for editing account balance */}
-      {modalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded shadow-lg w-full max-w-sm">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Edit Account Balance</h3>
-            <form onSubmit={handleUpdateAccount}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="account_name">
-                  Account Name
-                </label>
-                <input
-                  type="text"
-                  id="account_name"
-                  name="account_name"
-                  value={editAccount.account_name}
-                  disabled
-                  className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="account_balance">
-                  Balance
-                </label>
-                <input
-                  type="number"
-                  id="account_balance"
-                  name="balance"
-                  value={editAccount.balance}
-                  onChange={(e) =>
-                    setEditAccount({ ...editAccount, balance: e.target.value })
-                  }
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  Update
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };

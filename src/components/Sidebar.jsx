@@ -157,14 +157,9 @@ const Sidebar = ({ isExpanded, companyName }) => {
       dropdown: "expenses",
       links: [
         {
-          path: "/add-expense",
-          label: "Add Expense",
-          icon: <PlusCircle className="w-4 h-4" />,
-        },
-        {
-          path: "/list-expenses",
-          label: "List Expenses",
-          icon: <List className="w-4 h-4" />,
+          path: "/expense",
+          label: "Expenses",
+          icon: <Calculator className="w-4 h-4" />,
         },
       ],
     },
@@ -180,7 +175,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
         },
         {
           path: "/account-balances",
-          label: "Account Balances",
+          label: "Chart of Accounts",
           icon: <BookOpen className="w-4 h-4" />, // Adjust icon as needed
         },
       ],
@@ -253,24 +248,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
         
       ],
     },
-    {
-      name: "Accounting",
-      icon: <BookOpen className="w-4 h-4" />,
-      dropdown: "accounting",
-      links: [
-        {
-          path: "/chart-of-accounts",
-          label: "Chart of Accounts",
-          icon: <List className="w-4 h-4" />,
-        },
-        {
-          path: "/journal-entries",
-          label: "Journal Entries",
-          icon: <Edit className="w-4 h-4" />,
-        },
-     
-      ],
-    },
+   
     {
       name: "Settings",
       icon: <Settings className="w-4 h-4" />,
