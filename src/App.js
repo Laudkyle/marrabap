@@ -55,7 +55,10 @@ const App = () => {
           <ToastContainer />
           <Header isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Dashboard />}  companyName={companyName}
+                  email={email}
+                  phone={phone}
+                  companyAddress={companyAddress}/>
             <Route
               path="/pos"
               element={

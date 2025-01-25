@@ -34,7 +34,7 @@ ChartJS.register(
   ArcElement
 );
 
-const Dashboard = () => {
+const Dashboard = ({companyName}) => {
   // Filter out-of-stock products
   const [salesData, setSalesData] = useState([]);
   const [productData, setProductData] = useState([]);
@@ -114,7 +114,7 @@ const Dashboard = () => {
   return (
     <div className="h-[85vh] overflow-scroll bg-gray-100 p-8">
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        Marrabap Ventures
+        {companyName}
       </h1>
       <div>
         <div className="grid grid-cols-3 grid-rows-2 gap-6 mb-12">
