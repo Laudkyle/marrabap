@@ -39,10 +39,10 @@ import ExpenseComponent from "./components/Expense";
 
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
-  const companyName = "Essential Anchor";
-  const companyAddress = "123 Business St, City, Country";
-  const email = "support@company.com";
-  const phone = "(123) 456-7890";
+  const companyName = "Essential Anchor Limited";
+  const companyAddress = "P.O.Box:CS 9083 Comm. 7 Tema - Ghana";
+  const email = "essentialanchorltd@gmail.com";
+  const phone = "233 (0)20 694 5430, 233(0)24 929 2160";
   return (
     <Router>
       <div className="flex">

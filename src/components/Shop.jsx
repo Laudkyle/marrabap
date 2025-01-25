@@ -506,6 +506,10 @@ function Shop({ companyName, companyAddress, email, phone }) {
         setNewDocument={setDocuments}
         showClearCart={showClearCart}
         setShowClearCart={setShowClearCart}
+        companyName={companyName}
+        email={email}
+        phone={phone}
+        companyAddress={companyAddress}
       />
 
       <style jsx>
