@@ -7,8 +7,6 @@ import "react-toastify/dist/ReactToastify.css";
 const AccountBalances = () => {
   const [accounts, setAccounts] = useState([]);
   const [filteredAccounts, setFilteredAccounts] = useState([]);
-  const [editAccount, setEditAccount] = useState(null); // For editing account
-  const [modalOpen, setModalOpen] = useState(false); // Modal state
   const [searchText, setSearchText] = useState(""); // Search text
 
   // Fetch accounts from the backend
@@ -16,8 +14,12 @@ const AccountBalances = () => {
     const fetchAccounts = async () => {
       try {
         const response = await axios.get("http://localhost:5000/chart-of-accounts");
-        setAccounts(response.data);
-        setFilteredAccounts(response.data); // Initialize filtered accounts
+        const data = response.data.map((account) => ({
+          ...account,
+          balance: account.balance || 0, // Ensure balance has a default value
+        }));
+        setAccounts(data);
+        setFilteredAccounts(data); // Initialize filtered accounts
       } catch (error) {
         console.error("Error fetching accounts:", error);
         toast.error("Failed to fetch accounts.");
@@ -41,48 +43,6 @@ const AccountBalances = () => {
     setFilteredAccounts(filtered);
   };
 
-  // Open modal to edit an account
-  const handleEdit = (account) => {
-    setEditAccount(account);
-    setModalOpen(true);
-  };
-
-  // Close modal
-  const handleCloseModal = () => {
-    setEditAccount(null);
-    setModalOpen(false);
-  };
-
-  // Update account balance
-  const handleUpdateAccount = async (e) => {
-    e.preventDefault();
-    if (!editAccount || editAccount.balance === "") {
-      toast.error("Please provide a valid balance.");
-      return;
-    }
-
-    try {
-      await axios.put(`http://localhost:5000/accounts/${editAccount.id}`, {
-        balance: parseFloat(editAccount.balance),
-      });
-      setAccounts((prev) =>
-        prev.map((acc) =>
-          acc.id === editAccount.id ? { ...acc, balance: parseFloat(editAccount.balance) } : acc
-        )
-      );
-      setFilteredAccounts((prev) =>
-        prev.map((acc) =>
-          acc.id === editAccount.id ? { ...acc, balance: parseFloat(editAccount.balance) } : acc
-        )
-      );
-      toast.success("Account updated successfully!");
-      handleCloseModal();
-    } catch (error) {
-      console.error("Error updating account:", error);
-      toast.error("Failed to update account.");
-    }
-  };
-
   // Columns for React Data Table
   const columns = [
     {
@@ -97,17 +57,15 @@ const AccountBalances = () => {
     },
     {
       name: "Balance",
-      selector: (row) => row.balance.toFixed(2) || 0,
+      selector: (row) => parseFloat(row.balance).toFixed(2),
       sortable: true,
       right: true,
     },
-   
   ];
 
   return (
     <div className="p-6 bg-white rounded shadow-md h-[calc(100vh-80px)] overflow-y-scroll">
-
-      {/* Data Table with Search Subheader */}
+      {/* Data Table with Search */}
       <DataTable
         title="Current Account Balances"
         columns={columns}
@@ -126,8 +84,6 @@ const AccountBalances = () => {
           />
         }
       />
-
-      
     </div>
   );
 };

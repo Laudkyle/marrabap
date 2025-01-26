@@ -12,12 +12,26 @@ const IncomeStatement = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [date, setDate] = useState(""); // State for the selected date
+
+  // Set today's date as the default value
+  useEffect(() => {
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0]; // Get date in 'YYYY-MM-DD' format
+    setDate(formattedDate); // Set today's date as default
+  }, []);
 
   useEffect(() => {
     const fetchIncomeStatement = async () => {
+      if (!date) return; // Do not fetch if date is not set
+
       try {
         setLoading(true);
-        const response = await axios.get("http://localhost:5000/reports/income-statement");
+        console.log("Fetching income statement for date:", date); // Log the date being fetched
+        const response = await axios.get("http://localhost:5000/reports/income-statement", {
+          params: { date },
+        });
+        console.log("Received response:", response.data); // Log the response data
         setIncomeStatementData(response.data);
       } catch (err) {
         setError("Failed to load income statement data.");
@@ -28,16 +42,31 @@ const IncomeStatement = () => {
     };
 
     fetchIncomeStatement();
-  }, []);
+  }, [date]); // Fetch data when the date changes
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
 
   const { revenue, expenses, totalRevenue, totalExpenses, netIncome } = incomeStatementData;
 
+  if (!date) {
+    return <p>Please select a date to generate the income statement.</p>;
+  }
+
   return (
     <div className="max-w-4xl max-h-[calc(100vh-100px)] overflow-y-scroll mx-auto p-6 bg-white shadow rounded-md">
       <h2 className="text-2xl font-bold mb-6">Income Statement</h2>
+
+      {/* Date Picker */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold">Select Date</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)} // Update the date state
+          className="mt-2 p-2 border border-gray-300 rounded"
+        />
+      </div>
 
       {/* Revenue Section */}
       <div className="mb-8">

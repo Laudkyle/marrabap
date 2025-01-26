@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { ChevronRight, ChevronDown, Printer, Download, RefreshCw,Menu } from "lucide-react";
+import { ChevronRight, ChevronDown, Printer, Download, RefreshCw, Menu } from "lucide-react";
 import { formatCurrency } from "../utils/helpers";
+
 const BalanceSheet = () => {
   const [balanceSheetData, setBalanceSheetData] = useState({
     currentAssets: [],
@@ -18,11 +19,12 @@ const BalanceSheet = () => {
     nonCurrentLiabilities: true,
     equity: true,
   });
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]); // Default to today's date
 
   useEffect(() => {
     const fetchBalanceSheetData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/reports/balance-sheet");
+        const response = await fetch(`http://localhost:5000/reports/balance-sheet?date=${selectedDate}`);
         const data = await response.json();
         setBalanceSheetData({
           currentAssets: Array.isArray(data.currentAssets) ? data.currentAssets : [],
@@ -39,7 +41,7 @@ const BalanceSheet = () => {
     };
 
     fetchBalanceSheetData();
-  }, []);
+  }, [selectedDate]); // Fetch data whenever the selected date changes
 
   const calculateTotal = (data) => {
     if (!Array.isArray(data)) return 0;
@@ -53,12 +55,13 @@ const BalanceSheet = () => {
     }));
   };
 
- 
+  // Calculate totals
   const totals = {
     totalAssets: calculateTotal(balanceSheetData.currentAssets) + calculateTotal(balanceSheetData.nonCurrentAssets),
     totalLiabilities: calculateTotal(balanceSheetData.currentLiabilities) + calculateTotal(balanceSheetData.nonCurrentLiabilities),
     totalEquity: calculateTotal(balanceSheetData.equity),
   };
+
   const renderSection = (title, data, sectionKey, indent = false) => {
     const total = calculateTotal(data);
     return (
@@ -83,6 +86,10 @@ const BalanceSheet = () => {
         ))}
       </div>
     );
+  };
+
+  const handleDateChange = (e) => {
+    setSelectedDate(e.target.value);
   };
 
   if (loading) {
@@ -116,16 +123,19 @@ const BalanceSheet = () => {
           <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 md:mb-8 space-y-4 md:space-y-0">
             <div>
               <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Balance Sheet</h2>
-              <p className="text-sm md:text-md text-gray-600 mt-1">As of {new Date().toLocaleDateString()}</p>
+              <p className="text-sm md:text-md text-gray-600 mt-1">As of {selectedDate}</p>
             </div>
-            
-            {/* Mobile Menu Button */}
-            <div className="md:hidden">
-              <button className="p-2 rounded-md border border-gray-300">
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
+
+            {/* Date Picker */}
+            <div className="flex items-center space-x-2">
+              <input 
+                type="date"
+                value={selectedDate}
+                onChange={handleDateChange}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-700"
+              />
             </div>
-            
+
             {/* Action Buttons */}
             <div className="flex gap-2 md:gap-4">
               <button className="flex-1 md:flex-none inline-flex items-center justify-center px-3 md:px-5 py-2 md:py-3 bg-gray-100 text-xs md:text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">

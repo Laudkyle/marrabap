@@ -9,25 +9,28 @@ const OpeningBalances = () => {
   const [accounts, setAccounts] = useState([]);
   const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [editAccount, setEditAccount] = useState(null); // For editing account
-  const [addAccount, setAddAccount] = useState({ account_name: "", account_type: "", balance: "" }); // For adding a new account
+  const [addAccount, setAddAccount] = useState({
+    account_name: "",
+    account_type: "",
+    balance: "",
+    parent_account_id: "",
+  }); // For adding a new account
   const [editModalOpen, setEditModalOpen] = useState(false); // Edit modal state
   const [addModalOpen, setAddModalOpen] = useState(false); // Add modal state
   const [searchText, setSearchText] = useState(""); // Search text
   const accountTypes = ["asset", "liability", "equity", "revenue", "expense"];
-
+  const fetchAccounts = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/accounts");
+      setAccounts(response.data);
+      setFilteredAccounts(response.data); // Initialize filtered accounts
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      toast.error("Failed to fetch accounts.");
+    }
+  };
   // Fetch accounts from the backend
   useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        const response = await axios.get("http://localhost:5000/chart-of-accounts");
-        setAccounts(response.data);
-        setFilteredAccounts(response.data); // Initialize filtered accounts
-      } catch (error) {
-        console.error("Error fetching accounts:", error);
-        toast.error("Failed to fetch accounts.");
-      }
-    };
-
     fetchAccounts();
   }, []);
 
@@ -55,10 +58,16 @@ const OpeningBalances = () => {
   const handleCloseEditModal = () => {
     setEditAccount(null);
     setEditModalOpen(false);
+    fetchAccounts();
   };
 
   const handleCloseAddModal = () => {
-    setAddAccount({ account_name: "", account_type: "", balance: "" });
+    setAddAccount({
+      account_name: "",
+      account_type: "",
+      balance: "",
+      parent_account_id: "",
+    });
     setAddModalOpen(false);
   };
 
@@ -73,15 +82,16 @@ const OpeningBalances = () => {
     try {
       await axios.put(`http://localhost:5000/accounts/${editAccount.id}`, {
         balance: parseFloat(editAccount.balance),
+        parent_account_id: editAccount.parent_account_id || null,
       });
       setAccounts((prev) =>
         prev.map((acc) =>
-          acc.id === editAccount.id ? { ...acc, balance: parseFloat(editAccount.balance) } : acc
+          acc.id === editAccount.id ? { ...acc, ...editAccount } : acc
         )
       );
       setFilteredAccounts((prev) =>
         prev.map((acc) =>
-          acc.id === editAccount.id ? { ...acc, balance: parseFloat(editAccount.balance) } : acc
+          acc.id === editAccount.id ? { ...acc, ...editAccount } : acc
         )
       );
       toast.success("Account updated successfully!");
@@ -95,7 +105,8 @@ const OpeningBalances = () => {
   // Add a new account
   const handleAddAccount = async (e) => {
     e.preventDefault();
-    const { account_name, account_type, balance } = addAccount;
+    const { account_name, account_type, balance, parent_account_id } =
+      addAccount;
 
     if (!account_name || !account_type || balance === "") {
       toast.error("All fields are required.");
@@ -107,6 +118,7 @@ const OpeningBalances = () => {
         account_name,
         account_type,
         balance: parseFloat(balance),
+        parent_account_id: parent_account_id || null,
       });
 
       setAccounts((prev) => [...prev, response.data]);
@@ -138,6 +150,13 @@ const OpeningBalances = () => {
       right: true,
     },
     {
+      name: "Parent Account",
+      selector: (row) =>
+        accounts.find((acc) => acc.id === row.parent_account_id)
+          ?.account_name || "None",
+      sortable: true,
+    },
+    {
       name: "Actions",
       cell: (row) => (
         <button
@@ -155,7 +174,9 @@ const OpeningBalances = () => {
 
   return (
     <div className="p-6 bg-white rounded shadow-md h-[calc(100vh-80px)] overflow-y-scroll">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Manage Account Balances</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        Manage Account Balances
+      </h2>
 
       <div className="mb-4 flex justify-between items-center">
         <button
@@ -182,14 +203,17 @@ const OpeningBalances = () => {
         responsive
       />
 
-      {/* Modal for editing account balance */}
+      {/* Modal for editing account */}
       {editModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded shadow-lg w-full max-w-sm">
-            <h3 className="text-lg font-bold mb-4">Edit Account Balance</h3>
+            <h3 className="text-lg font-bold mb-4">Edit Account</h3>
             <form onSubmit={handleUpdateAccount}>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="account_name">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="account_name"
+                >
                   Account Name
                 </label>
                 <input
@@ -201,7 +225,10 @@ const OpeningBalances = () => {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="account_balance">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="account_balance"
+                >
                   Balance
                 </label>
                 <input
@@ -213,6 +240,32 @@ const OpeningBalances = () => {
                   }
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
+              </div>
+              <div className="mb-4">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="parent_account"
+                >
+                  Parent Account
+                </label>
+                <select
+                  id="parent_account"
+                  value={editAccount.parent_account_id || ""}
+                  onChange={(e) =>
+                    setEditAccount({
+                      ...editAccount,
+                      parent_account_id: e.target.value,
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                >
+                  <option value="">None</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.account_name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex justify-end gap-2">
                 <button
@@ -241,7 +294,10 @@ const OpeningBalances = () => {
             <h3 className="text-lg font-bold mb-4">Add New Account</h3>
             <form onSubmit={handleAddAccount}>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="account_name">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="account_name"
+                >
                   Account Name
                 </label>
                 <input
@@ -249,20 +305,29 @@ const OpeningBalances = () => {
                   id="account_name"
                   value={addAccount.account_name}
                   onChange={(e) =>
-                    setAddAccount({ ...addAccount, account_name: e.target.value })
+                    setAddAccount({
+                      ...addAccount,
+                      account_name: e.target.value,
+                    })
                   }
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="account_type">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="account_type"
+                >
                   Account Type
                 </label>
                 <select
                   id="account_type"
                   value={addAccount.account_type}
                   onChange={(e) =>
-                    setAddAccount({ ...addAccount, account_type: e.target.value })
+                    setAddAccount({
+                      ...addAccount,
+                      account_type: e.target.value,
+                    })
                   }
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
@@ -275,7 +340,10 @@ const OpeningBalances = () => {
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" htmlFor="balance">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="balance"
+                >
                   Opening Balance
                 </label>
                 <input
@@ -287,6 +355,32 @@ const OpeningBalances = () => {
                   }
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
+              </div>
+              <div className="mb-4">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="parent_account"
+                >
+                  Parent Account
+                </label>
+                <select
+                  id="parent_account"
+                  value={addAccount.parent_account_id || ""}
+                  onChange={(e) =>
+                    setAddAccount({
+                      ...addAccount,
+                      parent_account_id: e.target.value,
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                >
+                  <option value="">None</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.account_name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex justify-end gap-2">
                 <button

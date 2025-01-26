@@ -121,6 +121,7 @@ db.serialize(() => {
     account_name TEXT NOT NULL, -- Name of the account
     account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
     balance FLOAT DEFAULT 0,
+    is_current BOOLEAN DEFAULT 1,
     parent_account_id INTEGER, -- For hierarchical accounts
     FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
   )`);

@@ -4,6 +4,7 @@ import { formatCurrency } from "../utils/helpers"; // Utility to format currency
 
 const TrialBalance = () => {
   const [trialBalanceData, setTrialBalanceData] = useState([]);
+  const [expandedParents, setExpandedParents] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState("detailed"); // 'detailed' or 'net' mode
@@ -27,15 +28,56 @@ const TrialBalance = () => {
     fetchTrialBalance();
   }, []);
 
+  const toggleParent = (parentId) => {
+    setExpandedParents((prev) => ({
+      ...prev,
+      [parentId]: !prev[parentId],
+    }));
+  };
+
   if (loading) return <p>Loading...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
 
+  // Separate parent and child accounts
+  const groupedAccounts = trialBalanceData.reduce((acc, account) => {
+    if (account.parent_account_id) {
+      if (!acc[account.parent_account_id]) acc[account.parent_account_id] = [];
+      acc[account.parent_account_id].push(account);
+    } else {
+      acc[account.id] = acc[account.id] || [];
+    }
+    return acc;
+  }, {});
+
+  // Calculate aggregated balances for parent accounts
+  const getParentAggregatedBalances = (parentId) => {
+    const children = groupedAccounts[parentId] || [];
+    if (children.length === 0) {
+      // If no children, return the parent's actual balance
+      const parent = trialBalanceData.find((acc) => acc.id === parseInt(parentId));
+      return {
+        totalDebit: parent?.debit || 0,
+        totalCredit: parent?.credit || 0,
+      };
+    }
+
+    const totalDebit = children.reduce(
+      (total, child) => total + (child.debit || 0),
+      0
+    );
+    const totalCredit = children.reduce(
+      (total, child) => total + (child.credit || 0),
+      0
+    );
+    return { totalDebit, totalCredit };
+  };
+
   const totalDebit = trialBalanceData.reduce(
-    (total, entry) => total + entry.debit,
+    (total, entry) => total + (entry.debit || 0),
     0
   );
   const totalCredit = trialBalanceData.reduce(
-    (total, entry) => total + entry.credit,
+    (total, entry) => total + (entry.credit || 0),
     0
   );
   const netBalance = totalDebit - totalCredit;
@@ -45,9 +87,9 @@ const TrialBalance = () => {
       <h2 className="text-2xl font-bold mb-6">Trial Balance</h2>
 
       {/* View Mode Toggle */}
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2">
         <button
-          className={`px-4 py-2 mr-2 ${
+          className={`px-4 py-2 ${
             viewMode === "detailed" ? "bg-blue-500 text-white" : "bg-gray-200"
           }`}
           onClick={() => setViewMode("detailed")}
@@ -80,26 +122,80 @@ const TrialBalance = () => {
           </tr>
         </thead>
         <tbody>
-          {trialBalanceData.length > 0 ? (
-            trialBalanceData.map((entry) => (
-              <tr key={entry.account_name} className="border-b">
-                <td className="px-4 py-2">{entry.account_name}</td>
-                {viewMode === "detailed" ? (
-                  <>
-                    <td className="px-4 py-2 text-right">
-                      {formatCurrency(entry.debit)}
+          {Object.keys(groupedAccounts).length > 0 ? (
+            Object.keys(groupedAccounts).map((parentId) => {
+              const parentAccount = trialBalanceData.find(
+                (acc) => acc.id === parseInt(parentId)
+              );
+
+              if (!parentAccount) {
+                console.warn(
+                  `Parent account with ID ${parentId} not found in trialBalanceData.`
+                );
+                return null; // Skip if the parent account doesn't exist
+              }
+
+              const childAccounts = groupedAccounts[parentId];
+              const aggregatedBalances = getParentAggregatedBalances(parentId);
+
+              return (
+                <React.Fragment key={parentId}>
+                  {/* Parent Row */}
+                  <tr
+                    className="cursor-pointer bg-gray-100"
+                    onClick={() => toggleParent(parentId)}
+                  >
+                    <td className="px-4 py-2">
+                      <span>
+                        {expandedParents[parentId] ? "▼" : "▶"}{" "}
+                        {parentAccount.account_name}
+                      </span>
                     </td>
-                    <td className="px-4 py-2 text-right">
-                      {formatCurrency(entry.credit)}
-                    </td>
-                  </>
-                ) : (
-                  <td className="px-4 py-2 text-right">
-                    {formatCurrency(Math.abs(entry.debit - entry.credit))}
-                  </td>
-                )}
-              </tr>
-            ))
+                    {viewMode === "detailed" ? (
+                      <>
+                        <td className="px-4 py-2 text-right">
+                          {formatCurrency(aggregatedBalances.totalDebit)}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {formatCurrency(aggregatedBalances.totalCredit)}
+                        </td>
+                      </>
+                    ) : (
+                      <td className="px-4 py-2 text-right">
+                        {formatCurrency(
+                          aggregatedBalances.totalDebit -
+                            aggregatedBalances.totalCredit
+                        )}
+                      </td>
+                    )}
+                  </tr>
+
+                  {/* Child Rows */}
+                  {expandedParents[parentId] &&
+                    childAccounts.map((child) => (
+                      <tr key={child.account_name} className="border-b">
+                        <td className="px-4 py-2 pl-8">{child.account_name}</td>
+                        {viewMode === "detailed" ? (
+                          <>
+                            <td className="px-4 py-2 text-right">
+                              {formatCurrency(child.debit || 0)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {formatCurrency(child.credit || 0)}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="px-4 py-2 text-right">
+                            {formatCurrency(
+                              (child.debit || 0) - (child.credit || 0)
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                </React.Fragment>
+              );
+            })
           ) : (
             <tr>
               <td colSpan="3" className="text-center py-4">
@@ -110,28 +206,34 @@ const TrialBalance = () => {
         </tbody>
       </table>
 
-      {/* Total Debit, Credit or Net Balance */}
-      <div className="flex justify-between mt-6 font-bold text-lg">
-        <span>
-          {viewMode === "detailed" ? "Total Debit" : "Net Debit (Credit)"}
-        </span>
-        <span>
-          {formatCurrency(
-            viewMode === "detailed" ? totalDebit : Math.abs(netBalance)
-          )}
-        </span>
-      </div>
-      <div className="flex justify-between mt-2 font-bold text-lg">
-        <span>
-          {viewMode === "detailed" ? "Total Credit" : "Net Credit (Debit)"}
-        </span>
-        <span>
-          {formatCurrency(
-            viewMode === "detailed" ? totalCredit : Math.abs(netBalance)
-          )}
-        </span>
+      {/* Totals */}
+      <div className="mt-6 font-bold text-lg">
+        {viewMode === "detailed" ? (
+          <>
+            <div className="flex justify-between">
+              <span>Total Debit</span>
+              <span>{formatCurrency(totalDebit)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Credit</span>
+              <span>{formatCurrency(totalCredit)}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-between">
+            <span>Net Balance</span>
+            <span
+              className={`${
+                netBalance === 0 ? "text-green-500" : "text-red-500"
+              }`}
+            >
+              {formatCurrency(netBalance)}
+            </span>
+          </div>
+        )}
       </div>
 
+      {/* Trial Balance Status */}
       <div className="mt-4">
         <span
           className={`text-lg font-bold ${
@@ -140,7 +242,7 @@ const TrialBalance = () => {
         >
           {Math.round(netBalance) === 0
             ? "Trial Balance is Balanced"
-            : `Trial Balance is Unbalanced: ${Math.round(netBalance)}`}
+            : `Trial Balance is Unbalanced: ${formatCurrency(netBalance)}`}
         </span>
       </div>
     </div>

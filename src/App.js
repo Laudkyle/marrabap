@@ -40,7 +40,7 @@ import ExpenseComponent from "./components/Expense";
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor Limited";
-  const companyAddress = "P.O.Box:CS 9083 Comm. 7 Tema - Ghana";
+  const companyAddress = "P.O.Box: CS 9083 Comm. 7 Tema - Ghana";
   const email = "essentialanchorltd@gmail.com";
   const phone = "233 (0)20 694 5430, 233(0)24 929 2160";
   return (
@@ -55,10 +55,10 @@ const App = () => {
           <ToastContainer />
           <Header isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
           <Routes>
-            <Route path="/" element={<Dashboard />}  companyName={companyName}
+            <Route path="/" element={<Dashboard companyName={companyName}
                   email={email}
                   phone={phone}
-                  companyAddress={companyAddress}/>
+                  companyAddress={companyAddress} />}  />
             <Route
               path="/pos"
               element={

@@ -977,13 +977,12 @@ app.get("/accounts", (req, res) => {
   });
 });
 app.post("/accounts", (req, res) => {
-  const { account_name, account_type, balance } = req.body;
+  const { account_name, account_type, balance, parent_account_id } = req.body;
 
   if (!account_name || !account_type) {
     return res.status(400).json({ error: "Account name and type are required." });
   }
 
-  // Get the next account code by finding the highest existing code and incrementing
   const query = `SELECT MAX(CAST(account_code AS INTEGER)) as max_code FROM chart_of_accounts WHERE account_type = ?`;
 
   db.get(query, [account_type], (err, row) => {
@@ -992,18 +991,17 @@ app.post("/accounts", (req, res) => {
       return res.status(500).json({ error: "Failed to calculate account code." });
     }
 
-    // Generate the next account code
     const maxCode = row?.max_code || 0;
     const nextCode = maxCode + 1;
 
-    // Insert the new account
     const insertQuery = `
-      INSERT INTO chart_of_accounts (account_code, account_name, account_type, balance)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO chart_of_accounts (account_code, account_name, account_type, balance, parent_account_id)
+      VALUES (?, ?, ?, ?, ?)
     `;
+
     db.run(
       insertQuery,
-      [nextCode.toString(), account_name, account_type, balance || 0],
+      [nextCode.toString(), account_name, account_type, balance || 0, parent_account_id || null],
       function (err) {
         if (err) {
           console.error(err);
@@ -1012,13 +1010,11 @@ app.post("/accounts", (req, res) => {
 
         const newAccountId = this.lastID;
 
-        // If the opening balance is greater than 0, log a journal entry
         if (balance > 0) {
-          const referenceNumber = `OB-${Date.now()}`; // Unique reference number
-          const date = new Date().toISOString().split("T")[0]; // Current date
+          const referenceNumber = `OB-${Date.now()}`;
+          const date = new Date().toISOString().split("T")[0];
           const description = `Opening balance for ${account_name}`;
 
-          // Insert into journal_entries
           const journalEntryQuery = `
             INSERT INTO journal_entries (reference_number, date, description, status)
             VALUES (?, ?, ?, 'posted')
@@ -1031,14 +1027,11 @@ app.post("/accounts", (req, res) => {
             }
 
             const journalEntryId = this.lastID;
-
-            // Insert into journal_entry_lines
             const journalLineQuery = `
               INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
               VALUES (?, ?, ?, ?)
             `;
 
-            // Determine if balance should be a debit or credit based on account type
             const isDebit = ["asset", "expense"].includes(account_type.toLowerCase());
             const debit = isDebit ? balance : 0;
             const credit = isDebit ? 0 : balance;
@@ -1049,31 +1042,30 @@ app.post("/accounts", (req, res) => {
                 return res.status(500).json({ error: "Failed to log journal entry line." });
               }
 
-              // Respond with the new account
               res.status(201).json({
                 id: newAccountId,
                 account_code: nextCode.toString(),
                 account_name,
                 account_type,
                 balance: balance || 0,
+                parent_account_id: parent_account_id || null,
               });
             });
           });
         } else {
-          // If no opening balance, just return the new account
           res.status(201).json({
             id: newAccountId,
             account_code: nextCode.toString(),
             account_name,
             account_type,
             balance: balance || 0,
+            parent_account_id: parent_account_id || null,
           });
         }
       }
     );
   });
 });
-
 
 // Delete an account
 app.delete("/accounts/:id", (req, res) => {
@@ -1090,7 +1082,7 @@ app.delete("/accounts/:id", (req, res) => {
 
 app.put("/accounts/:id", (req, res) => {
   const { id } = req.params;
-  const { account_name, account_type, balance } = req.body;
+  const { account_name, account_type, balance, parent_account_id } = req.body;
 
   // Prepare the update fields dynamically
   const updates = [];
@@ -1104,6 +1096,11 @@ app.put("/accounts/:id", (req, res) => {
   if (account_type !== undefined) {
     updates.push("account_type = ?");
     params.push(account_type);
+  }
+
+  if (parent_account_id !== undefined) {
+    updates.push("parent_account_id = ?");
+    params.push(parent_account_id);
   }
 
   if (balance !== undefined) {
@@ -1134,7 +1131,7 @@ app.put("/accounts/:id", (req, res) => {
         return res.status(500).json({ error: "Failed to update account." });
       }
 
-      // If balance is updated, create a journal entry
+      // If balance is updated, create a journal entry and propagate changes
       if (balance !== undefined && balance !== originalBalance) {
         const journalEntry = {
           reference_number: `OPENBAL-${id}-${Date.now()}`,
@@ -1143,7 +1140,6 @@ app.put("/accounts/:id", (req, res) => {
           status: "posted",
         };
 
-        // Determine whether the entry is a debit or credit based on account type
         const debit = (["asset", "expense"].includes(account.account_type) && balance > 0) ? balance : 0;
         const credit = (["liability", "equity", "revenue"].includes(account.account_type) && balance > 0) ? balance : 0;
 
@@ -1160,13 +1156,8 @@ app.put("/accounts/:id", (req, res) => {
             const journalEntryId = this.lastID;
 
             // Insert the journal entry line
-            const journalLineQuery = `
-              INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-              VALUES (?, ?, ?, ?)
-            `;
-
             db.run(
-              journalLineQuery,
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
               [journalEntryId, id, debit, credit],
               (err) => {
                 if (err) {
@@ -1174,30 +1165,91 @@ app.put("/accounts/:id", (req, res) => {
                   return res.status(500).json({ error: "Failed to log journal entry line." });
                 }
 
-                // Return the updated account details
-                res.json({
-                  id,
-                  ...(account_name !== undefined && { account_name }),
-                  ...(account_type !== undefined && { account_type }),
-                  ...(balance !== undefined && { balance }),
-                  journal_entry: journalEntry,
+                // Update parent balances if applicable
+                updateParentBalance(account.parent_account_id, (err) => {
+                  if (err) {
+                    console.error("Failed to update parent account balance:", err);
+                    return res.status(500).json({ error: "Failed to update parent account balance." });
+                  }
+
+                  // Return the updated account details
+                  res.json({
+                    id,
+                    ...(account_name !== undefined && { account_name }),
+                    ...(account_type !== undefined && { account_type }),
+                    ...(balance !== undefined && { balance }),
+                    journal_entry: journalEntry,
+                  });
                 });
               }
             );
           }
         );
       } else {
-        // Return the updated account details if no balance update
-        res.json({
-          id,
-          ...(account_name !== undefined && { account_name }),
-          ...(account_type !== undefined && { account_type }),
-          ...(balance !== undefined && { balance }),
-        });
+        // If no balance update, handle parent updates directly
+        if (parent_account_id !== undefined) {
+          updateParentBalance(parent_account_id, (err) => {
+            if (err) {
+              console.error("Failed to update parent account balance:", err);
+              return res.status(500).json({ error: "Failed to update parent account balance." });
+            }
+            res.json({
+              id,
+              ...(account_name !== undefined && { account_name }),
+              ...(account_type !== undefined && { account_type }),
+              ...(balance !== undefined && { balance }),
+            });
+          });
+        } else {
+          res.json({
+            id,
+            ...(account_name !== undefined && { account_name }),
+            ...(account_type !== undefined && { account_type }),
+            ...(balance !== undefined && { balance }),
+          });
+        }
       }
     });
   });
 });
+
+// Recursive function to update parent account balances
+const updateParentBalance = (parentId, callback) => {
+  if (!parentId) return callback(null); // If no parent, stop here
+
+  db.all(
+    "SELECT SUM(balance) AS total_balance FROM chart_of_accounts WHERE parent_account_id = ?",
+    [parentId],
+    (err, result) => {
+      if (err) return callback(err);
+
+      const totalBalance = result[0]?.total_balance || 0;
+
+      db.run(
+        "UPDATE chart_of_accounts SET balance = ? WHERE id = ?",
+        [totalBalance, parentId],
+        (err) => {
+          if (err) return callback(err);
+
+          // Check if the parent itself has a parent and recursively update
+          db.get(
+            "SELECT parent_account_id FROM chart_of_accounts WHERE id = ?",
+            [parentId],
+            (err, parent) => {
+              if (err) return callback(err);
+
+              if (parent?.parent_account_id) {
+                updateParentBalance(parent.parent_account_id, callback);
+              } else {
+                callback(null); // No more parents to update
+              }
+            }
+          );
+        }
+      );
+    }
+  );
+};
 
 
 // ===================== Draft Endpoints =====================
@@ -3430,31 +3482,47 @@ app.delete("/expenses/:id", (req, res) => {
 
 // ===================== income statement =====================
 app.get("/reports/income-statement", (req, res) => {
+  const { date } = req.query; // Get date from query parameter
+
+  if (!date) {
+    return res.status(400).send("Date is required.");
+  }
+
   try {
-    // Query for revenue accounts
+    // Query for revenue accounts with the selected date
     const revenueQuery = `
       SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
-      FROM journal_entry_lines jel
+      FROM journal_entries je
+      INNER JOIN journal_entry_lines jel ON je.id = jel.journal_entry_id
       INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
       WHERE coa.account_type = 'revenue'
+      AND je.date <= ?  -- Filter based on the date
       GROUP BY coa.account_name
     `;
 
-    // Query for expense accounts
+    // Query for expense accounts with the selected date
     const expenseQuery = `
       SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
-      FROM journal_entry_lines jel
+      FROM journal_entries je
+      INNER JOIN journal_entry_lines jel ON je.id = jel.journal_entry_id
       INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
       WHERE coa.account_type = 'expense'
+      AND je.date <= ?  -- Filter based on the date
       GROUP BY coa.account_name
     `;
 
     // Run both queries
-    db.all(revenueQuery, [], (err, revenue) => {
-      if (err) throw err;
+    db.all(revenueQuery, [date], (err, revenue) => {
+      if (err) {
+        console.error("Error fetching revenue data:", err);
+        return res.status(500).send("Failed to fetch revenue data.");
+      }
 
-      db.all(expenseQuery, [], (err, expenses) => {
-        if (err) throw err;
+      db.all(expenseQuery, [date], (err, expenses) => {
+        if (err) {
+          console.error("Error fetching expense data:", err);
+          return res.status(500).send("Failed to fetch expense data.");
+        }
 
         // Calculate totals
         const totalRevenue = revenue.reduce((sum, item) => sum + item.amount, 0);
@@ -3476,82 +3544,143 @@ app.get("/reports/income-statement", (req, res) => {
     res.status(500).send("Failed to generate income statement.");
   }
 });
+
 app.get("/reports/balance-sheet", async (req, res) => {
+  const { date } = req.query;  // Extract the date from the query parameters
+
+  // Validate the date
+  if (!date) {
+    return res.status(400).send("Date is required.");
+  }
+
+  // Convert the date to a format suitable for SQL query (assuming the date is in 'YYYY-MM-DD' format)
+  const dateFormatted = new Date(date).toISOString().split('T')[0]; // Format as 'YYYY-MM-DD'
+
   try {
-    // Define queries
+    // Define queries with date filters using journal_entry.date
     const queries = {
       currentAssetsQuery: `
         SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
-        WHERE coa.account_type = 'asset'
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'asset' AND coa.is_current = TRUE
+        AND je.date <= ?
         GROUP BY coa.account_name
       `,
       nonCurrentAssetsQuery: `
         SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
-        WHERE coa.account_type = 'asset'
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'asset' AND coa.is_current = FALSE
+        AND je.date <= ?
         GROUP BY coa.account_name
       `,
       currentLiabilitiesQuery: `
         SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
-        WHERE coa.account_type = 'liability'
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'liability' AND coa.is_current = TRUE
+        AND je.date <= ?
         GROUP BY coa.account_name
       `,
       nonCurrentLiabilitiesQuery: `
         SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
-        WHERE coa.account_type = 'liability'
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'liability' AND coa.is_current = FALSE
+        AND je.date <= ?
         GROUP BY coa.account_name
       `,
       equityQuery: `
         SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
-        WHERE coa.account_type = 'equity'
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'equity' AND coa.is_current = TRUE
+        AND je.date <= ?
+        GROUP BY coa.account_name
+      `,
+      revenueQuery: `
+        SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'revenue' 
+        AND je.date <= ?
+        GROUP BY coa.account_name
+      `,
+      expenseQuery: `
+        SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
+        FROM journal_entry_lines jel
+        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+        WHERE coa.account_type = 'expense' 
+        AND je.date <= ?
         GROUP BY coa.account_name
       `,
     };
 
-    // Prepare statements for each query
+    // Prepare statements for each query, passing the date
     const currentAssetsStmt = db.prepare(queries.currentAssetsQuery);
     const nonCurrentAssetsStmt = db.prepare(queries.nonCurrentAssetsQuery);
     const currentLiabilitiesStmt = db.prepare(queries.currentLiabilitiesQuery);
     const nonCurrentLiabilitiesStmt = db.prepare(queries.nonCurrentLiabilitiesQuery);
     const equityStmt = db.prepare(queries.equityQuery);
+    const revenueStmt = db.prepare(queries.revenueQuery);
+    const expenseStmt = db.prepare(queries.expenseQuery);
 
     // Run queries in parallel using stmt.all()
-    const [currentAssets, nonCurrentAssets, currentLiabilities, nonCurrentLiabilities, equity] = await Promise.all([
+    const [
+      currentAssets,
+      nonCurrentAssets,
+      currentLiabilities,
+      nonCurrentLiabilities,
+      equity,
+      revenue,
+      expense,
+    ] = await Promise.all([
       new Promise((resolve, reject) => {
-        currentAssetsStmt.all([], (err, rows) => {
+        currentAssetsStmt.all([dateFormatted], (err, rows) => {
           if (err) reject(err);
           resolve(rows);
         });
       }),
       new Promise((resolve, reject) => {
-        nonCurrentAssetsStmt.all([], (err, rows) => {
+        nonCurrentAssetsStmt.all([dateFormatted], (err, rows) => {
           if (err) reject(err);
           resolve(rows);
         });
       }),
       new Promise((resolve, reject) => {
-        currentLiabilitiesStmt.all([], (err, rows) => {
+        currentLiabilitiesStmt.all([dateFormatted], (err, rows) => {
           if (err) reject(err);
           resolve(rows);
         });
       }),
       new Promise((resolve, reject) => {
-        nonCurrentLiabilitiesStmt.all([], (err, rows) => {
+        nonCurrentLiabilitiesStmt.all([dateFormatted], (err, rows) => {
           if (err) reject(err);
           resolve(rows);
         });
       }),
       new Promise((resolve, reject) => {
-        equityStmt.all([], (err, rows) => {
+        equityStmt.all([dateFormatted], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        revenueStmt.all([dateFormatted], (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        });
+      }),
+      new Promise((resolve, reject) => {
+        expenseStmt.all([dateFormatted], (err, rows) => {
           if (err) reject(err);
           resolve(rows);
         });
@@ -3565,26 +3694,33 @@ app.get("/reports/balance-sheet", async (req, res) => {
       currentLiabilities,
       nonCurrentLiabilities,
       equity,
+      revenue,
+      expense,
     });
   } catch (error) {
     console.error("Error generating balance sheet:", error.message);
     res.status(500).send("Failed to generate balance sheet.");
   }
 });
+
 app.get("/reports/trial-balance", (req, res) => {
   try {
     // Query to calculate total debits and credits for each account
     const query = `
-      SELECT
-        c.account_name,
-        SUM(jel.debit) AS debit,
-        SUM(jel.credit) AS credit
-      FROM
-        journal_entry_lines jel
-      JOIN
-        chart_of_accounts c ON jel.account_id = c.id
-      GROUP BY
-        c.account_name
+ SELECT
+  c.id,
+  c.account_name,
+  c.parent_account_id,
+  SUM(jel.debit) AS debit,
+  SUM(jel.credit) AS credit
+FROM
+  chart_of_accounts c
+LEFT JOIN
+  journal_entry_lines jel ON jel.account_id = c.id
+GROUP BY
+  c.id, c.account_name, c.parent_account_id
+ORDER BY
+  COALESCE(c.parent_account_id, c.id), c.id;
     `;
 
     db.all(query, [], (err, rows) => {
@@ -3606,11 +3742,45 @@ app.get("/reports/trial-balance", (req, res) => {
 app.get("/chart-of-accounts", (req, res) => {
   try {
     const query = `
-      SELECT coa.id, coa.account_name, coa.account_code, coa.account_type, 
-             SUM(jel.debit) AS total_debit, SUM(jel.credit) AS total_credit
-      FROM chart_of_accounts coa
-      LEFT JOIN journal_entry_lines jel ON coa.id = jel.account_id
-      GROUP BY coa.id
+      WITH RECURSIVE AccountHierarchy AS (
+        -- Base case: Start with all accounts
+        SELECT 
+          coa.id,
+          coa.account_name,
+          coa.account_code,
+          coa.account_type,
+          coa.parent_account_id,
+          SUM(jel.debit) AS total_debit,
+          SUM(jel.credit) AS total_credit
+        FROM chart_of_accounts coa
+        LEFT JOIN journal_entry_lines jel ON coa.id = jel.account_id
+        GROUP BY coa.id
+
+        UNION ALL
+
+        -- Recursive case: Add child accounts to their parent
+        SELECT 
+          parent.id,
+          parent.account_name,
+          parent.account_code,
+          parent.account_type,
+          parent.parent_account_id,
+          child.total_debit,
+          child.total_credit
+        FROM AccountHierarchy child
+        JOIN chart_of_accounts parent ON child.parent_account_id = parent.id
+      )
+      SELECT 
+        id,
+        account_name,
+        account_code,
+        account_type,
+        parent_account_id,
+        SUM(total_debit) AS total_debit,
+        SUM(total_credit) AS total_credit
+      FROM AccountHierarchy
+      GROUP BY id, account_name, account_code, account_type, parent_account_id
+      ORDER BY COALESCE(parent_account_id, id), id;
     `;
 
     db.all(query, [], (err, accounts) => {
@@ -3625,12 +3795,13 @@ app.get("/chart-of-accounts", (req, res) => {
 
         // Adjust balance calculation based on account type
         switch (account.account_type) {
-          case 'asset':
-          case 'expense':
+          case "asset":
+          case "expense":
             balance = account.total_debit - account.total_credit;
             break;
-          case 'liability':
-          case 'income':
+          case "liability":
+          case "income":
+          case "equity": // Added equity handling
             balance = account.total_credit - account.total_debit;
             break;
           default:
