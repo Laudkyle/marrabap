@@ -73,14 +73,14 @@ db.serialize(() => {
     },
     {
       account_code: "5010",
-      account_name: "Salaries and Wages",
-      account_type: "expense",
+      account_name: "Advances",
+      account_type: "asset",
       balance: 0,
     },
     {
       account_code: "5020",
-      account_name: "Sales Returns",
-      account_type: "expense",
+      account_name: "Prepayments",
+      account_type: "liability",
       balance: 0,
     },
     {
@@ -122,6 +122,7 @@ db.serialize(() => {
     account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
     balance FLOAT DEFAULT 0,
     is_current BOOLEAN DEFAULT 1,
+    opening_balance_journal_entry_id INTEGER,
     parent_account_id INTEGER, -- For hierarchical accounts
     FOREIGN KEY (parent_account_id) REFERENCES chart_of_accounts(id)
   )`);
@@ -238,9 +239,11 @@ END;
   discount_type TEXT, -- 'percentage' or 'fixed' discount type
   discount_amount REAL CHECK(discount_amount >= 0), -- Discount amount
   description TEXT, -- Additional description/details about the sale
+  return_status TEXT DEFAULT 'not_returned' CHECK(return_status IN ('not_returned', 'returned', 'partial_return')),
   FOREIGN KEY (product_id) REFERENCES products(id),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reference_number TEXT NOT NULL, -- Links payment to an invoice
@@ -291,13 +294,24 @@ END;
 `);
   db.run(`CREATE TABLE IF NOT EXISTS returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sale_id INTEGER NOT NULL,
-  reference_number TEXT NOT NULL,
-  return_quantity INTEGER NOT NULL,
-  action TEXT NOT NULL CHECK(action IN ('restock', 'dispose')),
-  return_date TEXT NOT NULL,
-  FOREIGN KEY (sale_id) REFERENCES sales(id)
+  sale_id INTEGER NOT NULL, -- Links the return to the specific sale
+  product_id INTEGER NOT NULL, -- Links to the product being returned
+  customer_id INTEGER NOT NULL, -- Links to the customer making the return
+  reference_number TEXT NOT NULL, -- Unique reference number for the sale
+  return_quantity INTEGER NOT NULL CHECK(return_quantity >= 0), -- Quantity being returned must be non-negative
+  action TEXT NOT NULL CHECK(action IN ('restock', 'dispose')), -- Specifies whether returned items are restocked or disposed
+  return_date TEXT NOT NULL, -- ISO 8601 format (YYYY-MM-DD) recommended
+  selling_price REAL CHECK(selling_price >= 0), -- Selling price of the product being returned
+  tax REAL CHECK(tax >= 0), -- Tax applied to the returned product
+  discount_amount REAL CHECK(discount_amount >= 0), -- Discount amount applied
+  discount_type TEXT,
+  payment_method TEXT,
+  total_refund REAL CHECK(total_refund >= 0), -- Total refund amount for the return
+  FOREIGN KEY (sale_id) REFERENCES sales(id),
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
 )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS suppliers (
     id INTEGER PRIMARY KEY,
     type TEXT NOT NULL, -- "Individual" or "Business"
@@ -467,7 +481,7 @@ END;
     '1234567890',          -- Mobile number (ensure it’s unique)
     1                      -- Active status: 1 means active
 );`);
-db.run(`CREATE TABLE expenses (
+  db.run(`CREATE TABLE expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   expense_date DATE NOT NULL,
   amount DECIMAL NOT NULL,
@@ -479,7 +493,7 @@ db.run(`CREATE TABLE expenses (
   FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id)
 );
 
-`)
+`);
   // Triggers
   db.run(`CREATE TRIGGER after_supplier_insert
 AFTER INSERT ON suppliers
@@ -559,6 +573,7 @@ BEGIN
   -- No General Ledger Entry for Pending Purchase Order
 END;
 `);
+
   db.run(`CREATE TRIGGER handle_sales_updates
 AFTER INSERT ON sales
 FOR EACH ROW
@@ -721,9 +736,126 @@ WHERE NEW.tax IS NOT NULL;
 
 
 END;
-
 `);
 
+  db.run(`CREATE TRIGGER handle_sales_return
+AFTER INSERT ON returns
+FOR EACH ROW
+BEGIN
+    -- Create a reversing journal entry for the sale return
+    INSERT INTO journal_entries (reference_number, date, description, status)
+    VALUES (
+        'RETURN-' || NEW.id,  -- Reference number
+        CURRENT_DATE,         -- Return date
+        'Return of product ' || NEW.product_id,  -- Description
+        'posted'              -- Status
+    );
+
+    -- Reversing Revenue (debit) and Accounts Receivable (credit, if credit sale)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '4000'), -- Sales Revenue Account
+        CASE
+            WHEN NEW.tax IS NULL THEN NEW.returned_quantity * NEW.selling_price
+            ELSE
+                CASE
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                        (NEW.returned_quantity * NEW.selling_price) -
+                        CASE
+                            WHEN NEW.discount_type = 'percentage' THEN (NEW.returned_quantity * NEW.selling_price * NEW.discount_amount / 100)
+                            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                            ELSE 0
+                        END
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'inclusive' THEN
+                        ((NEW.returned_quantity * NEW.selling_price) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)))
+                    ELSE 0
+                END
+        END,
+        0  -- Credit
+    );
+
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'), -- Accounts Receivable
+        0,  -- Debit
+        CASE
+            WHEN NEW.tax IS NULL THEN NEW.returned_quantity * NEW.selling_price
+            ELSE
+                CASE
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                        (NEW.returned_quantity * NEW.selling_price) -
+                        CASE
+                            WHEN NEW.discount_type = 'percentage' THEN (NEW.returned_quantity * NEW.selling_price * NEW.discount_amount / 100)
+                            WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                            ELSE 0
+                        END
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'inclusive' THEN
+                        NEW.returned_quantity * NEW.selling_price
+                    ELSE 0
+                END
+        END
+    WHERE NEW.payment_method = 'credit';
+
+    -- Reversing Cost of Goods Sold (credit) and Inventory (debit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),  -- Last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),  -- Cost of Goods Sold
+        0,  -- Debit
+        ROUND((SELECT cost_per_unit * NEW.returned_quantity FROM inventory WHERE product_id = NEW.product_id), 2) -- Credit
+    );
+
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),  -- Last inserted journal entry ID
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),  -- Inventory Account
+        ROUND((SELECT cost_per_unit * NEW.returned_quantity FROM inventory WHERE product_id = NEW.product_id), 2),  -- Debit
+        0  -- Credit
+    );
+
+    -- Update the inventory stock
+    UPDATE inventory
+    SET quantity_in_stock = quantity_in_stock + NEW.returned_quantity
+    WHERE product_id = NEW.product_id;
+
+    -- Reverse Tax and Discount (if applicable)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),
+        (SELECT account_id FROM taxes WHERE id = NEW.tax),
+        CASE
+            WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('asset', 'expense') THEN
+                CASE
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                        NEW.returned_quantity * NEW.selling_price * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'inclusive' THEN
+                        (NEW.returned_quantity * NEW.selling_price) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))
+                    ELSE 0
+                END
+            ELSE 0
+        END AS debit,
+        CASE
+            WHEN (SELECT account_type FROM chart_of_accounts WHERE id = (SELECT account_id FROM taxes WHERE id = NEW.tax)) IN ('liability', 'income') THEN
+                CASE
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'exclusive' THEN
+                        NEW.returned_quantity * NEW.selling_price * (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax)
+                    WHEN (SELECT tax_type FROM taxes WHERE id = NEW.tax) = 'inclusive' THEN
+                        (NEW.returned_quantity * NEW.selling_price) / (1 + (SELECT tax_rate / 100 FROM taxes WHERE id = NEW.tax))
+                    ELSE 0
+                END
+            ELSE 0
+        END AS credit
+    WHERE NEW.tax IS NOT NULL;
+
+    -- Adjust the customer's total_sale_due for credit sales
+    UPDATE customers
+    SET total_sale_due = total_sale_due - (NEW.returned_quantity * NEW.selling_price)
+    WHERE id = NEW.customer_id AND NEW.payment_method = 'credit';
+
+END
+`);
   db.run(`CREATE TRIGGER update_chart_of_accounts_after_payment
 AFTER INSERT ON payments
 FOR EACH ROW
@@ -777,6 +909,7 @@ END;
     
   );
 `);
+
   db.run(`
 CREATE TRIGGER supplier_payment_journal_entry
 AFTER INSERT ON supplier_payments

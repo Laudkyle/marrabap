@@ -21,7 +21,7 @@ const OpeningBalances = () => {
   const accountTypes = ["asset", "liability", "equity", "revenue", "expense"];
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/accounts");
+      const response = await axios.get("http://localhost:5000/chart-of-accounts");
       setAccounts(response.data);
       setFilteredAccounts(response.data); // Initialize filtered accounts
     } catch (error) {
@@ -145,7 +145,7 @@ const OpeningBalances = () => {
     },
     {
       name: "Balance",
-      selector: (row) => row.balance.toFixed(2),
+      selector: (row) => row.balance,
       sortable: true,
       right: true,
     },

@@ -39,12 +39,43 @@ const Dashboard = ({companyName}) => {
   const [salesData, setSalesData] = useState([]);
   const [productData, setProductData] = useState([]);
   // Fetch the sales data
+  const [netProfit, setNetProfit] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [salesReturns, setSalesReturns] = useState([]);
+  const [purchaseReturns, setPurchaseReturns] = useState([]);
+  const [expenses, setExpenses] = useState(0); // Add expenses if available
+
   useEffect(() => {
     fetch("http://localhost:5000/sales")
       .then((response) => response.json())
       .then((data) => setSalesData(data))
       .catch((err) => console.error("Error fetching sales data:", err));
+       // Fetch purchase orders data
+    fetch("http://localhost:5000/purchase_orders")
+      .then((response) => response.json())
+      .then((data) => setPurchaseOrders(data))
+      .catch((err) => console.error("Error fetching purchase orders:", err));
+
+    // Fetch sales returns data
+    fetch("http://localhost:5000/sales/returns")
+      .then((response) => response.json())
+      .then((data) => setSalesReturns(data))
+      .catch((err) => console.error("Error fetching sales returns:", err));
+
+    // Fetch purchase returns data
+    fetch("http://localhost:5000/returns")
+      .then((response) => response.json())
+      .then((data) => setPurchaseReturns(data))
+      .catch((err) => console.error("Error fetching purchase returns:", err));
+
+    // Fetch expenses data (this depends on your implementation)
+    fetch("http://localhost:5000/expenses")
+      .then((response) => response.json())
+      .then((data) => setExpenses(data))
+      .catch((err) => console.error("Error fetching expenses:", err));
+
   }, []);
+
 
   // Prepare data for the bar chart (total sales by product)
   const totalSalesByProduct = salesData.reduce((acc, sale) => {
@@ -68,6 +99,32 @@ const Dashboard = ({companyName}) => {
       },
     ],
   };
+
+  
+  // Calculate Total Sales
+  const totalSales = salesData.reduce((acc, sale) => acc + sale.total_price, 0);
+
+  // Calculate Total Purchases
+  const totalPurchases = purchaseOrders.reduce((acc, order) => acc + order.total_amount, 0);
+
+  // Calculate Total Sales Returns
+  const totalSalesReturns = salesReturns.reduce((acc, returnItem) => acc + returnItem.return_quantity * returnItem.price, 0);
+
+  // Calculate Total Purchase Returns
+  const totalPurchaseReturns = purchaseReturns.reduce((acc, returnItem) => acc + returnItem.return_quantity * returnItem.price, 0);
+
+  // Calculate Net Profit (example formula)
+  useEffect(() => {
+    const date = '2025-01-25'; // Set the date to fetch the income statement for
+    fetch(`http://localhost:5000/reports/income-statement?date=${date}`)
+      .then((response) => response.json())
+      .then((data) => {
+        // You can access data.netIncome here and set it in your state
+        setNetProfit(data.netIncome);
+      })
+      .catch((err) => console.error("Error fetching income statement:", err));
+  }, []);
+  
 
   // Prepare data for the line chart (sales over time)
   const salesByDate = salesData.reduce((acc, sale) => {
@@ -116,14 +173,13 @@ const Dashboard = ({companyName}) => {
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
         {companyName}
       </h1>
-      <div>
-        <div className="grid grid-cols-3 grid-rows-2 gap-6 mb-12">
+      <div className="grid grid-cols-3 grid-rows-2 gap-6 mb-12">
           {/* Total Sales */}
           <div className="bg-white shadow-lg rounded-lg p-4 text-center justify-center space-x-4 flex flex-row items-center transition-transform transform hover:-translate-y-1">
             <FiDollarSign className="text-4xl text-blue-500 mb-2" />
             <div>
               <h2 className="text-sm font-light text-gray-700">Total Sales</h2>
-              <p className="text-2xl font-bold text-gray-800">₵12,345</p>
+              <p className="text-2xl font-bold text-gray-800">₵{totalSales.toFixed(2)}</p>
             </div>
           </div>
 
@@ -131,10 +187,8 @@ const Dashboard = ({companyName}) => {
           <div className="bg-white shadow-lg rounded-lg p-4 text-center justify-center space-x-4 flex flex-row items-center transition-transform transform hover:-translate-y-1">
             <FiShoppingCart className="text-4xl text-green-500 mb-2" />
             <div>
-              <h2 className="text-sm font-light text-gray-700">
-                Total Purchases
-              </h2>
-              <p className="text-2xl font-bold text-gray-800">₵8,910</p>
+              <h2 className="text-sm font-light text-gray-700">Total Purchases</h2>
+              <p className="text-2xl font-bold text-gray-800">₵{totalPurchases.toFixed(2)}</p>
             </div>
           </div>
 
@@ -142,10 +196,8 @@ const Dashboard = ({companyName}) => {
           <div className="bg-white shadow-lg rounded-lg p-4 text-center justify-center space-x-4 flex flex-row items-center transition-transform transform hover:-translate-y-1">
             <FiTrendingDown className="text-4xl text-red-500 mb-2" />
             <div>
-              <h2 className="text-sm font-light text-gray-700">
-                Purchase Returns
-              </h2>
-              <p className="text-2xl font-bold text-gray-800">₵1,230</p>
+              <h2 className="text-sm font-light text-gray-700">Purchase Returns</h2>
+              <p className="text-2xl font-bold text-gray-800">₵{totalPurchaseReturns.toFixed(2)}</p>
             </div>
           </div>
 
@@ -154,7 +206,7 @@ const Dashboard = ({companyName}) => {
             <FiCreditCard className="text-4xl text-yellow-500 mb-2" />
             <div>
               <h2 className="text-sm font-light text-gray-700">Expenses</h2>
-              <p className="text-2xl font-bold text-gray-800">₵2,345</p>
+              <p className="text-2xl font-bold text-gray-800">₵{expenses}</p>
             </div>
           </div>
 
@@ -162,10 +214,8 @@ const Dashboard = ({companyName}) => {
           <div className="bg-white shadow-lg rounded-lg p-4 text-center justify-center space-x-4 flex flex-row items-center transition-transform transform hover:-translate-y-1">
             <FiTrendingDown className="text-4xl text-orange-500 mb-2" />
             <div>
-              <h2 className="text-sm font-light text-gray-700">
-                Sales Returns
-              </h2>
-              <p className="text-2xl font-bold text-gray-800">₵980</p>
+              <h2 className="text-sm font-light text-gray-700">Sales Returns</h2>
+              <p className="text-2xl font-bold text-gray-800">₵{totalSalesReturns.toFixed(2)}</p>
             </div>
           </div>
 
@@ -174,11 +224,11 @@ const Dashboard = ({companyName}) => {
             <FiBarChart2 className="text-4xl text-purple-500 mb-2" />
             <div>
               <h2 className="text-sm font-light text-gray-700">Net Profit</h2>
-              <p className="text-2xl font-bold text-green-600">₵9,500</p>
+              <p className="text-2xl font-bold text-green-600">₵{netProfit}</p>
             </div>
           </div>
         </div>
-      </div>
+      
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 gap-8 mb-16">

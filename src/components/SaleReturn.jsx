@@ -3,6 +3,7 @@ import axios from "axios";
 import DataTable from "react-data-table-component";
 import { toast, ToastContainer } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
+
 const SaleReturn = () => {
   const [sales, setSales] = useState([]);
   const [filteredSales, setFilteredSales] = useState([]);
@@ -19,12 +20,18 @@ const SaleReturn = () => {
   const fetchSales = async () => {
     try {
       const response = await axios.get("http://localhost:5000/sales");
-      setSales(response.data);
-      setFilteredSales(response.data);
+      const filtered = response.data.filter(
+        (sale) =>
+          sale.return_status === "partial_return" ||
+          sale.return_status === "not_returned"
+      );
+      setSales(filtered);
+      setFilteredSales(filtered);
     } catch (error) {
       console.error("Error fetching sales:", error);
     }
   };
+
   const handleSearch = (e) => {
     const value = e.target.value.toLowerCase();
     setFilterText(value);
@@ -36,6 +43,7 @@ const SaleReturn = () => {
     );
     setFilteredSales(filtered);
   };
+
   const handleReturn = async () => {
     if (returnQuantity <= 0 || returnQuantity > selectedSale.quantity) {
       toast.error("Invalid return quantity!");
@@ -43,15 +51,23 @@ const SaleReturn = () => {
     }
 
     const returnData = {
-      sale_id: selectedSale.id, // Send sale_id
-      reference_number: selectedSale.reference_number, // Send reference_number
+      sale_id: selectedSale.id,
+      reference_number: selectedSale.reference_number,
+      product_id: selectedSale.id,
+      customer_id: selectedSale.customer_id,
       return_quantity: returnQuantity,
+      payment_method: selectedSale.payment_method,
+      selling_price: selectedSale.selling_price,
+      tax: selectedSale.tax,
+      discount_type: selectedSale.discount_type,
+      discount_amount: selectedSale.discount_amount,
       action: restockOption,
     };
-
+console.log("salesData:",returnData)
+console.log("salesselectedData:",selectedSale)
     try {
       const response = await axios.post(
-        "http://localhost:5000/sales/return",
+        "http://localhost:5000/sales-return",
         returnData
       );
       if (response.status !== 200 && response.status !== 201) {
@@ -69,13 +85,16 @@ const SaleReturn = () => {
               quantity: sale.quantity - returnQuantity,
               total_price:
                 sale.total_price -
-                selectedSale.total_price *
-                  (returnQuantity / selectedSale.quantity),
+                (selectedSale.total_price *
+                  (returnQuantity / selectedSale.quantity)),
+              return_status:
+                sale.quantity - returnQuantity === 0
+                  ? "returned"
+                  : "partial_return",
             }
           : sale
       );
 
-      // Update both states
       setSales(updatedSales);
       setFilteredSales(updatedSales.filter((sale) => sale.quantity > 0));
     } catch (error) {
@@ -106,6 +125,11 @@ const SaleReturn = () => {
       sortable: true,
     },
     {
+      name: "Payment Method",
+      selector: (row) => row.payment_method,
+      sortable: true,
+    },
+    {
       name: "Date",
       selector: (row) => new Date(row.date).toLocaleDateString(),
       sortable: true,
@@ -113,30 +137,23 @@ const SaleReturn = () => {
     {
       name: "Actions",
       cell: (row) => (
-        <div className="flex space-x-2">
-          <button
-            onClick={() => {
-              setSelectedSale(row);
-              setModalVisible(true);
-              setReturnQuantity(0);
-            }}
-            className="text-blue-600 hover:bg-blue-100 p-2 rounded"
-          >
-            <div className="relative group">
-              <FaArrowLeft
-                className="cursor-pointer text-gray-500 hover:text-blue-500"
-                title="Return"
-              />
-            </div>
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setSelectedSale(row);
+            setModalVisible(true);
+            setReturnQuantity(0);
+          }}
+          className="text-blue-600 hover:bg-blue-100 p-2 rounded"
+        >
+          <FaArrowLeft title="Return" />
+        </button>
       ),
     },
   ];
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl px-6 font-semibold text-gray-800 mb-4">
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
         Make Sales Return
       </h2>
       <ToastContainer />
@@ -146,82 +163,59 @@ const SaleReturn = () => {
             <h2 className="text-lg font-semibold mb-4">Return Product</h2>
             {selectedSale && (
               <>
-                <div className="mb-6">
-                  <p className="text-sm text-gray-500">
-                    Process a return for the selected product.
+                <div className="mb-4">
+                  <p>
+                    <strong>Product:</strong> {selectedSale.product_name}
+                  </p>
+                  <p>
+                    <strong>Quantity Sold:</strong> {selectedSale.quantity}
                   </p>
                 </div>
                 <div className="mb-4">
-                  <p className="text-gray-600">
-                    <strong className="font-medium">Product:</strong>{" "}
-                    {selectedSale.product_name}
-                  </p>
-                  <p className="text-gray-600">
-                    <strong className="font-medium">Quantity Sold:</strong>{" "}
-                    {selectedSale.quantity}
-                  </p>
-                </div>
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Return Quantity
-                  </label>
+                  <label>Return Quantity</label>
                   <input
                     type="number"
                     value={returnQuantity}
-                    onChange={(e) => setReturnQuantity(Number(e.target.value))}
-                    onInput={(e) => {
-                      const value = Math.min(
-                        Number(e.target.value),
-                        selectedSale.quantity
-                      );
-                      e.target.value = value; // Enforce max value in the input field
-                      setReturnQuantity(value);
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-300"
+                    onChange={(e) =>
+                      setReturnQuantity(Number(e.target.value))
+                    }
+                    className="w-full border p-2 rounded"
                     placeholder={`Max: ${selectedSale.quantity}`}
                   />
-                  <p className="text-sm text-gray-500 mt-1">
-                    You can return up to {selectedSale.quantity} items.
-                  </p>
                 </div>
-
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Action
-                  </label>
-                  <div className="flex items-center space-x-6">
-                    <label className="flex items-center text-gray-700">
+                <div className="mb-4">
+                  <label>Action</label>
+                  <div>
+                    <label>
                       <input
                         type="radio"
                         value="restock"
                         checked={restockOption === "restock"}
                         onChange={(e) => setRestockOption(e.target.value)}
-                        className="mr-2"
                       />
                       Restock
                     </label>
-                    <label className="flex items-center text-gray-700">
+                    <label>
                       <input
                         type="radio"
                         value="dispose"
                         checked={restockOption === "dispose"}
                         onChange={(e) => setRestockOption(e.target.value)}
-                        className="mr-2"
                       />
                       Dispose
                     </label>
                   </div>
                 </div>
-                <div className="flex justify-end space-x-4">
+                <div className="flex justify-end">
                   <button
                     onClick={() => setModalVisible(false)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 focus:outline-none focus:ring focus:ring-gray-300"
+                    className="mr-2 p-2 bg-gray-200 rounded"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleReturn}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring focus:ring-blue-300"
+                    className="p-2 bg-blue-600 text-white rounded"
                   >
                     Process Return
                   </button>
@@ -231,33 +225,22 @@ const SaleReturn = () => {
           </div>
         </div>
       )}
-      <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
-        <DataTable
-          className="z-0"
-          columns={columns}
-          data={filteredSales}
-          pagination
-          highlightOnHover
-          responsive
-          striped
-          subHeader
-          subHeaderComponent={
-            <div className="flex justify-between items-center w-full">
-              <div className="flex items-center">
-                <h2 className="text-xl font-semibold text-gray-700">
-                  Sales List
-                </h2>
-              </div>
-              <input
-                type="text"
-                placeholder="Search sales"
-                className="p-2 border border-gray-300 rounded-md"
-                onChange={handleSearch}
-              />
-            </div>
-          }
-        />
-      </div>
+      <DataTable
+        columns={columns}
+        data={filteredSales}
+        pagination
+        highlightOnHover
+        subHeader
+        subHeaderComponent={
+          <input
+            type="text"
+            placeholder="Search sales"
+            value={filterText}
+            onChange={handleSearch}
+            className="border p-2 rounded"
+          />
+        }
+      />
     </div>
   );
 };
