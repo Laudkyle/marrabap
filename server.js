@@ -89,7 +89,7 @@ app.get("/products", (req, res) => {
     LEFT JOIN inventory ON products.id = inventory.product_id
     GROUP BY products.id
   `;
-  
+
   db.all(query, (err, rows) => {
     if (err) {
       console.error(err);
@@ -117,7 +117,7 @@ app.get("/products/:id", (req, res) => {
     WHERE products.id = ?
     GROUP BY products.id
   `;
-  
+
   db.get(query, [id], (err, row) => {
     if (err) {
       console.error(err.message);
@@ -173,31 +173,40 @@ app.post("/products/bulk", (req, res) => {
         "INSERT INTO products (name, cp, sp, suppliers_id) VALUES (?, ?, ?, ?)"
       );
 
-      stmt.run(product.name, product.cp, product.sp, suppliers_id, function (err) {
-        if (err) {
-          console.error("Error inserting product:", err.message);
-          errorOccurred = true;
-        } else {
-          const productId = this.lastID;
+      stmt.run(
+        product.name,
+        product.cp,
+        product.sp,
+        suppliers_id,
+        function (err) {
+          if (err) {
+            console.error("Error inserting product:", err.message);
+            errorOccurred = true;
+          } else {
+            const productId = this.lastID;
 
-          // Prepare inventory entry for the newly added product
-          inventoryInserts.push(
-            new Promise((resolve, reject) => {
-              db.run(
-                "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
-                [productId, 0, product.cp],
-                (err) => {
-                  if (err) {
-                    console.error("Error inserting into inventory:", err.message);
-                    return reject(err);
+            // Prepare inventory entry for the newly added product
+            inventoryInserts.push(
+              new Promise((resolve, reject) => {
+                db.run(
+                  "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
+                  [productId, 0, product.cp],
+                  (err) => {
+                    if (err) {
+                      console.error(
+                        "Error inserting into inventory:",
+                        err.message
+                      );
+                      return reject(err);
+                    }
+                    resolve();
                   }
-                  resolve();
-                }
-              );
-            })
-          );
+                );
+              })
+            );
+          }
         }
-      });
+      );
 
       stmt.finalize();
     });
@@ -213,7 +222,9 @@ app.post("/products/bulk", (req, res) => {
         }
 
         db.run("COMMIT");
-        res.status(201).send("Products and inventory entries added successfully.");
+        res
+          .status(201)
+          .send("Products and inventory entries added successfully.");
       })
       .catch((err) => {
         console.error("Error during inventory insertion:", err.message);
@@ -332,7 +343,7 @@ app.delete("/products/:id", (req, res) => {
 
 // ===================== Inventoty Endpoints =====================
 /// Create Inventory
-app.post('/inventory', (req, res) => {
+app.post("/inventory", (req, res) => {
   const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
   if (!product_id || !quantity_in_stock || !cost_per_unit) {
@@ -344,17 +355,19 @@ app.post('/inventory', (req, res) => {
      VALUES (?, ?, ?)`
   );
 
-  stmt.run(product_id, quantity_in_stock, cost_per_unit, function(err) {
+  stmt.run(product_id, quantity_in_stock, cost_per_unit, function (err) {
     if (err) {
       return res.status(500).send("Failed to add inventory.");
     }
-    res.status(201).json({ id: this.lastID, product_id, quantity_in_stock, cost_per_unit });
+    res
+      .status(201)
+      .json({ id: this.lastID, product_id, quantity_in_stock, cost_per_unit });
   });
 });
 
 // Read All Inventory Items
-app.get('/inventory', (req, res) => {
-  db.all('SELECT * FROM inventory', [], (err, rows) => {
+app.get("/inventory", (req, res) => {
+  db.all("SELECT * FROM inventory", [], (err, rows) => {
     if (err) {
       return res.status(500).send("Failed to retrieve inventory.");
     }
@@ -363,10 +376,10 @@ app.get('/inventory', (req, res) => {
 });
 
 // Read Single Inventory Item by ID
-app.get('/inventory/:id', (req, res) => {
+app.get("/inventory/:id", (req, res) => {
   const { id } = req.params;
 
-  db.get('SELECT * FROM inventory WHERE id = ?', [id], (err, row) => {
+  db.get("SELECT * FROM inventory WHERE id = ?", [id], (err, row) => {
     if (err) {
       return res.status(500).send("Failed to retrieve inventory item.");
     }
@@ -378,7 +391,7 @@ app.get('/inventory/:id', (req, res) => {
 });
 
 // Update Inventory
-app.put('/inventory/:id', (req, res) => {
+app.put("/inventory/:id", (req, res) => {
   const { id } = req.params;
   const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
@@ -392,7 +405,7 @@ app.put('/inventory/:id', (req, res) => {
      WHERE id = ?`
   );
 
-  stmt.run(product_id, quantity_in_stock, cost_per_unit, id, function(err) {
+  stmt.run(product_id, quantity_in_stock, cost_per_unit, id, function (err) {
     if (err) {
       return res.status(500).send("Failed to update inventory.");
     }
@@ -404,12 +417,12 @@ app.put('/inventory/:id', (req, res) => {
 });
 
 // Delete Inventory Item
-app.delete('/inventory/:id', (req, res) => {
+app.delete("/inventory/:id", (req, res) => {
   const { id } = req.params;
 
-  const stmt = db.prepare('DELETE FROM inventory WHERE id = ?');
-  
-  stmt.run(id, function(err) {
+  const stmt = db.prepare("DELETE FROM inventory WHERE id = ?");
+
+  stmt.run(id, function (err) {
     if (err) {
       return res.status(500).send("Failed to delete inventory item.");
     }
@@ -539,7 +552,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
     };
 
     const row = await getPurchaseOrder();
-    
+
     if (!row) {
       return res.status(404).send("Purchase order not found.");
     }
@@ -621,7 +634,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
             `INSERT INTO journal_entries (reference_number, date, description, status)
              VALUES (?, date('now'), ?, 'posted')`,
             [reference_number, `Purchase order #${id} received`],
-            function(err) {
+            function (err) {
               if (err) reject(err);
               else resolve(this.lastID);
             }
@@ -639,7 +652,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
           account_id: 3,
           debit: totalValue,
           credit: 0,
-          isLiability: false  // Asset account
+          isLiability: false, // Asset account
         },
         // Accounts Payable credit (Liability account: credit increases)
         {
@@ -647,13 +660,13 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
           account_id: 5,
           debit: 0,
           credit: totalValue,
-          isLiability: true  // Liability account
-        }
+          isLiability: true, // Liability account
+        },
       ];
 
       // Insert journal entry lines and update chart of accounts
       const processJournalLines = async () => {
-        const linePromises = journalLines.map(line => {
+        const linePromises = journalLines.map((line) => {
           return new Promise((resolve, reject) => {
             db.run(
               `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
@@ -668,12 +681,12 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
         });
 
         // Add ledger updates for chart of accounts with correct sign conventions
-        const ledgerUpdates = journalLines.map(line => {
+        const ledgerUpdates = journalLines.map((line) => {
           // For liability accounts, credits increase the balance and debits decrease it
           // For asset accounts, debits increase the balance and credits decrease it
           const netAmount = line.isLiability
-            ? (line.credit - line.debit)  // Liability accounts: credit increases, debit decreases
-            : (line.debit - line.credit); // Asset accounts: debit increases, credit decreases
+            ? line.credit - line.debit // Liability accounts: credit increases, debit decreases
+            : line.debit - line.credit; // Asset accounts: debit increases, credit decreases
 
           return new Promise((resolve, reject) => {
             db.run(
@@ -710,7 +723,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
       // Log to audit trail
       const changes = JSON.stringify({
         old_status: oldStatus,
-        new_status: order_status
+        new_status: order_status,
       });
 
       await new Promise((resolve, reject) => {
@@ -743,7 +756,9 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
     }
   } catch (error) {
     console.error("Error processing purchase order:", error);
-    res.status(500).send("An error occurred while processing the purchase order.");
+    res
+      .status(500)
+      .send("An error occurred while processing the purchase order.");
   }
 });
 // Update a purchase order
@@ -806,18 +821,24 @@ app.delete("/purchase_orders/:id", async (req, res) => {
           [total_amount, supplier_id],
           (err) => {
             if (err) {
-              console.error("Error updating supplier's total_purchase_due:", err);
-              return res.status(500).send("Error updating supplier's total_purchase_due.");
+              console.error(
+                "Error updating supplier's total_purchase_due:",
+                err
+              );
+              return res
+                .status(500)
+                .send("Error updating supplier's total_purchase_due.");
             }
 
-            res.send("Purchase order deleted and supplier's total_purchase_due updated.");
+            res.send(
+              "Purchase order deleted and supplier's total_purchase_due updated."
+            );
           }
         );
       });
     }
   );
 });
-
 
 // Get purchase order details by purchase order ID
 app.get("/purchase_orders/:id/details", (req, res) => {
@@ -980,7 +1001,9 @@ app.post("/accounts", (req, res) => {
   const { account_name, account_type, balance, parent_account_id } = req.body;
 
   if (!account_name || !account_type) {
-    return res.status(400).json({ error: "Account name and type are required." });
+    return res
+      .status(400)
+      .json({ error: "Account name and type are required." });
   }
 
   const query = `SELECT MAX(CAST(account_code AS INTEGER)) as max_code FROM chart_of_accounts WHERE account_type = ?`;
@@ -988,7 +1011,9 @@ app.post("/accounts", (req, res) => {
   db.get(query, [account_type], (err, row) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: "Failed to calculate account code." });
+      return res
+        .status(500)
+        .json({ error: "Failed to calculate account code." });
     }
 
     const maxCode = row?.max_code || 0;
@@ -1001,7 +1026,13 @@ app.post("/accounts", (req, res) => {
 
     db.run(
       insertQuery,
-      [nextCode.toString(), account_name, account_type, balance || 0, parent_account_id || null],
+      [
+        nextCode.toString(),
+        account_name,
+        account_type,
+        balance || 0,
+        parent_account_id || null,
+      ],
       function (err) {
         if (err) {
           console.error(err);
@@ -1020,50 +1051,71 @@ app.post("/accounts", (req, res) => {
             VALUES (?, ?, ?, 'posted')
           `;
 
-          db.run(journalEntryQuery, [referenceNumber, date, description], function (err) {
-            if (err) {
-              console.error(err);
-              return res.status(500).json({ error: "Failed to log journal entry." });
-            }
+          db.run(
+            journalEntryQuery,
+            [referenceNumber, date, description],
+            function (err) {
+              if (err) {
+                console.error(err);
+                return res
+                  .status(500)
+                  .json({ error: "Failed to log journal entry." });
+              }
 
-            const journalEntryId = this.lastID;
-            const journalLineQuery = `
+              const journalEntryId = this.lastID;
+              const journalLineQuery = `
               INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
               VALUES (?, ?, ?, ?)
             `;
 
-            const isDebit = ["asset", "expense"].includes(account_type.toLowerCase());
-            const debit = isDebit ? balance : 0;
-            const credit = isDebit ? 0 : balance;
+              const isDebit = ["asset", "expense"].includes(
+                account_type.toLowerCase()
+              );
+              const debit = isDebit ? balance : 0;
+              const credit = isDebit ? 0 : balance;
 
-            db.run(journalLineQuery, [journalEntryId, newAccountId, debit, credit], (err) => {
-              if (err) {
-                console.error(err);
-                return res.status(500).json({ error: "Failed to log journal entry line." });
-              }
+              db.run(
+                journalLineQuery,
+                [journalEntryId, newAccountId, debit, credit],
+                (err) => {
+                  if (err) {
+                    console.error(err);
+                    return res
+                      .status(500)
+                      .json({ error: "Failed to log journal entry line." });
+                  }
 
-              // Update the chart_of_accounts table with the opening balance journal entry ID
-              const updateAccountQuery = `
+                  // Update the chart_of_accounts table with the opening balance journal entry ID
+                  const updateAccountQuery = `
                 UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?
               `;
-              db.run(updateAccountQuery, [journalEntryId, newAccountId], (err) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).json({ error: "Failed to update account with journal entry ID." });
-                }
+                  db.run(
+                    updateAccountQuery,
+                    [journalEntryId, newAccountId],
+                    (err) => {
+                      if (err) {
+                        console.error(err);
+                        return res.status(500).json({
+                          error:
+                            "Failed to update account with journal entry ID.",
+                        });
+                      }
 
-                res.status(201).json({
-                  id: newAccountId,
-                  account_code: nextCode.toString(),
-                  account_name,
-                  account_type,
-                  balance: balance || 0,
-                  parent_account_id: parent_account_id || null,
-                  opening_balance_journal_entry_id: journalEntryId,
-                });
-              });
-            });
-          });
+                      res.status(201).json({
+                        id: newAccountId,
+                        account_code: nextCode.toString(),
+                        account_name,
+                        account_type,
+                        balance: balance || 0,
+                        parent_account_id: parent_account_id || null,
+                        opening_balance_journal_entry_id: journalEntryId,
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
         } else {
           res.status(201).json({
             id: newAccountId,
@@ -1123,158 +1175,219 @@ app.put("/accounts/:id", (req, res) => {
     return res.status(400).json({ error: "No fields provided to update." });
   }
 
-  const updateQuery = `UPDATE chart_of_accounts SET ${updates.join(", ")} WHERE id = ?`;
+  const updateQuery = `UPDATE chart_of_accounts SET ${updates.join(
+    ", "
+  )} WHERE id = ?`;
   params.push(id);
 
   // Fetch the original account data before the update
-  db.get("SELECT * FROM chart_of_accounts WHERE id = ?", [id], (err, account) => {
-    if (err || !account) {
-      console.error(err);
-      return res.status(500).json({ error: "Account not found or failed to fetch account details." });
-    }
-
-    const originalBalance = account.balance;
-
-    // Perform the update
-    db.run(updateQuery, params, function (err) {
-      if (err) {
+  db.get(
+    "SELECT * FROM chart_of_accounts WHERE id = ?",
+    [id],
+    (err, account) => {
+      if (err || !account) {
         console.error(err);
-        return res.status(500).json({ error: "Failed to update account." });
+        return res.status(500).json({
+          error: "Account not found or failed to fetch account details.",
+        });
       }
 
-      // If balance is updated, create or update a journal entry
-      if (balance !== undefined && balance !== originalBalance) {
-        const journalEntry = {
-          reference_number: `OPENBAL-${id}-${Date.now()}`,
-          date: new Date().toISOString(),
-          description: `Opening balance for account ID ${id}`,
-          status: "posted",
-        };
+      const originalBalance = account.balance;
 
-        const debit = (["asset", "expense"].includes(account.account_type) && balance > 0) ? balance : 0;
-        const credit = (["liability", "equity", "revenue"].includes(account.account_type) && balance > 0) ? balance : 0;
+      // Perform the update
+      db.run(updateQuery, params, function (err) {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ error: "Failed to update account." });
+        }
 
-        // Check if there's an existing journal entry for the opening balance
-        db.get(
-          "SELECT opening_balance_journal_entry_id FROM chart_of_accounts WHERE id = ?",
-          [id],
-          (err, result) => {
-            if (err) {
-              console.error("Failed to fetch existing journal entry:", err);
-              return res.status(500).json({ error: "Failed to fetch existing journal entry." });
-            }
+        // If balance is updated, create or update a journal entry
+        if (balance !== undefined && balance !== originalBalance) {
+          const journalEntry = {
+            reference_number: `OPENBAL-${id}-${Date.now()}`,
+            date: new Date().toISOString(),
+            description: `Opening balance for account ID ${id}`,
+            status: "posted",
+          };
 
-            const existingJournalEntryId = result?.opening_balance_journal_entry_id;
+          const debit =
+            ["asset", "expense"].includes(account.account_type) && balance > 0
+              ? balance
+              : 0;
+          const credit =
+            ["liability", "equity", "revenue"].includes(account.account_type) &&
+            balance > 0
+              ? balance
+              : 0;
 
-            if (existingJournalEntryId) {
-              // Update the existing journal entry lines
-              db.run(
-                `UPDATE journal_entry_lines SET debit = ?, credit = ? WHERE journal_entry_id = ? AND account_id = ?`,
-                [debit, credit, existingJournalEntryId, id],
-                (err) => {
-                  if (err) {
-                    console.error("Failed to update journal entry line:", err);
-                    return res.status(500).json({ error: "Failed to update journal entry line." });
-                  }
+          // Check if there's an existing journal entry for the opening balance
+          db.get(
+            "SELECT opening_balance_journal_entry_id FROM chart_of_accounts WHERE id = ?",
+            [id],
+            (err, result) => {
+              if (err) {
+                console.error("Failed to fetch existing journal entry:", err);
+                return res
+                  .status(500)
+                  .json({ error: "Failed to fetch existing journal entry." });
+              }
 
-                  updateParentBalance(account.parent_account_id, (err) => {
+              const existingJournalEntryId =
+                result?.opening_balance_journal_entry_id;
+
+              if (existingJournalEntryId) {
+                // Update the existing journal entry lines
+                db.run(
+                  `UPDATE journal_entry_lines SET debit = ?, credit = ? WHERE journal_entry_id = ? AND account_id = ?`,
+                  [debit, credit, existingJournalEntryId, id],
+                  (err) => {
                     if (err) {
-                      console.error("Failed to update parent account balance:", err);
-                      return res.status(500).json({ error: "Failed to update parent account balance." });
+                      console.error(
+                        "Failed to update journal entry line:",
+                        err
+                      );
+                      return res.status(500).json({
+                        error: "Failed to update journal entry line.",
+                      });
                     }
 
-                    res.json({
-                      id,
-                      ...(account_name !== undefined && { account_name }),
-                      ...(account_type !== undefined && { account_type }),
-                      ...(balance !== undefined && { balance }),
-                    });
-                  });
-                }
-              );
-            } else {
-              // Create a new journal entry and journal entry lines
-              db.run(
-                `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, ?)`,
-                [journalEntry.reference_number, journalEntry.date, journalEntry.description, journalEntry.status],
-                function (err) {
-                  if (err) {
-                    console.error("Failed to create journal entry:", err);
-                    return res.status(500).json({ error: "Failed to create journal entry." });
-                  }
-
-                  const journalEntryId = this.lastID;
-
-                  // Insert the journal entry line
-                  db.run(
-                    `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                    [journalEntryId, id, debit, credit],
-                    (err) => {
+                    updateParentBalance(account.parent_account_id, (err) => {
                       if (err) {
-                        console.error("Failed to create journal entry line:", err);
-                        return res.status(500).json({ error: "Failed to create journal entry line." });
+                        console.error(
+                          "Failed to update parent account balance:",
+                          err
+                        );
+                        return res.status(500).json({
+                          error: "Failed to update parent account balance.",
+                        });
                       }
 
-                      // Save the journal entry ID in the account record
-                      db.run(
-                        `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
-                        [journalEntryId, id],
-                        (err) => {
-                          if (err) {
-                            console.error("Failed to update account with journal entry ID:", err);
-                            return res.status(500).json({ error: "Failed to link journal entry to account." });
-                          }
+                      res.json({
+                        id,
+                        ...(account_name !== undefined && { account_name }),
+                        ...(account_type !== undefined && { account_type }),
+                        ...(balance !== undefined && { balance }),
+                      });
+                    });
+                  }
+                );
+              } else {
+                // Create a new journal entry and journal entry lines
+                db.run(
+                  `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, ?)`,
+                  [
+                    journalEntry.reference_number,
+                    journalEntry.date,
+                    journalEntry.description,
+                    journalEntry.status,
+                  ],
+                  function (err) {
+                    if (err) {
+                      console.error("Failed to create journal entry:", err);
+                      return res
+                        .status(500)
+                        .json({ error: "Failed to create journal entry." });
+                    }
 
-                          // Update parent balances
-                          updateParentBalance(account.parent_account_id, (err) => {
-                            if (err) {
-                              console.error("Failed to update parent account balance:", err);
-                              return res.status(500).json({ error: "Failed to update parent account balance." });
-                            }
+                    const journalEntryId = this.lastID;
 
-                            res.json({
-                              id,
-                              ...(account_name !== undefined && { account_name }),
-                              ...(account_type !== undefined && { account_type }),
-                              ...(balance !== undefined && { balance }),
-                              journal_entry: journalEntry,
-                            });
+                    // Insert the journal entry line
+                    db.run(
+                      `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                      [journalEntryId, id, debit, credit],
+                      (err) => {
+                        if (err) {
+                          console.error(
+                            "Failed to create journal entry line:",
+                            err
+                          );
+                          return res.status(500).json({
+                            error: "Failed to create journal entry line.",
                           });
                         }
-                      );
-                    }
-                  );
-                }
-              );
+
+                        // Save the journal entry ID in the account record
+                        db.run(
+                          `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
+                          [journalEntryId, id],
+                          (err) => {
+                            if (err) {
+                              console.error(
+                                "Failed to update account with journal entry ID:",
+                                err
+                              );
+                              return res.status(500).json({
+                                error:
+                                  "Failed to link journal entry to account.",
+                              });
+                            }
+
+                            // Update parent balances
+                            updateParentBalance(
+                              account.parent_account_id,
+                              (err) => {
+                                if (err) {
+                                  console.error(
+                                    "Failed to update parent account balance:",
+                                    err
+                                  );
+                                  return res.status(500).json({
+                                    error:
+                                      "Failed to update parent account balance.",
+                                  });
+                                }
+
+                                res.json({
+                                  id,
+                                  ...(account_name !== undefined && {
+                                    account_name,
+                                  }),
+                                  ...(account_type !== undefined && {
+                                    account_type,
+                                  }),
+                                  ...(balance !== undefined && { balance }),
+                                  journal_entry: journalEntry,
+                                });
+                              }
+                            );
+                          }
+                        );
+                      }
+                    );
+                  }
+                );
+              }
             }
-          }
-        );
-      } else {
-        // If no balance update, handle parent updates directly
-        if (parent_account_id !== undefined) {
-          updateParentBalance(parent_account_id, (err) => {
-            if (err) {
-              console.error("Failed to update parent account balance:", err);
-              return res.status(500).json({ error: "Failed to update parent account balance." });
-            }
+          );
+        } else {
+          // If no balance update, handle parent updates directly
+          if (parent_account_id !== undefined) {
+            updateParentBalance(parent_account_id, (err) => {
+              if (err) {
+                console.error("Failed to update parent account balance:", err);
+                return res
+                  .status(500)
+                  .json({ error: "Failed to update parent account balance." });
+              }
+              res.json({
+                id,
+                ...(account_name !== undefined && { account_name }),
+                ...(account_type !== undefined && { account_type }),
+                ...(balance !== undefined && { balance }),
+              });
+            });
+          } else {
             res.json({
               id,
               ...(account_name !== undefined && { account_name }),
               ...(account_type !== undefined && { account_type }),
               ...(balance !== undefined && { balance }),
             });
-          });
-        } else {
-          res.json({
-            id,
-            ...(account_name !== undefined && { account_name }),
-            ...(account_type !== undefined && { account_type }),
-            ...(balance !== undefined && { balance }),
-          });
+          }
         }
-      }
-    });
-  });
+      });
+    }
+  );
 });
 
 // Recursive function to update parent account balances
@@ -1314,7 +1427,6 @@ const updateParentBalance = (parentId, callback) => {
     }
   );
 };
-
 
 // ===================== Draft Endpoints =====================
 
@@ -1624,8 +1736,6 @@ app.post("/supplier_payments", (req, res) => {
 
       const paymentId = this.lastID;
 
-    
-
       // Step 4: Update the purchase order's payment status if applicable
       if (purchase_order_id) {
         const updatePurchaseOrderQuery = `
@@ -1637,11 +1747,15 @@ app.post("/supplier_payments", (req, res) => {
           END
           WHERE id = ?
         `;
-        db.run(updatePurchaseOrderQuery, [purchase_order_id, purchase_order_id], (err) => {
-          if (err) {
-            console.error("Error updating purchase order:", err.message);
+        db.run(
+          updatePurchaseOrderQuery,
+          [purchase_order_id, purchase_order_id],
+          (err) => {
+            if (err) {
+              console.error("Error updating purchase order:", err.message);
+            }
           }
-        });
+        );
       }
 
       // Step 5: Send success response
@@ -1649,7 +1763,6 @@ app.post("/supplier_payments", (req, res) => {
     });
   });
 });
-
 
 // READ: Get all supplier payments
 app.get("/supplier_payments", (req, res) => {
@@ -1748,7 +1861,9 @@ app.post("/payment-methods", (req, res) => {
       console.error("Error adding payment method:", err.message);
       return res.status(500).send("Failed to add payment method.");
     }
-    res.status(201).send({ id: this.lastID, message: "Payment method created." });
+    res
+      .status(201)
+      .send({ id: this.lastID, message: "Payment method created." });
   });
 });
 app.get("/payment-methods", (req, res) => {
@@ -1812,14 +1927,19 @@ app.put("/payment-methods/:id", (req, res) => {
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `;
-  db.run(query, [name, account_id, description, is_active, req.params.id], function (err) {
-    if (err) {
-      console.error("Error updating payment method:", err.message);
-      return res.status(500).send("Failed to update payment method.");
+  db.run(
+    query,
+    [name, account_id, description, is_active, req.params.id],
+    function (err) {
+      if (err) {
+        console.error("Error updating payment method:", err.message);
+        return res.status(500).send("Failed to update payment method.");
+      }
+      if (this.changes === 0)
+        return res.status(404).send("Payment method not found.");
+      res.status(200).send("Payment method updated.");
     }
-    if (this.changes === 0) return res.status(404).send("Payment method not found.");
-    res.status(200).send("Payment method updated.");
-  });
+  );
 });
 app.delete("/payment-methods/:id", (req, res) => {
   const query = "DELETE FROM payment_methods WHERE id = ?";
@@ -1828,7 +1948,8 @@ app.delete("/payment-methods/:id", (req, res) => {
       console.error("Error deleting payment method:", err.message);
       return res.status(500).send("Failed to delete payment method.");
     }
-    if (this.changes === 0) return res.status(404).send("Payment method not found.");
+    if (this.changes === 0)
+      return res.status(404).send("Payment method not found.");
     res.status(200).send("Payment method deleted.");
   });
 });
@@ -1924,7 +2045,13 @@ app.post("/payments", (req, res) => {
           "payments",
           paymentId,
           "insert",
-          JSON.stringify({ reference_number, payment_date, amount_paid, payment_method, payment_reference }),
+          JSON.stringify({
+            reference_number,
+            payment_date,
+            amount_paid,
+            payment_method,
+            payment_reference,
+          }),
         ];
 
         db.run(auditTrailQuery, auditTrailParams, function (err) {
@@ -1940,7 +2067,6 @@ app.post("/payments", (req, res) => {
     });
   });
 });
-
 
 // READ: Get all payments
 app.get("/payments", (req, res) => {
@@ -2036,13 +2162,21 @@ app.post("/sales", async (req, res) => {
         let errorOccurred = false;
         let totalCartPrice = 0;
         const saleResponses = [];
-        const reference_number = salesData[0].reference_number; 
-        const customer_id = salesData[0].customer_id; 
-        const payment_method = salesData[0].payment_method; 
+        const reference_number = salesData[0].reference_number;
+        const customer_id = salesData[0].customer_id;
+        const payment_method = salesData[0].payment_method;
 
         // Process each sale item in the cart
         const processSalePromises = salesData.map(
-          ({ product_id, quantity, selling_price, tax, discount_type, discount_amount, description }) => {
+          ({
+            product_id,
+            quantity,
+            selling_price,
+            tax,
+            discount_type,
+            discount_amount,
+            description,
+          }) => {
             return new Promise((resolveSale, rejectSale) => {
               db.get(
                 "SELECT * FROM inventory WHERE product_id = ?",
@@ -2056,11 +2190,15 @@ app.post("/sales", async (req, res) => {
 
                   if (inventory.quantity_in_stock < quantity) {
                     errorOccurred = true;
-                    console.error("Insufficient stock for product ID:", product_id);
+                    console.error(
+                      "Insufficient stock for product ID:",
+                      product_id
+                    );
                     return rejectSale("Insufficient stock");
                   }
 
-                  const total_price = selling_price * quantity - discount_amount; // Discount applied to the total price
+                  const total_price =
+                    selling_price * quantity - discount_amount; // Discount applied to the total price
                   totalCartPrice += total_price; // Sum total price for the cart
 
                   // Insert the sale record for each item
@@ -2094,7 +2232,10 @@ app.post("/sales", async (req, res) => {
                         (err) => {
                           if (err) {
                             errorOccurred = true;
-                            console.error("Error updating inventory: ", err.message);
+                            console.error(
+                              "Error updating inventory: ",
+                              err.message
+                            );
                           }
                           resolveSale({
                             customer_id,
@@ -2151,7 +2292,10 @@ app.post("/sales", async (req, res) => {
                   (err) => {
                     if (err) {
                       errorOccurred = true;
-                      console.error("Error updating customer's total_sale_due: ", err.message);
+                      console.error(
+                        "Error updating customer's total_sale_due: ",
+                        err.message
+                      );
                     }
                   }
                 );
@@ -2224,7 +2368,7 @@ app.get("/sales", (req, res) => {
 });
 app.post("/sales-return", async (req, res) => {
   const returnData = req.body;
-console.log("data",returnData)
+  console.log("data", returnData);
   try {
     db.run("BEGIN TRANSACTION");
     const promises = returnData.map((item) => {
@@ -2261,7 +2405,7 @@ console.log("data",returnData)
             discount_type, // Discount type from the request data
             payment_method, // Payment method from the request data
             // Calculate total refund amount based on your logic, e.g.,:
-            return_quantity * (selling_price - discount_amount + tax) 
+            return_quantity * (selling_price - discount_amount + tax),
           ],
           (err) => {
             if (err) return reject(err);
@@ -2281,7 +2425,7 @@ console.log("data",returnData)
       results,
     });
   } catch (error) {
-     db.run("ROLLBACK");
+    db.run("ROLLBACK");
     res.status(400).json({ message: "Error processing sales returns", error });
   }
 });
@@ -2356,16 +2500,37 @@ app.get("/suppliers/:id", (req, res) => {
 });
 app.post("/suppliers", (req, res) => {
   const {
-    type, contact_id, business_name, name, email, tax_number,
-    pay_term, opening_balance, advance_balance, address, mobile
+    type,
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    pay_term,
+    opening_balance,
+    advance_balance,
+    address,
+    mobile,
   } = req.body;
 
   db.run(
     `INSERT INTO suppliers 
       (type, contact_id, business_name, name, email, tax_number, pay_term, opening_balance, advance_balance, added_on, address, mobile, total_purchase_due, total_purchase_return_due) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-    [type, contact_id, business_name, name, email, tax_number, pay_term,
-      opening_balance || 0, advance_balance || 0, new Date().toISOString(), address, mobile],
+    [
+      type,
+      contact_id,
+      business_name,
+      name,
+      email,
+      tax_number,
+      pay_term,
+      opening_balance || 0,
+      advance_balance || 0,
+      new Date().toISOString(),
+      address,
+      mobile,
+    ],
     function (err) {
       if (err) {
         console.error("Error adding supplier:", err.message);
@@ -2374,155 +2539,224 @@ app.post("/suppliers", (req, res) => {
 
       const supplierId = this.lastID;
       let entriesLogged = 0;
-      const totalEntries = (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
+      const totalEntries =
+        (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
 
       const logJournalEntry = (balance, balanceType, accountId) => {
         const referenceNumber = `SUP-${balanceType}-${supplierId}-${Date.now()}`;
         const date = new Date().toISOString().split("T")[0];
-        const description = `${balanceType === 'OB' ? 'Opening' : 'Advance'} balance for supplier ${business_name || name}`;
+        const description = `${
+          balanceType === "OB" ? "Opening" : "Advance"
+        } balance for supplier ${business_name || name}`;
 
-        db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [accountId], (err, row) => {
-          if (err || !row) {
-            console.error(`Error fetching account type for ${balanceType}:`, err || "Account not found");
-            return;
-          }
-
-          const accountType = row.account_type.toLowerCase();
-          let debit = 0, credit = 0;
-          if (accountType === "asset") {
-            debit = balance; // Assets increase with debits
-          } else if (accountType === "liability") {
-            credit = balance; // Liabilities increase with credits
-          }
-
-          db.run(
-            `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-            [referenceNumber, date, description],
-            function (err) {
-              if (err) {
-                console.error(`Failed to create journal entry for ${balanceType}:`, err);
-                return;
-              }
-
-              const journalEntryId = this.lastID;
-              db.run(
-                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                [journalEntryId, accountId, debit, credit],
-                (err) => {
-                  if (err) {
-                    console.error(`Failed to create journal entry line for ${balanceType}:`, err);
-                  }
-
-                  db.run(
-                    `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
-                    [journalEntryId, accountId],
-                    (err) => {
-                      if (err) console.error(`Failed to update chart_of_accounts for ${balanceType}:`, err);
-                      entriesLogged++;
-                      if (entriesLogged === totalEntries) res.status(201).json({ id: supplierId, ...req.body });
-                    }
-                  );
-                }
+        db.get(
+          `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+          [accountId],
+          (err, row) => {
+            if (err || !row) {
+              console.error(
+                `Error fetching account type for ${balanceType}:`,
+                err || "Account not found"
               );
+              return;
             }
-          );
-        });
+
+            const accountType = row.account_type.toLowerCase();
+            let debit = 0,
+              credit = 0;
+            if (accountType === "asset") {
+              debit = balance; // Assets increase with debits
+            } else if (accountType === "liability") {
+              credit = balance; // Liabilities increase with credits
+            }
+
+            db.run(
+              `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+              [referenceNumber, date, description],
+              function (err) {
+                if (err) {
+                  console.error(
+                    `Failed to create journal entry for ${balanceType}:`,
+                    err
+                  );
+                  return;
+                }
+
+                const journalEntryId = this.lastID;
+                db.run(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                  [journalEntryId, accountId, debit, credit],
+                  (err) => {
+                    if (err) {
+                      console.error(
+                        `Failed to create journal entry line for ${balanceType}:`,
+                        err
+                      );
+                    }
+
+                    db.run(
+                      `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
+                      [journalEntryId, accountId],
+                      (err) => {
+                        if (err)
+                          console.error(
+                            `Failed to update chart_of_accounts for ${balanceType}:`,
+                            err
+                          );
+                        entriesLogged++;
+                        if (entriesLogged === totalEntries)
+                          res.status(201).json({ id: supplierId, ...req.body });
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          }
+        );
       };
 
-      if (opening_balance > 0) logJournalEntry(opening_balance, 'OB', 5); // Accounts Payable
-      if (advance_balance > 0) logJournalEntry(advance_balance, 'ADV', 11); // Advance Payments
+      if (opening_balance > 0) logJournalEntry(opening_balance, "OB", 5); // Accounts Payable
+      if (advance_balance > 0) logJournalEntry(advance_balance, "ADV", 11); // Advance Payments
 
-      if (totalEntries === 0) res.status(201).json({ id: supplierId, ...req.body });
+      if (totalEntries === 0)
+        res.status(201).json({ id: supplierId, ...req.body });
     }
   );
 });
 app.put("/suppliers/:id", (req, res) => {
   const { id } = req.params;
   const {
-    type, contact_id, business_name, name, email, tax_number,
-    pay_term, opening_balance, advance_balance, address, mobile,
-    total_purchase_due, total_purchase_return_due, active_status
+    type,
+    contact_id,
+    business_name,
+    name,
+    email,
+    tax_number,
+    pay_term,
+    opening_balance,
+    advance_balance,
+    address,
+    mobile,
+    total_purchase_due,
+    total_purchase_return_due,
+    active_status,
   } = req.body;
 
-  db.get("SELECT opening_balance, advance_balance FROM suppliers WHERE id = ?", [id], (err, row) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Error retrieving supplier data.");
-    }
-    if (!row) return res.status(404).send("Supplier not found.");
-
-    const fields = [];
-    const values = [];
-
-    if (type) fields.push("type = ?"), values.push(type);
-    if (contact_id) fields.push("contact_id = ?"), values.push(contact_id);
-    if (business_name) fields.push("business_name = ?"), values.push(business_name);
-    if (name) fields.push("name = ?"), values.push(name);
-    if (email) fields.push("email = ?"), values.push(email);
-    if (tax_number) fields.push("tax_number = ?"), values.push(tax_number);
-    if (pay_term) fields.push("pay_term = ?"), values.push(pay_term);
-    if (opening_balance !== undefined) fields.push("opening_balance = ?"), values.push(opening_balance);
-    if (advance_balance !== undefined) fields.push("advance_balance = ?"), values.push(advance_balance);
-    if (address) fields.push("address = ?"), values.push(address);
-    if (mobile) fields.push("mobile = ?"), values.push(mobile);
-    if (total_purchase_due !== undefined) fields.push("total_purchase_due = ?"), values.push(total_purchase_due);
-    if (total_purchase_return_due !== undefined) fields.push("total_purchase_return_due = ?"), values.push(total_purchase_return_due);
-    if (active_status !== undefined) fields.push("active_status = ?"), values.push(active_status);
-
-    values.push(id);
-    if (fields.length === 0) return res.status(400).send("No fields to update.");
-
-    db.run(`UPDATE suppliers SET ${fields.join(", ")} WHERE id = ?`, values, function (err) {
+  db.get(
+    "SELECT opening_balance, advance_balance FROM suppliers WHERE id = ?",
+    [id],
+    (err, row) => {
       if (err) {
-        console.error("Error updating supplier:", err.message);
-        return res.status(500).send("Error updating supplier");
+        console.error(err.message);
+        return res.status(500).send("Error retrieving supplier data.");
       }
+      if (!row) return res.status(404).send("Supplier not found.");
 
-      let entriesLogged = 0;
-      const totalEntries = (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
+      const fields = [];
+      const values = [];
 
-      const logJournalEntry = (balance, balanceType, accountId) => {
-        const referenceNumber = `SUP-${balanceType}-${id}-${Date.now()}`;
-        const date = new Date().toISOString().split("T")[0];
-        const description = `Updated ${balanceType === 'OB' ? 'Opening' : 'Advance'} balance for supplier ${business_name || name}`;
+      if (type) fields.push("type = ?"), values.push(type);
+      if (contact_id) fields.push("contact_id = ?"), values.push(contact_id);
+      if (business_name)
+        fields.push("business_name = ?"), values.push(business_name);
+      if (name) fields.push("name = ?"), values.push(name);
+      if (email) fields.push("email = ?"), values.push(email);
+      if (tax_number) fields.push("tax_number = ?"), values.push(tax_number);
+      if (pay_term) fields.push("pay_term = ?"), values.push(pay_term);
+      if (opening_balance !== undefined)
+        fields.push("opening_balance = ?"), values.push(opening_balance);
+      if (advance_balance !== undefined)
+        fields.push("advance_balance = ?"), values.push(advance_balance);
+      if (address) fields.push("address = ?"), values.push(address);
+      if (mobile) fields.push("mobile = ?"), values.push(mobile);
+      if (total_purchase_due !== undefined)
+        fields.push("total_purchase_due = ?"), values.push(total_purchase_due);
+      if (total_purchase_return_due !== undefined)
+        fields.push("total_purchase_return_due = ?"),
+          values.push(total_purchase_return_due);
+      if (active_status !== undefined)
+        fields.push("active_status = ?"), values.push(active_status);
 
-        db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [accountId], (err, row) => {
-          if (err || !row) {
-            console.error(`Error fetching account type for ${balanceType}:`, err || "Account not found");
-            return;
+      values.push(id);
+      if (fields.length === 0)
+        return res.status(400).send("No fields to update.");
+
+      db.run(
+        `UPDATE suppliers SET ${fields.join(", ")} WHERE id = ?`,
+        values,
+        function (err) {
+          if (err) {
+            console.error("Error updating supplier:", err.message);
+            return res.status(500).send("Error updating supplier");
           }
 
-          const accountType = row.account_type.toLowerCase();
-          let debit = 0, credit = 0;
-          if (accountType === "asset") debit = balance;
-          else if (accountType === "liability") credit = balance;
+          let entriesLogged = 0;
+          const totalEntries =
+            (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
 
-          db.run(`INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-            [referenceNumber, date, description],
-            function (err) {
-              if (!err) {
-                const journalEntryId = this.lastID;
-                db.run(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                  [journalEntryId, accountId, debit, credit], () => {
-                    db.run(`UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
-                      [journalEntryId, accountId], () => {
-                        entriesLogged++;
-                        if (entriesLogged === totalEntries) res.status(200).json({ id, ...req.body });
-                      });
-                  });
+          const logJournalEntry = (balance, balanceType, accountId) => {
+            const referenceNumber = `SUP-${balanceType}-${id}-${Date.now()}`;
+            const date = new Date().toISOString().split("T")[0];
+            const description = `Updated ${
+              balanceType === "OB" ? "Opening" : "Advance"
+            } balance for supplier ${business_name || name}`;
+
+            db.get(
+              `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+              [accountId],
+              (err, row) => {
+                if (err || !row) {
+                  console.error(
+                    `Error fetching account type for ${balanceType}:`,
+                    err || "Account not found"
+                  );
+                  return;
+                }
+
+                const accountType = row.account_type.toLowerCase();
+                let debit = 0,
+                  credit = 0;
+                if (accountType === "asset") debit = balance;
+                else if (accountType === "liability") credit = balance;
+
+                db.run(
+                  `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+                  [referenceNumber, date, description],
+                  function (err) {
+                    if (!err) {
+                      const journalEntryId = this.lastID;
+                      db.run(
+                        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                        [journalEntryId, accountId, debit, credit],
+                        () => {
+                          db.run(
+                            `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
+                            [journalEntryId, accountId],
+                            () => {
+                              entriesLogged++;
+                              if (entriesLogged === totalEntries)
+                                res.status(200).json({ id, ...req.body });
+                            }
+                          );
+                        }
+                      );
+                    }
+                  }
+                );
               }
-            });
-        });
-      };
+            );
+          };
 
-      if (opening_balance > 0) logJournalEntry(opening_balance, 'OB', 5);
-      if (advance_balance > 0) logJournalEntry(advance_balance, 'ADV', 11);
+          if (opening_balance > 0) logJournalEntry(opening_balance, "OB", 5);
+          if (advance_balance > 0) logJournalEntry(advance_balance, "ADV", 11);
 
-      if (totalEntries === 0) res.status(200).json({ id, ...req.body });
-    });
-  });
+          if (totalEntries === 0) res.status(200).json({ id, ...req.body });
+        }
+      );
+    }
+  );
 });
-
 
 // Delete a supplier
 app.delete("/suppliers/:id", (req, res) => {
@@ -2706,7 +2940,6 @@ app.get("/customers/:id", (req, res) => {
   });
 });
 
-
 app.post("/customers", (req, res) => {
   const {
     contact_id,
@@ -2753,80 +2986,102 @@ app.post("/customers", (req, res) => {
 
       const customerId = this.lastID;
       let entriesLogged = 0;
-      const totalEntries = (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
+      const totalEntries =
+        (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
 
       const logJournalEntry = (balance, balanceType, accountId) => {
         const referenceNumber = `CUS-${balanceType}-${customerId}-${Date.now()}`;
         const date = new Date().toISOString().split("T")[0];
-        const description = `${balanceType === 'OB' ? 'Opening' : 'Advance'} balance for customer ${business_name || name}`;
+        const description = `${
+          balanceType === "OB" ? "Opening" : "Advance"
+        } balance for customer ${business_name || name}`;
 
         // Get the account type from chart_of_accounts
-        db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [accountId], (err, row) => {
-          if (err) {
-            console.error(`Failed to fetch account type for ${balanceType}:`, err);
-            return;
-          }
-
-          if (!row) {
-            console.error(`Account ID ${accountId} not found in chart_of_accounts.`);
-            return;
-          }
-
-          const accountType = row.account_type.toLowerCase(); // "asset" or "liability"
-
-          // Determine debit or credit based on account type
-          let debit = 0, credit = 0;
-          if (accountType === "asset") {
-            debit = balance; // Assets increase with debits
-          } else if (accountType === "liability") {
-            credit = balance; // Liabilities increase with credits
-          }
-
-          // Insert into journal_entries
-          db.run(
-            `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-            [referenceNumber, date, description],
-            function (err) {
-              if (err) {
-                console.error(`Failed to create journal entry for ${balanceType}:`, err);
-                return;
-              }
-
-              const journalEntryId = this.lastID;
-
-              // Insert into journal_entry_lines
-              db.run(
-                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                [journalEntryId, accountId, debit, credit],
-                (err) => {
-                  if (err) {
-                    console.error(`Failed to create journal entry line for ${balanceType}:`, err);
-                  }
-
-                  // Update chart_of_accounts with opening_balance_journal_entry_id
-                  db.run(
-                    `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
-                    [journalEntryId, accountId],
-                    (err) => {
-                      if (err) {
-                        console.error(`Failed to update chart_of_accounts for ${balanceType}:`, err);
-                      }
-
-                      entriesLogged++;
-                      if (entriesLogged === totalEntries) {
-                        res.status(201).json({ id: customerId, ...req.body });
-                      }
-                    }
-                  );
-                }
+        db.get(
+          `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+          [accountId],
+          (err, row) => {
+            if (err) {
+              console.error(
+                `Failed to fetch account type for ${balanceType}:`,
+                err
               );
+              return;
             }
-          );
-        });
+
+            if (!row) {
+              console.error(
+                `Account ID ${accountId} not found in chart_of_accounts.`
+              );
+              return;
+            }
+
+            const accountType = row.account_type.toLowerCase(); // "asset" or "liability"
+
+            // Determine debit or credit based on account type
+            let debit = 0,
+              credit = 0;
+            if (accountType === "asset") {
+              debit = balance; // Assets increase with debits
+            } else if (accountType === "liability") {
+              credit = balance; // Liabilities increase with credits
+            }
+
+            // Insert into journal_entries
+            db.run(
+              `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+              [referenceNumber, date, description],
+              function (err) {
+                if (err) {
+                  console.error(
+                    `Failed to create journal entry for ${balanceType}:`,
+                    err
+                  );
+                  return;
+                }
+
+                const journalEntryId = this.lastID;
+
+                // Insert into journal_entry_lines
+                db.run(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                  [journalEntryId, accountId, debit, credit],
+                  (err) => {
+                    if (err) {
+                      console.error(
+                        `Failed to create journal entry line for ${balanceType}:`,
+                        err
+                      );
+                    }
+
+                    // Update chart_of_accounts with opening_balance_journal_entry_id
+                    db.run(
+                      `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
+                      [journalEntryId, accountId],
+                      (err) => {
+                        if (err) {
+                          console.error(
+                            `Failed to update chart_of_accounts for ${balanceType}:`,
+                            err
+                          );
+                        }
+
+                        entriesLogged++;
+                        if (entriesLogged === totalEntries) {
+                          res.status(201).json({ id: customerId, ...req.body });
+                        }
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          }
+        );
       };
 
-      if (opening_balance > 0) logJournalEntry(opening_balance, 'OB', 4); // Accounts Receivable (OB)
-      if (advance_balance > 0) logJournalEntry(advance_balance, 'ADV', 12); // Advance Payments (ADV)
+      if (opening_balance > 0) logJournalEntry(opening_balance, "OB", 4); // Accounts Receivable (OB)
+      if (advance_balance > 0) logJournalEntry(advance_balance, "ADV", 12); // Advance Payments (ADV)
 
       if (totalEntries === 0) {
         res.status(201).json({ id: customerId, ...req.body });
@@ -2917,7 +3172,9 @@ app.put("/customers/:id", (req, res) => {
   // Add ID at the end for WHERE clause
   values.push(id);
 
-  const query = `UPDATE customers SET ${fields.join(", ")} WHERE contact_id = ?`;
+  const query = `UPDATE customers SET ${fields.join(
+    ", "
+  )} WHERE contact_id = ?`;
 
   db.run(query, values, function (err) {
     if (err) {
@@ -2927,87 +3184,108 @@ app.put("/customers/:id", (req, res) => {
     if (this.changes === 0) return res.status(404).send("Customer not found");
 
     let entriesLogged = 0;
-    const totalEntries = (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
+    const totalEntries =
+      (opening_balance > 0 ? 1 : 0) + (advance_balance > 0 ? 1 : 0);
 
     const logJournalEntry = (balance, balanceType, accountId) => {
       const referenceNumber = `CUS-${balanceType}-${id}-${Date.now()}`;
       const date = new Date().toISOString().split("T")[0];
-      const description = `${balanceType === 'OB' ? 'Opening' : 'Advance'} balance for customer ${business_name || name}`;
+      const description = `${
+        balanceType === "OB" ? "Opening" : "Advance"
+      } balance for customer ${business_name || name}`;
 
       // Get the account type from chart_of_accounts
-      db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [accountId], (err, row) => {
-        if (err) {
-          console.error(`Failed to fetch account type for ${balanceType}:`, err);
-          return;
-        }
-
-        if (!row) {
-          console.error(`Account ID ${accountId} not found in chart_of_accounts.`);
-          return;
-        }
-
-        const accountType = row.account_type.toLowerCase(); // "asset" or "liability"
-
-        // Determine debit or credit based on account type
-        let debit = 0, credit = 0;
-        if (accountType === "asset") {
-          debit = balance; // Assets increase with debits
-        } else if (accountType === "liability") {
-          credit = balance; // Liabilities increase with credits
-        }
-
-        // Insert into journal_entries
-        db.run(
-          `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-          [referenceNumber, date, description],
-          function (err) {
-            if (err) {
-              console.error(`Failed to create journal entry for ${balanceType}:`, err);
-              return;
-            }
-
-            const journalEntryId = this.lastID;
-
-            // Insert into journal_entry_lines
-            db.run(
-              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-              [journalEntryId, accountId, debit, credit],
-              (err) => {
-                if (err) {
-                  console.error(`Failed to create journal entry line for ${balanceType}:`, err);
-                }
-
-                // Update chart_of_accounts with opening_balance_journal_entry_id
-                db.run(
-                  `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
-                  [journalEntryId, accountId],
-                  (err) => {
-                    if (err) {
-                      console.error(`Failed to update chart_of_accounts for ${balanceType}:`, err);
-                    }
-
-                    entriesLogged++;
-                    if (entriesLogged === totalEntries) {
-                      res.status(200).json({ id, ...req.body });
-                    }
-                  }
-                );
-              }
+      db.get(
+        `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+        [accountId],
+        (err, row) => {
+          if (err) {
+            console.error(
+              `Failed to fetch account type for ${balanceType}:`,
+              err
             );
+            return;
           }
-        );
-      });
+
+          if (!row) {
+            console.error(
+              `Account ID ${accountId} not found in chart_of_accounts.`
+            );
+            return;
+          }
+
+          const accountType = row.account_type.toLowerCase(); // "asset" or "liability"
+
+          // Determine debit or credit based on account type
+          let debit = 0,
+            credit = 0;
+          if (accountType === "asset") {
+            debit = balance; // Assets increase with debits
+          } else if (accountType === "liability") {
+            credit = balance; // Liabilities increase with credits
+          }
+
+          // Insert into journal_entries
+          db.run(
+            `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+            [referenceNumber, date, description],
+            function (err) {
+              if (err) {
+                console.error(
+                  `Failed to create journal entry for ${balanceType}:`,
+                  err
+                );
+                return;
+              }
+
+              const journalEntryId = this.lastID;
+
+              // Insert into journal_entry_lines
+              db.run(
+                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                [journalEntryId, accountId, debit, credit],
+                (err) => {
+                  if (err) {
+                    console.error(
+                      `Failed to create journal entry line for ${balanceType}:`,
+                      err
+                    );
+                  }
+
+                  // Update chart_of_accounts with opening_balance_journal_entry_id
+                  db.run(
+                    `UPDATE chart_of_accounts SET opening_balance_journal_entry_id = ? WHERE id = ?`,
+                    [journalEntryId, accountId],
+                    (err) => {
+                      if (err) {
+                        console.error(
+                          `Failed to update chart_of_accounts for ${balanceType}:`,
+                          err
+                        );
+                      }
+
+                      entriesLogged++;
+                      if (entriesLogged === totalEntries) {
+                        res.status(200).json({ id, ...req.body });
+                      }
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
     };
 
-    if (opening_balance > 0) logJournalEntry(opening_balance, 'OB', 4); // Accounts Receivable (OB)
-    if (advance_balance > 0) logJournalEntry(advance_balance, 'ADV', 12); // Advance Payments (ADV)
+    if (opening_balance > 0) logJournalEntry(opening_balance, "OB", 4); // Accounts Receivable (OB)
+    if (advance_balance > 0) logJournalEntry(advance_balance, "ADV", 12); // Advance Payments (ADV)
 
     if (totalEntries === 0) {
       res.status(200).json({ id, ...req.body });
     }
   });
 });
-
 
 // Delete a customer
 app.delete("/customers/:id", (req, res) => {
@@ -3213,7 +3491,7 @@ app.patch("/customer_groups/:id", (req, res) => {
 
 // ===================== Server Initialization =====================
 // CREATE - Add a new tax
-app.post('/taxes', async (req, res) => {
+app.post("/taxes", async (req, res) => {
   const { tax_name, tax_rate, tax_type, account_code } = req.body;
 
   // Validate required fields
@@ -3222,8 +3500,10 @@ app.post('/taxes', async (req, res) => {
   }
 
   // Validate tax_type
-  if (!['inclusive', 'exclusive'].includes(tax_type)) {
-    return res.status(400).json({ error: "Invalid tax type. Must be 'inclusive' or 'exclusive'" });
+  if (!["inclusive", "exclusive"].includes(tax_type)) {
+    return res
+      .status(400)
+      .json({ error: "Invalid tax type. Must be 'inclusive' or 'exclusive'" });
   }
 
   // Validate tax_rate is non-negative
@@ -3235,7 +3515,7 @@ app.post('/taxes', async (req, res) => {
     // First check if the account exists
     const accountExists = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT account_code FROM chart_of_accounts WHERE account_code = ?',
+        "SELECT account_code FROM chart_of_accounts WHERE account_code = ?",
         [account_code],
         (err, row) => {
           if (err) reject(err);
@@ -3255,21 +3535,21 @@ app.post('/taxes', async (req, res) => {
        FROM chart_of_accounts
        WHERE account_code = ?`,
       [tax_name, tax_rate, tax_type, account_code],
-      function(err) {
+      function (err) {
         if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
+          if (err.message.includes("UNIQUE constraint failed")) {
             return res.status(409).json({ error: "Tax name already exists" });
           }
           console.error(err);
           return res.status(500).json({ error: "Failed to create tax" });
         }
-        
+
         res.status(201).json({
           id: this.lastID,
           tax_name,
           tax_rate,
           tax_type,
-          account_code
+          account_code,
         });
       }
     );
@@ -3280,7 +3560,7 @@ app.post('/taxes', async (req, res) => {
 });
 
 // READ - Get all taxes
-app.get('/taxes', (req, res) => {
+app.get("/taxes", (req, res) => {
   db.all(
     `SELECT t.id, t.tax_name, t.tax_rate, t.tax_type, coa.account_code, coa.account_name, coa.account_type
      FROM taxes t
@@ -3298,9 +3578,9 @@ app.get('/taxes', (req, res) => {
 });
 
 // READ - Get a single tax by ID
-app.get('/taxes/:id', (req, res) => {
+app.get("/taxes/:id", (req, res) => {
   const { id } = req.params;
-  
+
   db.get(
     `SELECT t.id, t.tax_name, t.tax_rate, t.tax_type, coa.account_code, coa.account_name, coa.account_type
      FROM taxes t
@@ -3321,7 +3601,7 @@ app.get('/taxes/:id', (req, res) => {
 });
 
 // UPDATE - Update a tax
-app.put('/taxes/:id', async (req, res) => {
+app.put("/taxes/:id", async (req, res) => {
   const { id } = req.params;
   const { tax_name, tax_rate, tax_type, account_code } = req.body;
 
@@ -3331,8 +3611,10 @@ app.put('/taxes/:id', async (req, res) => {
   }
 
   // Validate tax_type
-  if (!['inclusive', 'exclusive'].includes(tax_type)) {
-    return res.status(400).json({ error: "Invalid tax type. Must be 'inclusive' or 'exclusive'" });
+  if (!["inclusive", "exclusive"].includes(tax_type)) {
+    return res
+      .status(400)
+      .json({ error: "Invalid tax type. Must be 'inclusive' or 'exclusive'" });
   }
 
   // Validate tax_rate is non-negative
@@ -3344,7 +3626,7 @@ app.put('/taxes/:id', async (req, res) => {
     // Check if the account exists
     const accountExists = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT account_code FROM chart_of_accounts WHERE account_code = ?',
+        "SELECT account_code FROM chart_of_accounts WHERE account_code = ?",
         [account_code],
         (err, row) => {
           if (err) reject(err);
@@ -3366,25 +3648,25 @@ app.put('/taxes/:id', async (req, res) => {
            account_id = (SELECT id FROM chart_of_accounts WHERE account_code = ?)
        WHERE id = ?`,
       [tax_name, tax_rate, tax_type, account_code, id],
-      function(err) {
+      function (err) {
         if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
+          if (err.message.includes("UNIQUE constraint failed")) {
             return res.status(409).json({ error: "Tax name already exists" });
           }
           console.error(err);
           return res.status(500).json({ error: "Failed to update tax" });
         }
-        
+
         if (this.changes === 0) {
           return res.status(404).json({ error: "Tax not found" });
         }
-        
+
         res.json({
           id: parseInt(id),
           tax_name,
           tax_rate,
           tax_type,
-          account_code
+          account_code,
         });
       }
     );
@@ -3395,28 +3677,24 @@ app.put('/taxes/:id', async (req, res) => {
 });
 
 // DELETE - Delete a tax
-app.delete('/taxes/:id', (req, res) => {
+app.delete("/taxes/:id", (req, res) => {
   const { id } = req.params;
 
-  db.run(
-    'DELETE FROM taxes WHERE id = ?',
-    [id],
-    function(err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Failed to delete tax" });
-      }
-      
-      if (this.changes === 0) {
-        return res.status(404).json({ error: "Tax not found" });
-      }
-      
-      res.json({ message: "Tax deleted successfully" });
+  db.run("DELETE FROM taxes WHERE id = ?", [id], function (err) {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Failed to delete tax" });
     }
-  );
+
+    if (this.changes === 0) {
+      return res.status(404).json({ error: "Tax not found" });
+    }
+
+    res.json({ message: "Tax deleted successfully" });
+  });
 });
 
-/// ==================== CREATE EXPENSE ====================
+// ==================== CREATE EXPENSE ====================
 app.post("/expenses", (req, res) => {
   const {
     expense_date,
@@ -3479,6 +3757,7 @@ app.post("/expenses", (req, res) => {
                   expense_account_id,
                   description,
                   journal_entry_id,
+                  payment_method,
                   res
                 );
               }
@@ -3506,6 +3785,7 @@ app.post("/expenses", (req, res) => {
                   expense_account_id,
                   description,
                   journal_entry_id,
+                  payment_method_id,
                   res
                 );
               }
@@ -3517,17 +3797,18 @@ app.post("/expenses", (req, res) => {
   );
 });
 
-// Function to create the expense record
 function createExpenseRecord(
   expense_date,
   amount,
   expense_account_id,
   description,
   journal_entry_id,
+  payment_method, // <-- Added payment_method
   res
 ) {
   db.run(
-    `INSERT INTO expenses (expense_date, amount, expense_account_id, description, journal_entry_id) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO expenses (expense_date, amount, expense_account_id, description, journal_entry_id) 
+     VALUES (?, ?, ?, ?, ?)`,
     [expense_date, amount, expense_account_id, description, journal_entry_id],
     function (err) {
       if (err) {
@@ -3535,9 +3816,42 @@ function createExpenseRecord(
         return res.status(500).send("Error creating expense");
       }
 
+      const expense_id = this.lastID; // Get the inserted expense ID
+      createExpenseInvoice(expense_id, amount, payment_method, res); // <-- Pass payment_method
+    }
+  );
+}
+
+// Function to create the expense invoice
+function createExpenseInvoice(expense_id, total_amount, payment_method, res) {
+  const reference_number = `EXP-INV-${Date.now()}`;
+  const issue_date = new Date().toISOString().split("T")[0];
+
+  // Determine invoice status based on payment method
+  const status = payment_method === "credit" ? "unpaid" : "paid";
+
+  db.run(
+    `INSERT INTO expense_invoices (expense_id, reference_number, issue_date, total_amount, amount_paid, status) 
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      expense_id,
+      reference_number,
+      issue_date,
+      total_amount,
+      status === "paid" ? total_amount : 0,
+      status,
+    ], // <-- Set amount_paid if paid
+    function (err) {
+      if (err) {
+        console.error("Error creating expense invoice:", err.message);
+        return res.status(500).send("Error creating expense invoice");
+      }
+
       res.status(201).json({
-        message: "Expense created successfully",
-        expense_id: this.lastID,
+        message: "Expense and Invoice created successfully",
+        expense_id: expense_id,
+        invoice_id: this.lastID,
+        invoice_status: status,
       });
     }
   );
@@ -3545,8 +3859,12 @@ function createExpenseRecord(
 
 // ==================== READ EXPENSES ====================
 app.get("/expenses", (req, res) => {
-  const query = `SELECT * FROM expenses`;
-  
+  const query = `
+    SELECT e.*, ei.status 
+    FROM expenses e
+    LEFT JOIN expense_invoices ei ON e.id = ei.id
+  `;
+
   db.all(query, [], (err, rows) => {
     if (err) {
       console.error("Error fetching expenses:", err.message);
@@ -3576,37 +3894,238 @@ app.get("/expenses/:id", (req, res) => {
   });
 });
 
+app.put("/expenses/pay/:id", (req, res) => {
+  const { id } = req.params;
+  const { payment_method_id, payAmount } = req.body;
+
+  // Fetch expense details
+  db.get(
+    `SELECT e.*, ei.id AS invoice_id, ei.total_amount, ei.amount_paid, ei.balance_due
+     FROM expenses e
+     LEFT JOIN expense_invoices ei ON e.id = ei.id
+     WHERE e.id = ?`,
+    [id],
+    (err, expense) => {
+      if (err) {
+        console.error("Error fetching expense:", err.message);
+        return res.status(500).send("Error fetching expense");
+      }
+      if (!expense) {
+        return res.status(404).send("Expense not found");
+      }
+
+      // Ensure payment amount does not exceed balance due
+      if (payAmount > expense.balance_due) {
+        return res.status(400).send("Payment amount exceeds balance due");
+      }
+
+      // Step 1: Create a new Journal Entry for the payment
+      const reference_number = `PAY${Date.now()}`;
+      const date = new Date().toISOString().split("T")[0];
+      const journal_entry_description = `Payment for Expense #${id}`;
+
+      db.run(
+        `INSERT INTO journal_entries (reference_number, date, description, status) 
+         VALUES (?, ?, ?, 'posted')`,
+        [reference_number, date, journal_entry_description],
+        function (err) {
+          if (err) {
+            console.error("Error creating payment journal entry:", err.message);
+            return res.status(500).send("Error creating journal entry");
+          }
+
+          const journal_entry_id = this.lastID;
+
+          // Step 2: Create Journal Entry Lines
+          const paymentAccountId = payment_method_id; // Cash/Bank Account
+          const accountsPayableId = 5; // Replace with actual "Accounts Payable" account ID
+
+          // Debit: Reduce cash/bank balance
+          db.run(
+            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) 
+             VALUES (?, ?, ?, ?)`,
+            [journal_entry_id, paymentAccountId, payAmount, 0],
+            function (err) {
+              if (err) {
+                console.error("Error creating debit journal entry line:", err.message);
+                return res.status(500).send("Error creating journal entry line");
+              }
+
+              // Credit: Reduce liability
+              db.run(
+                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) 
+                 VALUES (?, ?, ?, ?)`,
+                [journal_entry_id, accountsPayableId, 0, payAmount],
+                function (err) {
+                  if (err) {
+                    console.error("Error creating credit journal entry line:", err.message);
+                    return res.status(500).send("Error creating journal entry line");
+                  }
+
+                  // Step 3: Update Payment Records
+                  const newAmountPaid = expense.amount_paid + payAmount;
+                  const newBalanceDue = expense.total_amount - newAmountPaid;
+                  const newStatus = newBalanceDue === 0 ? "paid" : "partial";
+
+                  db.run(
+                    `UPDATE expense_invoices 
+                     SET amount_paid = ?, status = ? 
+                     WHERE id = ?`,
+                    [newAmountPaid, newStatus, expense.invoice_id],
+                    function (err) {
+                      if (err) {
+                        console.error("Error updating expense status:", err.message);
+                        return res.status(500).send("Error updating expense status");
+                      }
+
+                      res.status(200).json({
+                        message: `Expense marked as ${newStatus}, journal entry created successfully!`,
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 // ==================== UPDATE EXPENSE ====================
 app.put("/expenses/:id", (req, res) => {
   const { id } = req.params;
-  const { expense_date, amount, expense_account_id, payment_method, description } = req.body;
+  const {
+    expense_date,
+    amount,
+    expense_account_id,
+    payment_method,
+    payment_method_id,
+    description,
+  } = req.body;
 
-  // Step 1: Update the journal entry for the expense
-  const query = `UPDATE journal_entries SET date = ?, description = ? WHERE id = (SELECT journal_entry_id FROM expenses WHERE id = ?)`;
-
-  db.run(query, [expense_date, description, id], function (err) {
-    if (err) {
-      console.error("Error updating journal entry:", err.message);
-      return res.status(500).send("Error updating journal entry");
-    }
-
-    // Step 2: Update the expense record
-    const updateExpenseQuery = `
-      UPDATE expenses 
-      SET expense_date = ?, amount = ?, expense_account_id = ?, payment_method = ?, description = ?
-      WHERE id = ?
-    `;
-
-    db.run(updateExpenseQuery, [expense_date, amount, expense_account_id, payment_method, description, id], function (err) {
+  // Step 1: Get journal_entry_id associated with the expense
+  db.get(
+    `SELECT journal_entry_id FROM expenses WHERE id = ?`,
+    [id],
+    (err, row) => {
       if (err) {
-        console.error("Error updating expense:", err.message);
-        return res.status(500).send("Error updating expense");
+        console.error("Error fetching journal entry ID:", err.message);
+        return res.status(500).send("Error fetching journal entry ID");
       }
 
-      res.status(200).json({ message: "Expense updated successfully" });
-    });
-  });
+      if (!row) {
+        return res.status(404).send("Expense not found");
+      }
+
+      const journal_entry_id = row.journal_entry_id;
+
+      // Step 2: Update the journal entry (date, description)
+      db.run(
+        `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
+        [expense_date, description, journal_entry_id],
+        function (err) {
+          if (err) {
+            console.error("Error updating journal entry:", err.message);
+            return res.status(500).send("Error updating journal entry");
+          }
+
+          // Step 3: Update journal entry lines (debit & credit)
+          updateJournalEntryLines(
+            journal_entry_id,
+            expense_account_id,
+            amount,
+            payment_method,
+            payment_method_id,
+            res,
+            () => {
+              // Step 4: Update the expense record
+              db.run(
+                `UPDATE expenses 
+                 SET expense_date = ?, amount = ?, expense_account_id = ?, payment_method = ?, description = ? 
+                 WHERE id = ?`,
+                [
+                  expense_date,
+                  amount,
+                  expense_account_id,
+                  payment_method,
+                  description,
+                  id,
+                ],
+                function (err) {
+                  if (err) {
+                    console.error("Error updating expense:", err.message);
+                    return res.status(500).send("Error updating expense");
+                  }
+
+                  res
+                    .status(200)
+                    .json({ message: "Expense updated successfully" });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
 });
+
+// Function to update journal entry lines
+function updateJournalEntryLines(
+  journal_entry_id,
+  expense_account_id,
+  amount,
+  payment_method,
+  payment_method_id,
+  res,
+  callback
+) {
+  db.serialize(() => {
+    // Update Debit Entry (Expense Account)
+    db.run(
+      `UPDATE journal_entry_lines 
+       SET account_id = ?, debit = ?, credit = 0 
+       WHERE journal_entry_id = ? AND debit > 0`,
+      [expense_account_id, amount, journal_entry_id],
+      function (err) {
+        if (err) {
+          console.error(
+            "Error updating expense journal entry line:",
+            err.message
+          );
+          return res
+            .status(500)
+            .send("Error updating expense journal entry line");
+        }
+
+        // Update Credit Entry (Payment Method or Accounts Payable)
+        const creditAccountId =
+          payment_method === "credit" ? 5 : payment_method_id; // 5 = Accounts Payable
+        db.run(
+          `UPDATE journal_entry_lines 
+           SET account_id = ?, debit = 0, credit = ? 
+           WHERE journal_entry_id = ? AND credit > 0`,
+          [creditAccountId, amount, journal_entry_id],
+          function (err) {
+            if (err) {
+              console.error(
+                "Error updating payment journal entry line:",
+                err.message
+              );
+              return res
+                .status(500)
+                .send("Error updating payment journal entry line");
+            }
+
+            callback(); // Proceed with updating expense record
+          }
+        );
+      }
+    );
+  });
+}
 
 app.patch("/expenses/payment/:id", (req, res) => {
   const { id } = req.params;
@@ -3644,29 +4163,44 @@ app.patch("/expenses/payment/:id", (req, res) => {
         INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
         VALUES ((SELECT journal_entry_id FROM expenses WHERE id = ?), ?, ?, 0)
       `;
-      
+
       const insertCreditQuery = `
         INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
         VALUES ((SELECT journal_entry_id FROM expenses WHERE id = ?), ?, 0, ?)
       `;
 
       // Debit the expense account
-      db.run(insertDebitQuery, [id, expense_account_id, amount], function (err) {
-        if (err) {
-          console.error("Error inserting debit journal line:", err.message);
-          return res.status(500).send("Error inserting debit journal line");
-        }
-
-        // Credit the payment method account
-        db.run(insertCreditQuery, [id, payment_method, amount], function (err) {
+      db.run(
+        insertDebitQuery,
+        [id, expense_account_id, amount],
+        function (err) {
           if (err) {
-            console.error("Error inserting credit journal line:", err.message);
-            return res.status(500).send("Error inserting credit journal line");
+            console.error("Error inserting debit journal line:", err.message);
+            return res.status(500).send("Error inserting debit journal line");
           }
 
-          res.status(200).json({ message: "Payment recorded successfully and journal updated" });
-        });
-      });
+          // Credit the payment method account
+          db.run(
+            insertCreditQuery,
+            [id, payment_method, amount],
+            function (err) {
+              if (err) {
+                console.error(
+                  "Error inserting credit journal line:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error inserting credit journal line");
+              }
+
+              res.status(200).json({
+                message: "Payment recorded successfully and journal updated",
+              });
+            }
+          );
+        }
+      );
     });
   });
 });
@@ -3708,19 +4242,122 @@ app.delete("/expenses/:id", (req, res) => {
           return res.status(500).send("Error deleting journal entry");
         }
 
-        // Step 4: Delete the expense record
-        const deleteExpenseQuery = `DELETE FROM expenses WHERE id = ?`;
+        // Step 4: Delete the related expense invoice
+        const deleteExpenseInvoiceQuery = `DELETE FROM expense_invoices WHERE id = ?`;
 
-        db.run(deleteExpenseQuery, [id], (err) => {
+        db.run(deleteExpenseInvoiceQuery, [id], (err) => {
           if (err) {
-            console.error("Error deleting expense:", err.message);
-            return res.status(500).send("Error deleting expense");
+            console.error("Error deleting expense invoice:", err.message);
+            return res.status(500).send("Error deleting expense invoice");
           }
 
-          res.status(200).json({ message: "Expense deleted successfully" });
+          // Step 5: Delete the expense record
+          const deleteExpenseQuery = `DELETE FROM expenses WHERE id = ?`;
+
+          db.run(deleteExpenseQuery, [id], (err) => {
+            if (err) {
+              console.error("Error deleting expense:", err.message);
+              return res.status(500).send("Error deleting expense");
+            }
+
+            res
+              .status(200)
+              .json({
+                message: "Expense and related invoice deleted successfully",
+              });
+          });
         });
       });
     });
+  });
+});
+
+// 🔹 Get All Invoices
+app.get("/expense-invoices", (req, res) => {
+  db.all("SELECT * FROM expense_invoices", [], (err, rows) => {
+    if (err) {
+      console.error("Error fetching invoices:", err.message);
+      return res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+    res.json(rows);
+  });
+});
+
+// 🔹 Get Single Invoice by ID
+app.get("/expense-invoices/:id", (req, res) => {
+  const { id } = req.params;
+  db.get("SELECT * FROM expense_invoices WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      console.error("Error fetching invoice:", err.message);
+      return res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+    if (!row) return res.status(404).json({ error: "Invoice not found" });
+    res.json(row);
+  });
+});
+
+// 🔹 Create New Invoice
+app.post("/expense-invoices", (req, res) => {
+  const { expense_id, total_amount } = req.body;
+  if (!expense_id || !total_amount) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const reference_number = `EXP${Date.now()}`;
+  const issue_date = new Date().toISOString().split("T")[0];
+
+  db.run(
+    `INSERT INTO expense_invoices (expense_id, reference_number, issue_date, total_amount, amount_paid, status) 
+     VALUES (?, ?, ?, ?, 0, 'unpaid')`,
+    [expense_id, reference_number, issue_date, total_amount],
+    function (err) {
+      if (err) {
+        console.error("Error creating invoice:", err.message);
+        return res.status(500).json({ error: "Failed to create invoice" });
+      }
+      res.status(201).json({ message: "Invoice created", id: this.lastID });
+    }
+  );
+});
+
+// 🔹 Update Invoice (Payment)
+app.put("/expense-invoices/:id", (req, res) => {
+  const { id } = req.params;
+  const { amount_paid } = req.body;
+
+  if (amount_paid === undefined) {
+    return res.status(400).json({ error: "Amount paid is required" });
+  }
+
+  db.run(
+    `UPDATE expense_invoices 
+     SET amount_paid = ?, 
+         status = CASE 
+                    WHEN total_amount = amount_paid THEN 'paid'
+                    WHEN amount_paid > 0 THEN 'partial'
+                    ELSE 'unpaid'
+                  END
+     WHERE id = ?`,
+    [amount_paid, id],
+    function (err) {
+      if (err) {
+        console.error("Error updating invoice:", err.message);
+        return res.status(500).json({ error: "Failed to update invoice" });
+      }
+      res.json({ message: "Invoice updated successfully" });
+    }
+  );
+});
+
+// 🔹 Delete Invoice
+app.delete("/expense-invoices/:id", (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM expense_invoices WHERE id = ?", [id], function (err) {
+    if (err) {
+      console.error("Error deleting invoice:", err.message);
+      return res.status(500).json({ error: "Failed to delete invoice" });
+    }
+    res.json({ message: "Invoice deleted successfully" });
   });
 });
 
@@ -3769,8 +4406,14 @@ app.get("/reports/income-statement", (req, res) => {
         }
 
         // Calculate totals
-        const totalRevenue = revenue.reduce((sum, item) => sum + item.amount, 0);
-        const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const totalRevenue = revenue.reduce(
+          (sum, item) => sum + item.amount,
+          0
+        );
+        const totalExpenses = expenses.reduce(
+          (sum, item) => sum + item.amount,
+          0
+        );
         const netIncome = totalRevenue - totalExpenses;
 
         // Respond with the income statement data
@@ -3790,7 +4433,7 @@ app.get("/reports/income-statement", (req, res) => {
 });
 
 app.get("/reports/balance-sheet", async (req, res) => {
-  const { date } = req.query;  // Extract the date from the query parameters
+  const { date } = req.query; // Extract the date from the query parameters
 
   // Validate the date
   if (!date) {
@@ -3798,7 +4441,7 @@ app.get("/reports/balance-sheet", async (req, res) => {
   }
 
   // Convert the date to a format suitable for SQL query (assuming the date is in 'YYYY-MM-DD' format)
-  const dateFormatted = new Date(date).toISOString().split('T')[0]; // Format as 'YYYY-MM-DD'
+  const dateFormatted = new Date(date).toISOString().split("T")[0]; // Format as 'YYYY-MM-DD'
 
   try {
     // Define queries with date filters using journal_entry.date
@@ -3872,7 +4515,9 @@ app.get("/reports/balance-sheet", async (req, res) => {
     const currentAssetsStmt = db.prepare(queries.currentAssetsQuery);
     const nonCurrentAssetsStmt = db.prepare(queries.nonCurrentAssetsQuery);
     const currentLiabilitiesStmt = db.prepare(queries.currentLiabilitiesQuery);
-    const nonCurrentLiabilitiesStmt = db.prepare(queries.nonCurrentLiabilitiesQuery);
+    const nonCurrentLiabilitiesStmt = db.prepare(
+      queries.nonCurrentLiabilitiesQuery
+    );
     const equityStmt = db.prepare(queries.equityQuery);
     const revenueStmt = db.prepare(queries.revenueQuery);
     const expenseStmt = db.prepare(queries.expenseQuery);
@@ -3981,7 +4626,6 @@ ORDER BY
   }
 });
 
-
 // API endpoint to fetch chart of accounts with balances
 app.get("/chart-of-accounts", (req, res) => {
   try {
@@ -4029,7 +4673,10 @@ app.get("/chart-of-accounts", (req, res) => {
 
     db.all(query, [], (err, accounts) => {
       if (err) {
-        console.error("Error fetching chart of accounts with balances:", err.message);
+        console.error(
+          "Error fetching chart of accounts with balances:",
+          err.message
+        );
         return res.status(500).send("Error fetching chart of accounts.");
       }
 
@@ -4058,7 +4705,10 @@ app.get("/chart-of-accounts", (req, res) => {
       res.json(accountsWithBalances);
     });
   } catch (error) {
-    console.error("Error fetching chart of accounts with balances:", error.message);
+    console.error(
+      "Error fetching chart of accounts with balances:",
+      error.message
+    );
     res.status(500).send("Failed to fetch chart of accounts.");
   }
 });

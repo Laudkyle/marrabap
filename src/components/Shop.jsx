@@ -94,7 +94,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       return;
     }
 
-    if (!sellingPrice || sellingPrice <= 0) {
+    if (!sellingPrice  || sellingPrice <= 0  ) {
       setError("Please enter a valid selling price");
       return;
     }
@@ -178,7 +178,11 @@ function Shop({ companyName, companyAddress, email, phone }) {
       return updatedCart;
     });
   };
-
+  useEffect(() => {
+    if (selectedProduct) {
+      setSellingPrice(selectedProduct.sp);
+    }
+  }, [selectedProduct]);
   // Updated handleMakeSale function
   const handleMakeSale = async () => {
     try {
@@ -314,7 +318,9 @@ function Shop({ companyName, companyAddress, email, phone }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
-              <div key={product.id} onClick={() => handleProductClick(product)}>
+              <div key={product.id} onClick={() => {handleProductClick(product)
+
+              }}>
                 <ProductCard product={product} />
               </div>
             ))
@@ -324,7 +330,8 @@ function Shop({ companyName, companyAddress, email, phone }) {
         </div>
       </div>
       {/* Product Details Modal */}
-      {selectedProduct && (
+      {(selectedProduct) && (
+        
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%]">
             {/* Modal Header */}

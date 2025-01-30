@@ -277,6 +277,7 @@ END;
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 )
 `);
+
   db.run(`CREATE TABLE IF NOT EXISTS supplier_invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- Unique invoice ID
     reference_number TEXT UNIQUE NOT NULL, -- Unique identifier for the invoice
@@ -494,6 +495,19 @@ END;
 );
 
 `);
+db.run(`CREATE TABLE expense_invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  expense_id INTEGER UNIQUE NOT NULL, -- Links to expenses table
+  reference_number TEXT UNIQUE NOT NULL, -- Unique invoice reference
+  issue_date DATE NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Invoice date
+  total_amount DECIMAL NOT NULL CHECK(total_amount >= 0), -- Invoice total
+  amount_paid DECIMAL DEFAULT 0 CHECK(amount_paid >= 0), -- Amount paid
+  balance_due DECIMAL GENERATED ALWAYS AS (total_amount - amount_paid) VIRTUAL, -- Auto-calculated balance
+  status TEXT DEFAULT 'unpaid', -- Status: unpaid, partial, paid
+  FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
+);
+`)
+
   // Triggers
   db.run(`CREATE TRIGGER after_supplier_insert
 AFTER INSERT ON suppliers
