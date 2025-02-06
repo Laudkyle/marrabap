@@ -63,7 +63,7 @@ const Dashboard = ({companyName}) => {
       .catch((err) => console.error("Error fetching sales returns:", err));
 
     // Fetch purchase returns data
-    fetch("http://localhost:5000/returns")
+    fetch("http://localhost:5000/sales/returns")
       .then((response) => response.json())
       .then((data) => setPurchaseReturns(data))
       .catch((err) => console.error("Error fetching purchase returns:", err));

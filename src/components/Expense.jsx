@@ -95,7 +95,7 @@ const ExpenseComponent = () => {
       setSelectedExpense(null);
       fetchExpenses();
     } catch (error) {
-      console.error("Error saving expense:", error);
+      console.error("Error saving expense:", error.message);
     } finally {
       setLoading(false); // Stop loading
     }
@@ -159,6 +159,7 @@ const ExpenseComponent = () => {
 
   const handleEditExpense = (expense) => {
     setSelectedExpense(expense);
+
     setNewExpense({
       expense_date: expense.expense_date,
       amount: expense.amount,
@@ -188,6 +189,10 @@ const ExpenseComponent = () => {
       selector: (row) => row.description,
     },
     {
+      name: "Balance due",
+      selector: (row) => row.balance_due,
+    },
+    {
       name: "Status",
       selector: (row) => row.status, // Display expense status (paid/unpaid)
       sortable: true,
@@ -205,7 +210,9 @@ const ExpenseComponent = () => {
         <div className="flex space-x-4">
           {row.status === "unpaid" && (
             <FaEdit
-              onClick={() => handleEditExpense(row.id)}
+              onClick={() => {handleEditExpense(row)
+
+              }}
               className="cursor-pointer text-yellow-500 hover:text-yellow-700"
               title="Edit"
             />

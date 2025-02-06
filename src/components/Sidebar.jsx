@@ -63,11 +63,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Customer Groups",
           icon: <Group className="w-4 h-4" />,
         },
-        {
-          path: "/operations",
-          label: "Operations",
-          icon: <Cog className="w-4 h-4" />,
-        },
+       
       ],
     },
     {
@@ -205,28 +201,6 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/tax-reports",
           label: "Tax Reports",
           icon: <List className="w-4 h-4" />,
-        },
-      ],
-    },
-    {
-      name: "Fixed Assets",
-      icon: <Building2 className="w-4 h-4" />,
-      dropdown: "fixed-assets",
-      links: [
-        {
-          path: "/add-asset",
-          label: "Add Asset",
-          icon: <PlusCircle className="w-4 h-4" />,
-        },
-        {
-          path: "/list-assets",
-          label: "List Assets",
-          icon: <List className="w-4 h-4" />,
-        },
-        {
-          path: "/depreciation",
-          label: "Depreciation Schedule",
-          icon: <Calculator className="w-4 h-4" />,
         },
       ],
     },

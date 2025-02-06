@@ -3860,7 +3860,7 @@ function createExpenseInvoice(expense_id, total_amount, payment_method, res) {
 // ==================== READ EXPENSES ====================
 app.get("/expenses", (req, res) => {
   const query = `
-    SELECT e.*, ei.status 
+    SELECT e.*, ei.status, ei.balance_due
     FROM expenses e
     LEFT JOIN expense_invoices ei ON e.id = ei.id
   `;
@@ -3944,7 +3944,7 @@ app.put("/expenses/pay/:id", (req, res) => {
           db.run(
             `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) 
              VALUES (?, ?, ?, ?)`,
-            [journal_entry_id, paymentAccountId, payAmount, 0],
+            [journal_entry_id, paymentAccountId, 0, payAmount],
             function (err) {
               if (err) {
                 console.error("Error creating debit journal entry line:", err.message);
@@ -3955,7 +3955,7 @@ app.put("/expenses/pay/:id", (req, res) => {
               db.run(
                 `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) 
                  VALUES (?, ?, ?, ?)`,
-                [journal_entry_id, accountsPayableId, 0, payAmount],
+                [journal_entry_id, accountsPayableId, payAmount, 0],
                 function (err) {
                   if (err) {
                     console.error("Error creating credit journal entry line:", err.message);
@@ -3963,8 +3963,9 @@ app.put("/expenses/pay/:id", (req, res) => {
                   }
 
                   // Step 3: Update Payment Records
-                  const newAmountPaid = expense.amount_paid + payAmount;
-                  const newBalanceDue = expense.total_amount - newAmountPaid;
+                  const newAmountPaid = parseFloat(expense.amount_paid) + parseFloat(payAmount);
+
+                  const newBalanceDue = parseFloat(expense.total_amount) - parseFloat(newAmountPaid);
                   const newStatus = newBalanceDue === 0 ? "paid" : "partial";
 
                   db.run(
@@ -3992,7 +3993,6 @@ app.put("/expenses/pay/:id", (req, res) => {
     }
   );
 });
-
 // ==================== UPDATE EXPENSE ====================
 app.put("/expenses/:id", (req, res) => {
   const { id } = req.params;
@@ -4004,10 +4004,9 @@ app.put("/expenses/:id", (req, res) => {
     payment_method_id,
     description,
   } = req.body;
-
   // Step 1: Get journal_entry_id associated with the expense
   db.get(
-    `SELECT journal_entry_id FROM expenses WHERE id = ?`,
+    `SELECT journal_entry_id, id AS invoice_id FROM expenses WHERE id = ?`,
     [id],
     (err, row) => {
       if (err) {
@@ -4020,7 +4019,8 @@ app.put("/expenses/:id", (req, res) => {
       }
 
       const journal_entry_id = row.journal_entry_id;
-
+      const invoice_id = row.invoice_id;
+      
       // Step 2: Update the journal entry (date, description)
       db.run(
         `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
@@ -4059,9 +4059,10 @@ app.put("/expenses/:id", (req, res) => {
                     return res.status(500).send("Error updating expense");
                   }
 
-                  res
-                    .status(200)
-                    .json({ message: "Expense updated successfully" });
+                  // Step 5: Update the expense invoice (if applicable)
+                  updateExpenseInvoice(invoice_id, amount, res, () => {
+                    res.status(200).json({ message: "Expense updated successfully" });
+                  });
                 }
               );
             }
@@ -4126,6 +4127,41 @@ function updateJournalEntryLines(
     );
   });
 }
+
+// Function to update the expense_invoice
+function updateExpenseInvoice(invoice_id, amount, res, callback) {
+  // Fetch current invoice data
+  db.get(
+    `SELECT total_amount, amount_paid, balance_due FROM expense_invoices WHERE expense_id = ?`,
+    [invoice_id],
+    (err, invoice) => {
+      if (err) {
+        console.error("Error fetching expense invoice:", err.message);
+        return res.status(500).send("Error fetching expense invoice");
+      }
+
+      if (!invoice) {
+        return res.status(404).send("Invoice not found");
+      }
+      // Update invoice with new amount_paid and balance_due
+      db.run(
+        `UPDATE expense_invoices
+         SET total_amount = ?
+         WHERE expense_id = ?`,
+        [amount, invoice_id],
+        function (err) {
+          if (err) {
+            console.error("Error updating expense invoice:", err.message);
+            return res.status(500).send("Error updating expense invoice");
+          }
+
+          callback(); // Proceed with final response
+        }
+      );
+    }
+  );
+}
+
 
 app.patch("/expenses/payment/:id", (req, res) => {
   const { id } = req.params;
@@ -4209,10 +4245,8 @@ app.patch("/expenses/payment/:id", (req, res) => {
 app.delete("/expenses/:id", (req, res) => {
   const { id } = req.params;
 
-  // Step 1: Get the journal entry ID for the expense
-  const getJournalEntryIdQuery = `SELECT journal_entry_id FROM expenses WHERE id = ?`;
-
-  db.get(getJournalEntryIdQuery, [id], (err, row) => {
+  // Step 1: Get journal entry ID for the expense
+  db.get(`SELECT journal_entry_id FROM expenses WHERE id = ?`, [id], (err, row) => {
     if (err) {
       console.error("Error fetching journal entry ID:", err.message);
       return res.status(500).send("Error fetching journal entry ID");
@@ -4223,54 +4257,108 @@ app.delete("/expenses/:id", (req, res) => {
     }
 
     const journal_entry_id = row.journal_entry_id;
+    const reversal_reference = `REV${Date.now()}`;
+    const reversal_date = new Date().toISOString().split("T")[0];
 
-    // Step 2: Delete the journal entry lines
-    const deleteJournalEntryLinesQuery = `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`;
+    // Step 2: Fetch existing journal entry lines
+    db.all(`SELECT account_id, debit, credit FROM journal_entry_lines WHERE journal_entry_id = ?`, 
+      [journal_entry_id], 
+      (err, lines) => {
+        if (err) {
+          console.error("Error fetching journal entry lines:", err.message);
+          return res.status(500).send("Error fetching journal entry lines");
+        }
 
-    db.run(deleteJournalEntryLinesQuery, [journal_entry_id], (err) => {
+        if (!lines || lines.length === 0) {
+          return res.status(404).send("No journal entry lines found for expense.");
+        }
+
+        // Step 3: Insert a new reversing journal entry
+        db.run(
+          `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+          [reversal_reference, reversal_date, `Reversal for Expense #${id}`],
+          function (err) {
+            if (err) {
+              console.error("Error creating reversing journal entry:", err.message);
+              return res.status(500).send("Error creating reversing journal entry");
+            }
+
+            const reversal_entry_id = this.lastID;
+
+            // Step 4: Insert reversing journal entry lines
+            let insertQueries = lines.map(line => {
+              return new Promise((resolve, reject) => {
+                db.run(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                  [reversal_entry_id, line.account_id, line.credit, line.debit], // Reversing debit & credit
+                  function (err) {
+                    if (err) {
+                      console.error("Error inserting reversing journal entry line:", err.message);
+                      reject(err);
+                    } else {
+                      resolve();
+                    }
+                  }
+                );
+              });
+            });
+
+            Promise.all(insertQueries)
+              .then(() => {
+                // Step 5: Proceed with deleting original journal entry and expense
+                deleteExpenseAndInvoice(journal_entry_id, id, res);
+              })
+              .catch(err => {
+                console.error("Error inserting reversing journal entry lines:", err.message);
+                res.status(500).send("Error inserting reversing journal entry lines");
+              });
+          }
+        );
+      }
+    );
+  });
+});
+
+// Function to delete the journal entry, invoice, and expense
+function deleteExpenseAndInvoice(journal_entry_id, expense_id, res) {
+  db.serialize(() => {
+    // Delete Journal Entry Lines
+    db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journal_entry_id], function (err) {
       if (err) {
         console.error("Error deleting journal entry lines:", err.message);
         return res.status(500).send("Error deleting journal entry lines");
       }
 
-      // Step 3: Delete the journal entry itself
-      const deleteJournalEntryQuery = `DELETE FROM journal_entries WHERE id = ?`;
-
-      db.run(deleteJournalEntryQuery, [journal_entry_id], (err) => {
+      // Delete Journal Entry
+      db.run(`DELETE FROM journal_entries WHERE id = ?`, [journal_entry_id], function (err) {
         if (err) {
           console.error("Error deleting journal entry:", err.message);
           return res.status(500).send("Error deleting journal entry");
         }
 
-        // Step 4: Delete the related expense invoice
-        const deleteExpenseInvoiceQuery = `DELETE FROM expense_invoices WHERE id = ?`;
-
-        db.run(deleteExpenseInvoiceQuery, [id], (err) => {
+        // Delete Expense Invoice
+        db.run(`DELETE FROM expense_invoices WHERE id = ?`, [expense_id], function (err) {
           if (err) {
             console.error("Error deleting expense invoice:", err.message);
             return res.status(500).send("Error deleting expense invoice");
           }
 
-          // Step 5: Delete the expense record
-          const deleteExpenseQuery = `DELETE FROM expenses WHERE id = ?`;
-
-          db.run(deleteExpenseQuery, [id], (err) => {
+          // Delete Expense Record
+          db.run(`DELETE FROM expenses WHERE id = ?`, [expense_id], function (err) {
             if (err) {
               console.error("Error deleting expense:", err.message);
               return res.status(500).send("Error deleting expense");
             }
 
-            res
-              .status(200)
-              .json({
-                message: "Expense and related invoice deleted successfully",
-              });
+            res.status(200).json({
+              message: "Expense deleted successfully, and reversal entry recorded.",
+            });
           });
         });
       });
     });
   });
-});
+}
 
 // 🔹 Get All Invoices
 app.get("/expense-invoices", (req, res) => {
