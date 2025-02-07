@@ -48,7 +48,7 @@ const SupplierPayment = () => {
   }, []);
 
   const generateReferenceNumber = () => {
-    const uniqueNumber = Date.now() + Math.floor(Math.random() * 1000000);
+    const uniqueNumber = parseInt(Date.now()) + Math.floor(Math.random() * 1000000);
     return `SUP- ${uniqueNumber}`;
   };
 

@@ -13,11 +13,26 @@ const PaymentList = () => {
   const [paymentToDelete, setPaymentToDelete] = useState(null);
   const [searchText, setSearchText] = useState("");
 
-  // Fetch payments from the backend
+  // Fetch both supplier payments and customer payments
   const fetchPayments = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/payments");
-      setPayments(response.data);
+      const [customerPayments, supplierPayments] = await Promise.all([
+        axios.get("http://localhost:5000/payments"),
+        axios.get("http://localhost:5000/supplier_payments"),
+      ]);
+
+      const combinedPayments = [
+        ...customerPayments.data.map((payment) => ({
+          ...payment,
+          type: "Customer Payment",
+        })),
+        ...supplierPayments.data.map((payment) => ({
+          ...payment,
+          type: "Supplier Payment",
+        })),
+      ];
+
+      setPayments(combinedPayments);
     } catch (error) {
       console.error("Error fetching payments:", error);
       toast.error("Failed to load payments.");
@@ -43,7 +58,12 @@ const PaymentList = () => {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/payments/${paymentToDelete.id}`);
+      const endpoint =
+        paymentToDelete.type === "Supplier Payment"
+          ? `http://localhost:5000/supplier_payments/${paymentToDelete.id}`
+          : `http://localhost:5000/payments/${paymentToDelete.id}`;
+
+      await axios.delete(endpoint);
       toast.success("Payment deleted successfully.");
       setShowDeleteConfirmation(false);
       fetchPayments(); // Refresh payments list
@@ -66,18 +86,24 @@ const PaymentList = () => {
   const filteredPayments = payments.filter((payment) => {
     const searchLower = searchText.toLowerCase();
     return (
-      payment.reference_number.toLowerCase().includes(searchLower) ||
+      (payment.reference_number ||payment.payment_reference).toLowerCase().includes(searchLower) ||
       payment.payment_date.toLowerCase().includes(searchLower) ||
       payment.amount_paid.toString().toLowerCase().includes(searchLower) ||
-      (payment.payment_method && payment.payment_method.toLowerCase().includes(searchLower))
+      (payment.payment_method && payment.payment_method.toLowerCase().includes(searchLower)) ||
+      payment.type.toLowerCase().includes(searchLower)
     );
   });
 
   // DataTable columns definition
   const columns = [
     {
+      name: "Type",
+      selector: (row) => row.type,
+      sortable: true,
+    },
+    {
       name: "Reference Number",
-      selector: (row) => row.reference_number,
+      selector: (row) => row.reference_number||row.payment_reference,
       sortable: true,
     },
     {
@@ -158,20 +184,12 @@ const PaymentList = () => {
         overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center"
       >
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Confirm Delete</h2>
-        <p className="text-gray-600">
-          Are you sure you want to delete this payment?
-        </p>
+        <p className="text-gray-600">Are you sure you want to delete this payment?</p>
         <div className="flex justify-end space-x-4 mt-4">
-          <button
-            onClick={() => setShowDeleteConfirmation(false)}
-            className="bg-gray-300 text-gray-700 py-2 px-4 rounded-lg"
-          >
+          <button onClick={() => setShowDeleteConfirmation(false)} className="bg-gray-300 text-gray-700 py-2 px-4 rounded-lg">
             Cancel
           </button>
-          <button
-            onClick={confirmDelete}
-            className="bg-red-500 text-white py-2 px-4 rounded-lg"
-          >
+          <button onClick={confirmDelete} className="bg-red-500 text-white py-2 px-4 rounded-lg">
             Confirm
           </button>
         </div>
@@ -189,53 +207,25 @@ const PaymentList = () => {
           <h3 className="text-3xl font-bold text-gray-800 mb-6">Payment Details</h3>
 
           <div className="space-y-4">
-            <div>
-              <strong>Reference Number:</strong> {selectedPayment.reference_number}
-            </div>
-            <div>
-              <strong>Payment Date:</strong> {selectedPayment.payment_date}
-            </div>
-            <div>
-              <strong>Amount Paid:</strong> {selectedPayment.amount_paid}
-            </div>
-            <div>
-              <strong>Payment Method:</strong> {selectedPayment.payment_method || "N/A"}
-            </div>
+            <div><strong>Reference Number:</strong> {selectedPayment.reference_number || selectedPayment.payment_reference}</div>
+            <div><strong>Payment Date:</strong> {selectedPayment.payment_date}</div>
+            <div><strong>Amount Paid:</strong> {selectedPayment.amount_paid}</div>
+            <div><strong>Payment Method:</strong> {selectedPayment.payment_method || "N/A"}</div>
           </div>
 
           {/* Documents Table */}
-          <div className="mt-6 max-h-[200px] overflow-y-scroll">
-            <h4 className="text-xl font-semibold text-gray-800 mb-4">Related Documents</h4>
-            <DataTable
-              title="Documents"
-              columns={[
-                { name: "Transaction Type", selector: (row) => row.transaction_type, sortable: true },
-                { name: "Document Name", selector: (row) => row.document_name, sortable: true },
-                { name: "Uploaded On", selector: (row) => row.uploaded_on, sortable: true },
-                {
-                  name: "File Path",
-                  selector: (row) => (
-                    <a href={row.file_path} target="_blank" rel="noopener noreferrer" className="text-blue-500">
-                      View Document
-                    </a>
-                  ),
-                  sortable: true,
-                },
-              ]}
-              data={documents}
-              pagination
-              highlightOnHover
-            />
-          </div>
+          <h4 className="text-xl font-semibold text-gray-800 mb-4 mt-6">Related Documents</h4>
+          <DataTable
+            columns={[
+              { name: "Document Name", selector: (row) => row.document_name, sortable: true },
+              { name: "Uploaded On", selector: (row) => row.uploaded_on, sortable: true },
+              { name: "File", selector: (row) => <a href={row.file_path} target="_blank" className="text-blue-500">View</a> },
+            ]}
+            data={documents}
+            pagination
+          />
 
-          <div className="flex justify-end space-x-4 mt-6">
-            <button
-              onClick={() => setSelectedPayment(null)}
-              className="bg-gray-300 text-gray-700 py-2 px-6 rounded-lg hover:bg-gray-400"
-            >
-              Close
-            </button>
-          </div>
+          <button onClick={() => setSelectedPayment(null)} className="bg-gray-300 py-2 px-6 rounded-lg mt-6">Close</button>
         </ReactModal>
       )}
 

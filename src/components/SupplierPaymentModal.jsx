@@ -39,7 +39,7 @@ const SupplierPaymentModal = ({ isOpen, onClose, supplierId }) => {
     e.preventDefault();
     setLoading(true);
 
-    const referenceNumber = `SUP-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const referenceNumber = `SUP-${Date.now()}`;
     
     if (!paymentData.amountPaid || paymentData.amountPaid <= 0) {
       setLoading(false);
