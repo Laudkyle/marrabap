@@ -246,6 +246,7 @@ END;
 
   db.run(`CREATE TABLE IF NOT EXISTS payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL, -- Reference to the customer
   reference_number TEXT NOT NULL, -- Links payment to an invoice
   payment_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Date and time of payment
   amount_paid REAL NOT NULL CHECK(amount_paid > 0), -- Payment amount must be positive

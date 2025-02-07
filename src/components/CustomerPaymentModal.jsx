@@ -4,6 +4,7 @@ import { toast, ToastContainer } from "react-toastify";
 
 const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
   const [paymentData, setPaymentData] = useState({
+    customerId: "",
     invoiceId: "",
     amountPaid: "",
     paymentMethod: "cash",
@@ -86,6 +87,7 @@ const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
     }
 
     const paymentPayload = {
+      customerId:selectedInvoice.customer_id,
       reference_number: selectedInvoice.reference_number,
       payment_date: paymentData.paymentDate,
       amount_paid: paymentData.amountPaid,

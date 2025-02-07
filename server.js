@@ -1962,6 +1962,7 @@ app.delete("/payment-methods/:id", (req, res) => {
 // ===================== Payments Endpoints =====================
 app.post("/payments", (req, res) => {
   const {
+    customerId,
     reference_number,
     payment_date,
     amount_paid,
@@ -1977,10 +1978,11 @@ app.post("/payments", (req, res) => {
 
   // Insert the payment
   const paymentQuery = `
-    INSERT INTO payments (reference_number, payment_date, amount_paid, payment_method, payment_reference)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO payments (customer_id,reference_number, payment_date, amount_paid, payment_method, payment_reference)
+    VALUES (?,?, ?, ?, ?, ?)
   `;
   const paymentParams = [
+    customerId,
     reference_number,
     payment_date || new Date().toISOString(),
     amount_paid,
@@ -2051,6 +2053,7 @@ app.post("/payments", (req, res) => {
           paymentId,
           "insert",
           JSON.stringify({
+            customerId,
             reference_number,
             payment_date,
             amount_paid,
