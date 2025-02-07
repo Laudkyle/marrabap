@@ -1041,7 +1041,7 @@ app.post("/accounts", (req, res) => {
 
         const newAccountId = this.lastID;
 
-        if (balance > 0) {
+        if (balance !== 0) {
           const referenceNumber = `OB-${Date.now()}`;
           const date = new Date().toISOString().split("T")[0];
           const description = `Opening balance for ${account_name}`;
@@ -1071,8 +1071,14 @@ app.post("/accounts", (req, res) => {
               const isDebit = ["asset", "expense"].includes(
                 account_type.toLowerCase()
               );
-              const debit = isDebit ? balance : 0;
-              const credit = isDebit ? 0 : balance;
+
+              let debit = isDebit ? Math.abs(balance) : 0;
+              let credit = isDebit ? 0 : Math.abs(balance);
+
+              // If balance is negative, swap debit and credit
+              if (balance < 0) {
+                [debit, credit] = [credit, debit];
+              }
 
               db.run(
                 journalLineQuery,
@@ -1210,15 +1216,14 @@ app.put("/accounts/:id", (req, res) => {
             status: "posted",
           };
 
-          const debit =
-            ["asset", "expense"].includes(account.account_type) && balance > 0
-              ? balance
-              : 0;
-          const credit =
-            ["liability", "equity", "revenue"].includes(account.account_type) &&
-            balance > 0
-              ? balance
-              : 0;
+          let isDebit = ["asset", "expense"].includes(account.account_type);
+          let debit = isDebit ? Math.abs(balance) : 0;
+          let credit = isDebit ? 0 : Math.abs(balance);
+
+          // Swap debit and credit if balance is negative
+          if (balance < 0) {
+            [debit, credit] = [credit, debit];
+          }
 
           // Check if there's an existing journal entry for the opening balance
           db.get(

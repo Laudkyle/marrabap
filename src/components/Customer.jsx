@@ -11,15 +11,19 @@ import {
   FaToggleOff,
   FaEye,
 } from "react-icons/fa";
-
+import CustomerPaymentModal from "./CustomerPaymentModal";
 import { Tooltip } from "react-tooltip";
+
 
 const Customer = () => {
   const [customers, setCustomers] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isEditFormVisible, setIsEditFormVisible] = useState(false);
   const [customerGroups, setCustomerGroups] = useState([]);
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  
+ 
   const [formData, setFormData] = useState({
     customer_type: "business", // Default to Business
     contact_id: "",
@@ -75,6 +79,15 @@ const Customer = () => {
       )
     );
   }, [filterText, customers, formData]);
+  const handleOpenModal = (customerId) => {
+    setSelectedCustomerId(customerId);
+    setIsModalOpen(true);
+  };
+  
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedCustomerId(null);
+  };
   // Define columns for the data table
   const columns = [
     {
@@ -84,8 +97,8 @@ const Customer = () => {
           <ActionButton
             id={`payment-${row.contact_id}`}
             icon={<FaMoneyBillWave />}
-            tooltip="Pay"
-            onClick={() => {}}
+            tooltip="Receive Payment"
+            onClick={() => handleOpenModal(row.id)}
             color="green-500"
           />
           <ActionButton
@@ -883,7 +896,13 @@ const Customer = () => {
           striped
         />
       </div>
-
+      {/* Render the modal if open */}
+     
+        <CustomerPaymentModal
+        isOpen={isModalOpen}
+          customerId={selectedCustomerId}
+          onClose={handleCloseModal}
+        />
       <Tooltip />
     </div>
   );

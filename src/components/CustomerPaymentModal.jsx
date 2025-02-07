@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
-const CustomerPaymentModal = ({ customerId, onClose }) => {
+const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
   const [paymentData, setPaymentData] = useState({
     invoiceId: "",
     amountPaid: "",
     paymentMethod: "cash",
     paymentReference: "",
     paymentDate: new Date().toISOString(),
+    documents: [],
   });
+
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -22,12 +23,15 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
             `http://localhost:5000/invoices?customerId=${customerId}`
           );
           const filteredInvoices = response.data.filter(
-            (invoice) => invoice.status === "partial" || invoice.status === "unpaid"
+            (invoice) =>
+              invoice.status === "partial" || invoice.status === "unpaid"
           );
           setInvoices(filteredInvoices);
         } catch (error) {
           toast.error("Error fetching invoices.");
         }
+      } else {
+        setInvoices([]);
       }
     };
     fetchInvoices();
@@ -41,7 +45,9 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
         const selectedInvoice = invoices.find(
           (invoice) => invoice.id === parseInt(value)
         );
-        newData.paymentReference = selectedInvoice ? selectedInvoice.reference_number : "";
+        newData.paymentReference = selectedInvoice
+          ? selectedInvoice.reference_number
+          : "";
       }
       return newData;
     });
@@ -71,10 +77,8 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
       return;
     }
 
-    const remainingBalance = selectedInvoice.total_amount - selectedInvoice.amount_paid;
-    const updatedStatus =
-      parseFloat(paymentData.amountPaid) >= remainingBalance ? "paid" : "partial";
-
+    const remainingBalance =
+      selectedInvoice.total_amount - selectedInvoice.amount_paid;
     if (parseFloat(paymentData.amountPaid) > remainingBalance) {
       toast.error("Payment amount exceeds the remaining balance.");
       setLoading(false);
@@ -91,15 +95,8 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
 
     try {
       await axios.post("http://localhost:5000/payments", paymentPayload);
-      await axios.put(`http://localhost:5000/invoices/${selectedInvoice.reference_number}`, {
-        total_amount: selectedInvoice.total_amount,
-        amount_paid: parseFloat(selectedInvoice.amount_paid) + parseFloat(paymentData.amountPaid),
-        due_date: selectedInvoice.due_date,
-        status: updatedStatus,
-      });
-      
       toast.success("Payment processed successfully.");
-      onClose(); // Close the modal after successful payment
+      onClose();
     } catch (error) {
       toast.error("Error processing payment.");
     } finally {
@@ -107,14 +104,16 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-1/3">
-        <h2 className="text-2xl font-semibold text-gray-800">Customer Payment</h2>
-        <ToastContainer />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 className="text-lg font-semibold mb-4">Customer Payment</h2>
         <form onSubmit={handleSubmit}>
-          <div className="mt-4">
-            <label className="block text-gray-600">Invoice</label>
+          <ToastContainer />
+          <div className="mb-4">
+            <label className="block text-gray-700">Invoice</label>
             <select
               name="invoiceId"
               value={paymentData.invoiceId}
@@ -125,15 +124,14 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
               <option value="">Select Invoice</option>
               {invoices.map((invoice) => (
                 <option key={invoice.id} value={invoice.id}>
-                  {invoice.reference_number} - ₵{(
-                    invoice.total_amount - invoice.amount_paid
-                  ).toFixed(2)}
+                  {invoice.reference_number} - ₵
+                  {(invoice.total_amount - invoice.amount_paid).toFixed(2)}
                 </option>
               ))}
             </select>
           </div>
-          <div className="mt-4">
-            <label className="block text-gray-600">Amount Paid</label>
+          <div className="mb-4">
+            <label className="block text-gray-700">Amount Paid</label>
             <input
               type="number"
               name="amountPaid"
@@ -141,10 +139,11 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
               onChange={handleInputChange}
               required
               className="w-full p-2 border rounded"
+              min="1"
             />
           </div>
-          <div className="mt-4">
-            <label className="block text-gray-600">Payment Method</label>
+          <div className="mb-4">
+            <label className="block text-gray-700">Payment Method</label>
             <select
               name="paymentMethod"
               value={paymentData.paymentMethod}
@@ -154,20 +153,20 @@ const CustomerPaymentModal = ({ customerId, onClose }) => {
               <option value="cash">Cash</option>
             </select>
           </div>
-          <div className="mt-6 flex justify-end">
+          <div className="flex justify-end space-x-2">
             <button
               type="button"
-              className="px-4 py-2 bg-gray-400 text-white rounded mr-2"
               onClick={onClose}
+              className="px-4 py-2 bg-gray-500 text-white rounded"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded"
             >
-              {loading ? "Processing..." : "Submit Payment"}
+              {loading ? "Processing..." : "Receive Payment"}
             </button>
           </div>
         </form>

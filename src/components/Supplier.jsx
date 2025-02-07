@@ -13,13 +13,14 @@ import {
 } from "react-icons/fa";
 
 import { Tooltip } from "react-tooltip";
-
+import SupplierPaymentModal from "./SupplierPaymentModal"; // Import the modal
 const Supplier = () => {
   const [Suppliers, setSuppliers] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isEditFormVisible, setIsEditFormVisible] = useState(false);
   const [filterText, setFilterText] = useState("");
-
+  const [showModal, setShowModal] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(null);
   
   const [formData, setFormData] = useState({
     type: "individual", // Default to "individual"
@@ -290,7 +291,10 @@ const filteredSuppliersd = useMemo(() => {
           id={`payment-${row.contact_id}`}
           icon={<FaMoneyBillWave />}
           tooltip="Pay"
-          onClick={() => {}}
+          onClick={() => {
+            setSelectedSupplierId(row.id); // Set the supplier ID
+            setShowModal(true); // Open modal
+          }}
           color="green-500"
         />
         <ActionButton
@@ -746,6 +750,12 @@ const filteredSuppliersd = useMemo(() => {
         striped
       />
     </div>
+    {/* Render the modal */}
+    <SupplierPaymentModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        supplierId={selectedSupplierId}
+      />
       <Tooltip />
     </div>
   );
