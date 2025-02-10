@@ -8,7 +8,7 @@ import "typeface-inter";
 import Header from "./components/Header";
 import ProductList from "./components/ProductList";
 import StockList from "./components/StockList";
-import Edit from "./components/EditProduct";
+import Adjustments from "./components/Adjustments";
 import AddPurchaseOrder from "./components/AddPurchaseOrder";
 import EditPurchaseOrder from "./components/EditPurchaseOrder";
 import ExpenseList from "./components/ExpenseList";
@@ -36,7 +36,6 @@ import TrailBalance from "./components/TrailBalance";
 import TaxReport from "./components/TaxReport";
 import ExpenseComponent from "./components/Expense";
 
-
 const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor Limited";
@@ -55,10 +54,17 @@ const App = () => {
           <ToastContainer />
           <Header isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
           <Routes>
-            <Route path="/" element={<Dashboard companyName={companyName}
+            <Route
+              path="/"
+              element={
+                <Dashboard
+                  companyName={companyName}
                   email={email}
                   phone={phone}
-                  companyAddress={companyAddress} />}  />
+                  companyAddress={companyAddress}
+                />
+              }
+            />
             <Route
               path="/pos"
               element={
@@ -94,6 +100,7 @@ const App = () => {
             <Route path="/suppliers" element={<Supplier />} />
             <Route path="/account-balances" element={<AccountBalances />} />
             <Route path="/opening-balances" element={<OpeningBalances />} />
+            <Route path="/adjustments" element={<Adjustments />} />
             <Route path="/customers" element={<Customer />} />
             <Route path="/customer-groups" element={<CustomerGroup />} />
             <Route path="/list-products" element={<ProductList />} />

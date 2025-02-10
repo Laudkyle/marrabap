@@ -113,7 +113,68 @@ db.serialize(() => {
       account_type: "asset",
       balance: 0,
     },
+    {
+      account_code: "7000",
+      account_name: "Contra Account",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7001",
+      account_name: "Correction Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7001",
+      account_name: "Correction Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7002",
+      account_name: "Reconciliation Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7003",
+      account_name: "Depreciation Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7004",
+      account_name: "Accrual Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7005",
+      account_name: "Prepaid Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7006",
+      account_name: "Deferral Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7007",
+      account_name: "Write-off Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
+    {
+      account_code: "7008",
+      account_name: "Tax Adjustments",
+      account_type: "adjustment",
+      balance: 0,
+    },
   ];
+  
 
   db.run(`CREATE TABLE IF NOT EXISTS chart_of_accounts (
     id INTEGER PRIMARY KEY,
@@ -151,6 +212,27 @@ db.serialize(() => {
     suppliers_id INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (suppliers_id) REFERENCES suppliers(id)
 );`);
+db.run(
+  `CREATE TABLE adjustments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference_number TEXT NOT NULL,
+    account_id INTEGER NOT NULL,
+    adjustment_type TEXT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    reason TEXT,
+    date DATE NOT NULL,
+    entry_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    document_reference TEXT,
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME,
+    journal_entry_id INTEGER,
+    affected_period_year INTEGER,
+    affected_period_quarter INTEGER,
+    affected_period_month INTEGER
+  )`
+);
   db.run(`
 
     CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -415,8 +497,10 @@ END;
   date TEXT NOT NULL, -- Transaction date
   description TEXT, -- Summary of the transaction
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'posted')), -- Posting status
+  adjustment_type TEXT NOT NULL DEFAULT 'NON ADJUSTMENT',
   created_on TEXT DEFAULT CURRENT_TIMESTAMP -- Timestamp
 )`);
+
 
   db.run(`CREATE TABLE IF NOT EXISTS taxes (
   id INTEGER PRIMARY KEY,
@@ -449,15 +533,17 @@ END;
   FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
 );`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS journal_entry_lines (
+db.run(`CREATE TABLE IF NOT EXISTS journal_entry_lines (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   journal_entry_id INTEGER NOT NULL,
   account_id INTEGER NOT NULL,
   debit REAL DEFAULT 0 CHECK(debit >= 0),
   credit REAL DEFAULT 0 CHECK(credit >= 0),
+  entry_type TEXT NOT NULL DEFAULT 'GENERAL',
   FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id)
-
 )`);
+
+
   db.run(`CREATE TABLE IF NOT EXISTS audit_trails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL, -- User making the change

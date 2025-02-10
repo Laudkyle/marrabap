@@ -16,6 +16,7 @@ import {
   PlusCircle,
   List,
   Edit,
+  UserCogIcon,
   ArrowLeft,
   Save,
   ShoppingCart,
@@ -29,6 +30,7 @@ import {
   Group,
   Cog,
   BookCheck,
+  CogIcon,
 
 } from "lucide-react";
 import { FaMoneyBill1,FaMoneyBill } from "react-icons/fa6";
@@ -173,6 +175,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/account-balances",
           label: "Chart of Accounts",
           icon: <BookOpen className="w-4 h-4" />, // Adjust icon as needed
+        },
+        {
+          path: "/adjustments",
+          label: "Adjustments",
+          icon: <UserCogIcon className="w-4 h-4" />, // Adjust icon as needed
         },
       ],
     },

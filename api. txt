@@ -9,6 +9,7 @@ sales
 payments
 invoices
 supplier_invoices
+supplier_payments
 returns
 suppliers
 customers
@@ -18,13 +19,15 @@ documents
 general_ledger
 journal_entries
 taxes
+expenses
+expense_invoice
 fixed_assets
 budgets
 journal_entry_lines
 audit_trails
 
 
-LInking to parent chart_of_accounts
+
 expense form printing and invoice
 statement for customers, suppliers - trade payables
 payment method

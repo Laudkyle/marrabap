@@ -3328,6 +3328,299 @@ app.patch("/customers/:id", (req, res) => {
     }
   });
 });
+// ===================== Adjsutments Endpoints =====================
+// Helper function to create journal entry
+const createJournalEntry = (adjustment) => {
+  return new Promise((resolve, reject) => {
+    const { 
+      id, 
+      account_id, 
+      adjustment_type, 
+      amount, 
+      reason, 
+      date, 
+      entry_type,
+      reference_number 
+    } = adjustment;
+    
+    // Handle different account mappings based on adjustment type
+    const getAccountMapping = (type) => {
+      const mappings = {
+        'correction': { contra_account: 7001 },
+        'reconciliation': { contra_account: 7002 },
+        'depreciation': { contra_account: 7003 },
+        'accrual': { contra_account: 7004 },
+        'prepaid': { contra_account: 7005 },
+        'deferral': { contra_account: 7006 },
+        'write-off': { contra_account: 7007 },
+        'tax': { contra_account: 7008 }
+      };
+      return mappings[type] || { contra_account: 7000 }; // Default contra account
+    };
+
+    const { contra_account } = getAccountMapping(adjustment_type);
+    const debit_account_id = entry_type === 'debit' ? account_id : contra_account;
+    const credit_account_id = entry_type === 'credit' ? account_id : contra_account;
+
+    db.run(
+      `INSERT INTO journal_entries (
+        reference_number, 
+        date, 
+        description, 
+        status,
+        adjustment_type,
+       
+      ) VALUES (?, ?, ?, ?, ?)`,
+      [
+        reference_number,
+        date,
+        reason,
+        'pending',
+        adjustment_type,        
+      ],
+      function (err) {
+        if (err) return reject(err);
+        const journal_entry_id = this.lastID;
+
+        // Create debit entry
+        db.run(
+          `INSERT INTO journal_entry_lines (
+            journal_entry_id, 
+            account_id, 
+            debit, 
+            credit,
+            entry_type
+          ) VALUES (?, ?, ?, ?, ?)`,
+          [journal_entry_id, debit_account_id, amount, 0, 'debit'],
+          function (err) {
+            if (err) return reject(err);
+
+            // Create credit entry
+            db.run(
+              `INSERT INTO journal_entry_lines (
+                journal_entry_id, 
+                account_id, 
+                debit, 
+                credit,
+                entry_type
+              ) VALUES (?, ?, ?, ?, ?)`,
+              [journal_entry_id, credit_account_id, 0, amount, 'credit'],
+              function (err) {
+                if (err) return reject(err);
+
+                db.run(
+                  `UPDATE adjustments SET journal_entry_id = ? WHERE id = ?`,
+                  [journal_entry_id, id]
+                );
+                resolve(journal_entry_id);
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+};
+
+// CREATE ADJUSTMENT
+app.post("/adjustments", (req, res) => {
+  const {
+    account_id,
+    adjustment_type,
+    amount,
+    reason,
+    date,
+    entry_type,
+    document_reference,
+    created_by,
+    affected_periods
+  } = req.body;
+
+  const reference_number = `ADJ-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+  db.run(
+    `INSERT INTO adjustments (
+      account_id,
+      adjustment_type,
+      amount,
+      reason,
+      date,
+      entry_type,
+      reference_number,
+      status,
+      document_reference,
+      created_by,
+      created_at,
+      affected_period_year,
+      affected_period_quarter,
+      affected_period_month
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      account_id,
+      adjustment_type,
+      amount,
+      reason,
+      date,
+      entry_type,
+      reference_number,
+      'pending',
+      document_reference,
+      created_by,
+      new Date().toISOString(),
+      affected_periods.fiscal_year,
+      affected_periods.fiscal_quarter,
+      affected_periods.fiscal_month
+    ],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      const adjustment = {
+        id: this.lastID,
+        ...req.body,
+        reference_number,
+        status: 'pending'
+      };
+
+      createJournalEntry(adjustment)
+        .then(() => res.json({ 
+          message: "Adjustment created successfully", 
+          adjustment 
+        }))
+        .catch((error) => res.status(500).json({ error }));
+    }
+  );
+});
+
+// READ ADJUSTMENTS
+app.get("/adjustments", (req, res) => {
+  const { startDate, endDate, type, account, status } = req.query;
+  
+  let query = `
+    SELECT 
+      a.*,
+      acc.account_name,
+      acc.account_code
+    FROM adjustments a
+    LEFT JOIN accounts acc ON a.account_id = acc.id
+    WHERE 1=1
+  `;
+  
+  const params = [];
+  
+  if (startDate && endDate) {
+    query += ` AND date BETWEEN ? AND ?`;
+    params.push(startDate, endDate);
+  }
+  
+  if (type) {
+    query += ` AND adjustment_type = ?`;
+    params.push(type);
+  }
+  
+  if (account) {
+    query += ` AND account_id = ?`;
+    params.push(account);
+  }
+  
+  if (status) {
+    query += ` AND status = ?`;
+    params.push(status);
+  }
+  
+  query += ` ORDER BY date DESC`;
+
+  db.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// UPDATE ADJUSTMENT
+app.put("/adjustments/:id", (req, res) => {
+  const { id } = req.params;
+  const {
+    account_id,
+    adjustment_type,
+    amount,
+    reason,
+    date,
+    entry_type,
+    document_reference,
+    status
+  } = req.body;
+
+  db.get(`SELECT * FROM adjustments WHERE id = ?`, [id], (err, oldAdjustment) => {
+    if (err || !oldAdjustment) return res.status(404).json({ error: "Adjustment not found" });
+
+    db.run(
+      `UPDATE adjustments 
+       SET account_id = ?,
+           adjustment_type = ?,
+           amount = ?,
+           reason = ?,
+           date = ?,
+           entry_type = ?,
+           document_reference = ?,
+           status = ?,
+           updated_at = ?
+       WHERE id = ?`,
+      [
+        account_id,
+        adjustment_type,
+        amount,
+        reason,
+        date,
+        entry_type,
+        document_reference,
+        status,
+        new Date().toISOString(),
+        id
+      ],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+
+        // Delete old journal entry
+        db.run(`DELETE FROM journal_entries WHERE id = ?`, [oldAdjustment.journal_entry_id], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+
+          const updatedAdjustment = {
+            id,
+            ...req.body,
+            reference_number: oldAdjustment.reference_number
+          };
+
+          createJournalEntry(updatedAdjustment)
+            .then(() => res.json({ 
+              message: "Adjustment updated successfully",
+              adjustment: updatedAdjustment
+            }))
+            .catch((error) => res.status(500).json({ error }));
+        });
+      }
+    );
+  });
+});
+
+// DELETE ADJUSTMENT
+app.delete("/adjustments/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.get(`SELECT * FROM adjustments WHERE id = ?`, [id], (err, adjustment) => {
+    if (err || !adjustment) return res.status(404).json({ error: "Adjustment not found" });
+
+    db.run(`DELETE FROM journal_entries WHERE id = ?`, [adjustment.journal_entry_id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      db.run(`DELETE FROM adjustments WHERE id = ?`, [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ 
+          message: "Adjustment and related journal entry deleted successfully" 
+        });
+      });
+    });
+  });
+});
+
 // ===================== Customer Groups Endpoints =====================
 
 // Get all customer groups

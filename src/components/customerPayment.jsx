@@ -17,7 +17,7 @@ const CustomerPayment = () => {
   const [customers, setCustomers] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
-
+const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
   useEffect(() => {
     // Fetch customers for dropdown
     const fetchCustomers = async () => {
@@ -163,7 +163,7 @@ const CustomerPayment = () => {
 
     // Payload for the payment
     const paymentPayload = {
-      customerId:paymentData.customerId,
+      customerId: paymentData.customerId,
       reference_number: selectedInvoice.reference_number,
       payment_date: paymentData.paymentDate,
       amount_paid: paymentData.amountPaid,
@@ -229,6 +229,7 @@ const CustomerPayment = () => {
       <form onSubmit={handleSubmit}>
         <ToastContainer />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+         
           {/* Customer Dropdown */}
           <div>
             <label htmlFor="customerId" className="block text-gray-600">
