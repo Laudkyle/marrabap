@@ -4,10 +4,10 @@ import { FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaTrash } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import axios from "axios";
-import { toast} from "react-toastify";
+import { toast } from "react-toastify";
 import Invoice from "./Invoice";
 import "react-toastify/dist/ReactToastify.css";
-
+import { AiOutlinePlus, AiOutlineMinus } from "react-icons/ai";
 function Shop({ companyName, companyAddress, email, phone }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +46,24 @@ function Shop({ companyName, companyAddress, email, phone }) {
       setLoading(false);
       toast.error("Failed to fetch products. Please try again.");
     }
+  };
+
+  const [selectedTaxes, setSelectedTaxes] = useState([""]); // Start with one empty selection
+
+  const handleTaxChange = (index, value) => {
+    const newTaxes = [...selectedTaxes];
+    newTaxes[index] = value;
+    setSelectedTaxes(newTaxes);
+  };
+
+  const addTax = () => {
+    if (selectedTaxes.length < taxes.length) {
+      setSelectedTaxes([...selectedTaxes, ""]); // Add an empty tax selection
+    }
+  };
+
+  const removeTax = (index) => {
+    setSelectedTaxes(selectedTaxes.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -94,12 +112,12 @@ function Shop({ companyName, companyAddress, email, phone }) {
       return;
     }
 
-    if (!sellingPrice  || sellingPrice <= 0  ) {
+    if (!sellingPrice || sellingPrice <= 0) {
       setError("Please enter a valid selling price");
       return;
     }
 
-    if (!selectedTax) {
+    if (!selectedTaxes) {
       setError("Please select a tax option");
       return;
     }
@@ -108,7 +126,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       selectedProduct,
       quantity,
       sellingPrice,
-      selectedTax,
+      selectedTaxes,
       discountType,
       discountAmount,
       description
@@ -118,7 +136,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
     setSelectedProduct(null);
     setQuantity(1);
     setSellingPrice("");
-    setSelectedTax("");
+    setSelectedTaxes("");
     setDiscountType("percentage");
     setDiscountAmount(0);
     setDescription("");
@@ -317,9 +335,12 @@ function Shop({ companyName, companyAddress, email, phone }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
-              <div key={product.id} onClick={() => {handleProductClick(product)
-
-              }}>
+              <div
+                key={product.id}
+                onClick={() => {
+                  handleProductClick(product);
+                }}
+              >
                 <ProductCard product={product} />
               </div>
             ))
@@ -329,8 +350,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         </div>
       </div>
       {/* Product Details Modal */}
-      {(selectedProduct) && (
-        
+      {selectedProduct && (
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 w-[90%] sm:w-[60%] md:w-[50%] lg:w-[40%]">
             {/* Modal Header */}
@@ -390,26 +410,56 @@ function Shop({ companyName, companyAddress, email, phone }) {
               </div>
             </div>
 
-            {/* Tax Selection */}
+            {/* Tax Selection (Multiple Taxes) */}
             <div className="mb-4">
-              <label htmlFor="tax" className="block font-medium text-gray-700">
-                Select Tax:
+              <label className="block font-medium text-gray-700">
+                Select Taxes:
               </label>
-              <select
-                id="tax"
-                value={selectedTax}
-                onChange={(e) => setSelectedTax(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="">-- Select Tax --</option>
-                {taxes.map((tax) => (
-                  <option key={tax.id} value={tax.id}>
-                    {tax.tax_name} ({tax.tax_rate}%)
-                  </option>
-                ))}
-              </select>
-            </div>
 
+              {selectedTaxes.map((taxId, index) => (
+                <div key={index} className="flex items-center space-x-2 mb-2">
+                  <select
+                    value={taxId}
+                    onChange={(e) => handleTaxChange(index, e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="">-- Select Tax --</option>
+                    {taxes
+                      .filter(
+                        (tax) =>
+                          !selectedTaxes.includes(tax.id) || tax.id === taxId
+                      ) // Prevent duplicate selection
+                      .map((tax) => (
+                        <option key={tax.id} value={tax.id}>
+                          {tax.tax_name} ({tax.tax_rate}%)
+                        </option>
+                      ))}
+                  </select>
+
+                  {/* Remove Button (Only if more than one tax) */}
+                  {selectedTaxes.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTax(index)}
+                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none"
+                    >
+                      <AiOutlineMinus size={20} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Add New Tax Button */}
+              {selectedTaxes.length < taxes.length && ( // Prevent adding more than available taxes
+                <button
+                  type="button"
+                  onClick={addTax}
+                  className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none flex items-center"
+                >
+                  <AiOutlinePlus size={20} className="mr-2" /> Add Tax
+                </button>
+              )}
+            </div>
             {/* Discount Type and Amount */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               {/* Discount Type */}

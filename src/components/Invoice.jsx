@@ -33,7 +33,7 @@ function Invoice({
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(1);
   const [sellingPrice, setSellingPrice] = useState(0); // Selling price
-  const [selectedTax, setSelectedTax] = useState(""); // Tax
+  const [selectedTaxes, setSelectedTaxes] = useState(""); // Tax
   const [discountType, setDiscountType] = useState("percentage"); // Discount type
   const [discountAmount, setDiscountAmount] = useState(0); // Discount amount
   const [description, setDescription] = useState(""); // Description
@@ -123,24 +123,10 @@ function Invoice({
         const response = await axios.delete(
           `http://localhost:5000/documents/${documentId}`
         );
-        toast.success(response.data.message, {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
+        toast.success(response.data.message);
       } catch (error) {
         console.error("Error deleting document:", error);
-        toast.error("Failed to delete document. Please try again.", {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
+        toast.error("Failed to delete document. Please try again.");
       }
     }
   };
@@ -150,48 +136,55 @@ function Invoice({
     let totalTax = 0;
     let totalDiscount = 0;
     const taxBreakdown = {};
-
+  
     cart.forEach((item) => {
-      const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
-      const taxName =
-        taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
-      const taxType =
-        taxRates.find((tax) => tax.id == item.tax)?.tax_type || "exclusive"; // Default to exclusive
-
       // Calculate item total before discount
       const itemActualTotal = item.sellingPrice * item.quantity;
       actualSubtotal += itemActualTotal;
-
+  
       // Calculate discount
       const discount =
-        item.discountType === "percentage"
+        item.discountType == "percentage"
           ? (itemActualTotal * item.discountAmount) / 100
           : item.discountAmount;
       totalDiscount += discount;
-
+  
       let itemTotal = itemActualTotal - discount; // Default to exclusive tax scenario
-      let itemTax = 0;
-
-      if (taxType === "exclusive") {
-        // Tax is added to the item total after discount
-        itemTax = (itemTotal * taxRate) / 100;
-      } else if (taxType === "inclusive") {
-        // Tax is included in the selling price, extract it
-        itemTax = itemTotal - itemTotal / (1 + taxRate / 100);
-        itemTotal -= itemTax; // Adjust item total to exclude tax
-      }
-
-      totalTax += itemTax;
+      let itemTotalTax = 0;
+  
+      // Process each tax in the taxes array
+      item.taxes.forEach((taxId) => {
+        const tax = taxRates.find((t) => t.id == taxId);
+        if (!tax) {
+          console.log("not found")
+          return}; // Skip if tax is not found
+  
+        const { tax_name: taxName, tax_rate: taxRate, tax_type: taxType } = tax;
+  
+        let itemTax = 0;
+        if (taxType === "exclusive") {
+          // Tax is added to the item total after discount
+          itemTax = (itemTotal * taxRate) / 100;
+        } else if (taxType === "inclusive") {
+          // Tax is included in the selling price, extract it
+          itemTax = itemTotal - itemTotal / (1 + taxRate / 100);
+          itemTotal -= itemTax; // Adjust item total to exclude tax
+        }
+  
+        itemTotalTax += itemTax;
+  
+        // Add tax breakdown for each tax type
+        if (taxBreakdown[taxName]) {
+          taxBreakdown[taxName] += itemTax;
+        } else {
+          taxBreakdown[taxName] = itemTax;
+        }
+      });
+  
+      totalTax += itemTotalTax;
       subtotal += itemTotal;
-
-      // Add tax breakdown for each tax type
-      if (taxBreakdown[taxName]) {
-        taxBreakdown[taxName] += itemTax;
-      } else {
-        taxBreakdown[taxName] = itemTax;
-      }
     });
-
+  
     return {
       actualSubtotal,
       subtotal,
@@ -201,7 +194,7 @@ function Invoice({
       taxBreakdown,
     };
   };
-
+  
   // Use the updated function to calculate totals
   const {
     subtotal,
@@ -211,6 +204,7 @@ function Invoice({
     totalDiscount,
     taxBreakdown,
   } = calculateTotal();
+  
 
   return (
     <div>
@@ -281,7 +275,7 @@ function Invoice({
                           setSelectedProduct(product);
                           setSellingPrice(product.price || 0); // Set initial selling price
                           setNewItemQuantity(1); // Set initial quantity
-                          setSelectedTax(""); // Reset tax selection
+                          setSelectedTaxes(""); // Reset tax selection
                           setDiscountType("percentage"); // Default discount type
                           setDiscountAmount(0); // Default discount amount
                           setDescription(""); // Default description
@@ -373,8 +367,8 @@ function Invoice({
                         </label>
                         <select
                           id="tax"
-                          value={selectedTax}
-                          onChange={(e) => setSelectedTax(e.target.value)}
+                          value={selectedTaxes}
+                          onChange={(e) => setSelectedTaxes(e.target.value)}
                           className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         >
                           <option value="">-- Select Tax --</option>
@@ -465,7 +459,7 @@ function Invoice({
                                 selectedProduct,
                                 newItemQuantity,
                                 sellingPrice,
-                                selectedTax,
+                                selectedTaxes,
                                 discountType,
                                 discountAmount,
                                 description
@@ -663,15 +657,7 @@ function Invoice({
                               toast.error(
                                 `The following files exceed the 4MB limit and were not added: ${rejectedFiles.join(
                                   ", "
-                                )}`,
-                                {
-                                  position: "top-right",
-                                  autoClose: 3000,
-                                  hideProgressBar: false,
-                                  closeOnClick: true,
-                                  pauseOnHover: true,
-                                  draggable: true,
-                                }
+                                )}`
                               );
                             }
                           }

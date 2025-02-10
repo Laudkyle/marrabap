@@ -104,48 +104,66 @@ function ProcessSaleModal({
     let totalTax = 0;
     let totalDiscount = 0;
     const taxBreakdown = {};
+  
     cart.forEach((item) => {
-      const taxRate = taxRates.find((tax) => tax.id == item.tax)?.tax_rate || 0;
-      const taxName =
-        taxRates.find((tax) => tax.id == item.tax)?.tax_name || "Unknown Tax";
-
       // Calculate item total before discount
       const itemActualTotal = item.sellingPrice * item.quantity;
       actualSubtotal += itemActualTotal;
-
+  
       // Calculate discount
       const discount =
         item.discountType === "percentage"
           ? (itemActualTotal * item.discountAmount) / 100
           : item.discountAmount;
       totalDiscount += discount;
-
-      // Calculate item total after discount
-      const itemTotal = itemActualTotal - discount;
+  
+      let itemTotal = itemActualTotal - discount; // Default to exclusive tax scenario
+      let itemTotalTax = 0;
+  
+      // Process each tax in the taxes array
+      item.taxes.forEach((taxId) => {
+        const tax = taxRates.find((t) => t.id == taxId);
+        if (!tax) {
+          console.log("not found")
+          return}; // Skip if tax is not found
+  
+        const { tax_name: taxName, tax_rate: taxRate, tax_type: taxType } = tax;
+  
+        let itemTax = 0;
+        if (taxType === "exclusive") {
+          // Tax is added to the item total after discount
+          itemTax = (itemTotal * taxRate) / 100;
+        } else if (taxType === "inclusive") {
+          // Tax is included in the selling price, extract it
+          itemTax = itemTotal - itemTotal / (1 + taxRate / 100);
+          itemTotal -= itemTax; // Adjust item total to exclude tax
+        }
+  
+        itemTotalTax += itemTax;
+  
+        // Add tax breakdown for each tax type
+        if (taxBreakdown[taxName]) {
+          taxBreakdown[taxName] += itemTax;
+        } else {
+          taxBreakdown[taxName] = itemTax;
+        }
+      });
+  
+      totalTax += itemTotalTax;
       subtotal += itemTotal;
-
-      // Calculate tax
-      const itemTax = (itemTotal * taxRate) / 100;
-      totalTax += itemTax;
-
-      // Add tax breakdown for each tax type
-      if (taxBreakdown[taxName]) {
-        taxBreakdown[taxName] += itemTax;
-      } else {
-        taxBreakdown[taxName] = itemTax;
-      }
     });
-
+  
     return {
       actualSubtotal,
       subtotal,
       totalDiscount,
       totalTax,
-      grandTotal: subtotal + totalTax,
+      grandTotal: subtotal + totalTax, // For inclusive taxes, `subtotal` already includes tax
       taxBreakdown,
     };
   };
-
+  
+  // Use the updated function to calculate totals
   const {
     subtotal,
     actualSubtotal,
@@ -154,6 +172,8 @@ function ProcessSaleModal({
     totalDiscount,
     taxBreakdown,
   } = calculateTotal();
+  
+
 
   const removeDocument = async (index, documentId) => {
     // Remove the document from the UI first
@@ -166,24 +186,10 @@ function ProcessSaleModal({
         const response = await axios.delete(
           `http://localhost:5000/documents/${documentId}`
         );
-        toast.success(response.data.message, {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
+        toast.success(response.data.message);
       } catch (error) {
         console.error("Error deleting document:", error);
-        toast.error("Failed to delete document. Please try again.", {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
+        toast.error("Failed to delete document. Please try again.");
       }
     }
   };

@@ -24,7 +24,7 @@ export const CartProvider = ({ children }) => {
     product,
     quantity,
     sellingPrice,
-    tax,
+    taxes, // Now an array of selected taxes
     discountType,
     discountAmount,
     description
@@ -41,7 +41,7 @@ export const CartProvider = ({ children }) => {
           ...updatedCart[existingItemIndex],
           quantity: updatedCart[existingItemIndex].quantity + quantity,
           sellingPrice, // Update price
-          tax,
+          taxes, // Store multiple taxes
           discountType,
           discountAmount,
           description,
@@ -56,7 +56,7 @@ export const CartProvider = ({ children }) => {
           product,
           quantity,
           sellingPrice,
-          tax,
+          taxes, // Store multiple taxes
           discountType,
           discountAmount,
           description,
@@ -79,12 +79,14 @@ export const CartProvider = ({ children }) => {
         customer_id: customerId,
         payment_method: paymentMethod,
         selling_price: item.sellingPrice,
-        tax: item.tax,
+        taxes: item.taxes, // Pass multiple taxes
         discount_type: item.discountType,
         discount_amount: item.discountAmount,
         description: item.description,
       }));
-console.log("sales data:", salesData)
+
+      console.log("Sales data:", salesData);
+
       const response = await fetch("http://localhost:5000/sales", {
         method: "POST",
         headers: {
