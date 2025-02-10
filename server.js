@@ -3361,22 +3361,20 @@ const createJournalEntry = (adjustment) => {
     const { contra_account } = getAccountMapping(adjustment_type);
     const debit_account_id = entry_type === 'debit' ? account_id : contra_account;
     const credit_account_id = entry_type === 'credit' ? account_id : contra_account;
-
     db.run(
       `INSERT INTO journal_entries (
         reference_number, 
         date, 
         description, 
         status,
-        adjustment_type,
-       
+        adjustment_type
       ) VALUES (?, ?, ?, ?, ?)`,
       [
         reference_number,
         date,
         reason,
-        'pending',
-        adjustment_type,        
+        'posted',
+        adjustment_type      
       ],
       function (err) {
         if (err) return reject(err);
@@ -3463,7 +3461,7 @@ app.post("/adjustments", (req, res) => {
       date,
       entry_type,
       reference_number,
-      'pending',
+      'posted',
       document_reference,
       created_by,
       new Date().toISOString(),
@@ -3478,7 +3476,7 @@ app.post("/adjustments", (req, res) => {
         id: this.lastID,
         ...req.body,
         reference_number,
-        status: 'pending'
+        status: 'posted'
       };
 
       createJournalEntry(adjustment)
@@ -3501,7 +3499,7 @@ app.get("/adjustments", (req, res) => {
       acc.account_name,
       acc.account_code
     FROM adjustments a
-    LEFT JOIN accounts acc ON a.account_id = acc.id
+    LEFT JOIN chart_of_accounts acc ON a.account_id = acc.id
     WHERE 1=1
   `;
   
