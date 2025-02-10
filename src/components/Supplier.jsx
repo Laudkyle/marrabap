@@ -348,7 +348,7 @@ const filteredSuppliersd = useMemo(() => {
 
   return (
     <div className=" bg-gray-100  max-w-[80vw] h-[70vh] overflow-scroll">
-      <ToastContainer />
+      
       
       <div className="px-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold mb-6 text-gray-800">

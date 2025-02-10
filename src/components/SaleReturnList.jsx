@@ -64,7 +64,7 @@ const SaleReturnList = () => {
       <h2 className="text-2xl px-6 font-semibold text-gray-800 mb-4">
         Sale Return List
       </h2>
-      <ToastContainer />
+      
       <div className="bg-white mx-6 shadow-sm rounded-md h-[75vh] overflow-scroll p-6">
         <DataTable
           className="z-0"

@@ -4,7 +4,7 @@ import { FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaTrash } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast} from "react-toastify";
 import Invoice from "./Invoice";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -279,7 +279,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
 
   return (
     <div className="relative">
-      <ToastContainer />
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-2 p-4 bg-gray-800 text-white">
         <div className="flex justify-end items-center">

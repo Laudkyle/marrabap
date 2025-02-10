@@ -113,7 +113,7 @@ const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
       <div className="bg-white p-6 rounded-lg shadow-lg w-96">
         <h2 className="text-lg font-semibold mb-4">Customer Payment</h2>
         <form onSubmit={handleSubmit}>
-          <ToastContainer />
+          
           <div className="mb-4">
             <label className="block text-gray-700">Invoice</label>
             <select

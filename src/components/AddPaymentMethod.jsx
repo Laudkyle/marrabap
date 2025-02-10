@@ -75,7 +75,6 @@ console.log("payload : ",paymentMethodPayload)
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg space-y-6">
       <h2 className="text-2xl font-semibold text-gray-800">Add Payment Method</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <ToastContainer />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col">
             <label htmlFor="accountId" className="text-gray-600">Linked Account</label>

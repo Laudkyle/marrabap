@@ -35,8 +35,8 @@ import BalanceSheet from "./components/BalanceSheet";
 import TrailBalance from "./components/TrailBalance";
 import TaxReport from "./components/TaxReport";
 import ExpenseComponent from "./components/Expense";
-
-const App = () => {
+import { toastOptions } from "./toastConfig"; // Import the config
+ const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor Limited";
   const companyAddress = "P.O.Box: CS 9083 Comm. 7 Tema - Ghana";
@@ -51,7 +51,7 @@ const App = () => {
           companyName={companyName}
         />
         <div className="flex-1 bg-gray-100">
-          <ToastContainer />
+          <ToastContainer {...toastOptions} />
           <Header isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
           <Routes>
             <Route

@@ -476,7 +476,7 @@ const StockList = () => {
       </ReactModal>
 
       {/* Toast Container */}
-      <ToastContainer />
+      
     </div>
   );
 };

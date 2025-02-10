@@ -229,7 +229,7 @@ const PaymentList = () => {
         </ReactModal>
       )}
 
-      <ToastContainer />
+      
     </div>
   );
 };
