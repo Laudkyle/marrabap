@@ -23,6 +23,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [discountType, setDiscountType] = useState("percentage");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [description, setDescription] = useState("");
+  const [selectedTaxes, setSelectedTaxes] = useState([""]); // Start with one empty selection
 
   const [error, setError] = useState("");
   const [showInvoice, setShowInvoice] = useState(false);
@@ -48,7 +49,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
     }
   };
 
-  const [selectedTaxes, setSelectedTaxes] = useState([""]); // Start with one empty selection
 
   const handleTaxChange = (index, value) => {
     const newTaxes = [...selectedTaxes];
@@ -136,7 +136,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
     setSelectedProduct(null);
     setQuantity(1);
     setSellingPrice("");
-    setSelectedTaxes("");
+    setSelectedTaxes([""]);
     setDiscountType("percentage");
     setDiscountAmount(0);
     setDescription("");
