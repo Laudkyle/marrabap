@@ -12,6 +12,8 @@ const SaleReturn = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [returnQuantity, setReturnQuantity] = useState(0);
   const [restockOption, setRestockOption] = useState("restock");
+  const [reason, setReason] = useState("");
+  const [returnType, setReturnType] = useState("partial");
 
   useEffect(() => {
     fetchSales();
@@ -20,10 +22,11 @@ const SaleReturn = () => {
   const fetchSales = async () => {
     try {
       const response = await axios.get("http://localhost:5000/sales");
+
       const filtered = response.data.filter(
         (sale) =>
-          sale.return_status === "partial_return" ||
-          sale.return_status === "not_returned"
+          sale.return_status =="partial_return" ||
+          sale.return_status == "not_returned"
       );
       setSales(filtered);
       setFilteredSales(filtered);
@@ -45,63 +48,55 @@ const SaleReturn = () => {
   };
 
   const handleReturn = async () => {
+    if (!selectedSale) return;
+  
     if (returnQuantity <= 0 || returnQuantity > selectedSale.quantity) {
       toast.error("Invalid return quantity!");
       return;
     }
-
+  
+    // Extract and format taxes correctly
+    let taxesArray = [];
+    if (typeof selectedSale.applied_taxes === "string") {
+      taxesArray = selectedSale.applied_taxes.split("|").map((tax) => tax.trim());
+    }
+  
     const returnData = {
       sale_id: selectedSale.id,
       reference_number: selectedSale.reference_number,
-      product_id: selectedSale.id,
+      product_id: selectedSale.product_id, // Ensure this is defined
       customer_id: selectedSale.customer_id,
       return_quantity: returnQuantity,
       payment_method: selectedSale.payment_method,
       selling_price: selectedSale.selling_price,
-      tax: selectedSale.tax,
+      taxes: taxesArray,
       discount_type: selectedSale.discount_type,
       discount_amount: selectedSale.discount_amount,
       action: restockOption,
+      return_type: returnQuantity == selectedSale.quantity ? "full" : "partial",
+      status: "approved",
+      reason: "please", // Allow user to enter a reason later
     };
-console.log("salesData:",returnData)
-console.log("salesselectedData:",selectedSale)
     try {
       const response = await axios.post(
         "http://localhost:5000/sales-return",
         returnData
       );
+  
       if (response.status !== 200 && response.status !== 201) {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
-
+  
       toast.success("Return processed successfully!");
       setModalVisible(false);
-
-      // Update the sales list
-      const updatedSales = sales.map((sale) =>
-        sale.id === selectedSale.id
-          ? {
-              ...sale,
-              quantity: sale.quantity - returnQuantity,
-              total_price:
-                sale.total_price -
-                (selectedSale.total_price *
-                  (returnQuantity / selectedSale.quantity)),
-              return_status:
-                sale.quantity - returnQuantity === 0
-                  ? "returned"
-                  : "partial_return",
-            }
-          : sale
-      );
-
-      setSales(updatedSales);
-      setFilteredSales(updatedSales.filter((sale) => sale.quantity > 0));
+  
+      fetchSales(); // Refresh sales data
     } catch (error) {
       console.error("Error processing return:", error);
       toast.error("Error processing return. Please try again.");
     }
   };
+  
 
   const columns = [
     {
@@ -121,7 +116,7 @@ console.log("salesselectedData:",selectedSale)
     },
     {
       name: "Total Price",
-      selector: (row) => row.total_price,
+      selector: (row) => row.total_price.toFixed(2),
       sortable: true,
     },
     {
@@ -142,6 +137,7 @@ console.log("salesselectedData:",selectedSale)
             setSelectedSale(row);
             setModalVisible(true);
             setReturnQuantity(0);
+            setReason("");
           }}
           className="text-blue-600 hover:bg-blue-100 p-2 rounded"
         >
@@ -156,90 +152,87 @@ console.log("salesselectedData:",selectedSale)
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">
         Make Sales Return
       </h2>
-      
-      {modalVisible && (
+
+      {modalVisible && selectedSale && (
         <div className="fixed inset-0 flex z-50 items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg p-6 w-96">
             <h2 className="text-lg font-semibold mb-4">Return Product</h2>
-            {selectedSale && (
-              <>
-                <div className="mb-4">
-                  <p>
-                    <strong>Product:</strong> {selectedSale.product_name}
-                  </p>
-                  <p>
-                    <strong>Quantity Sold:</strong> {selectedSale.quantity}
-                  </p>
-                </div>
-                <div className="mb-4">
-                  <label>Return Quantity</label>
+            <div className="mb-4">
+              <p>
+                <strong>Product:</strong> {selectedSale.product_name}
+              </p>
+              <p>
+                <strong>Quantity Sold:</strong> {selectedSale.quantity}
+              </p>
+            </div>
+            <div className="mb-4">
+              <label>Return Quantity</label>
+              <input
+                type="number"
+                value={returnQuantity}
+                onChange={(e) =>
+                  setReturnQuantity(Number(e.target.value))
+                }
+                className="w-full border p-2 rounded"
+                placeholder={`Max: ${selectedSale.quantity}`}
+              />
+            </div>
+            <div className="mb-4">
+              <label>Reason for Return</label>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full border p-2 rounded"
+                placeholder="Enter reason"
+              />
+            </div>
+            <div className="mb-4">
+              <label>Action</label>
+              <div>
+                <label>
                   <input
-                    type="number"
-                    value={returnQuantity}
-                    onChange={(e) =>
-                      setReturnQuantity(Number(e.target.value))
-                    }
-                    className="w-full border p-2 rounded"
-                    placeholder={`Max: ${selectedSale.quantity}`}
+                    type="radio"
+                    value="restock"
+                    checked={restockOption === "restock"}
+                    onChange={(e) => setRestockOption(e.target.value)}
                   />
-                </div>
-                <div className="mb-4">
-                  <label>Action</label>
-                  <div>
-                    <label>
-                      <input
-                        type="radio"
-                        value="restock"
-                        checked={restockOption === "restock"}
-                        onChange={(e) => setRestockOption(e.target.value)}
-                      />
-                      Restock
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        value="dispose"
-                        checked={restockOption === "dispose"}
-                        onChange={(e) => setRestockOption(e.target.value)}
-                      />
-                      Dispose
-                    </label>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setModalVisible(false)}
-                    className="mr-2 p-2 bg-gray-200 rounded"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleReturn}
-                    className="p-2 bg-blue-600 text-white rounded"
-                  >
-                    Process Return
-                  </button>
-                </div>
-              </>
-            )}
+                  Restock
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    value="dispose"
+                    checked={restockOption === "dispose"}
+                    onChange={(e) => setRestockOption(e.target.value)}
+                  />
+                  Dispose
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setModalVisible(false)}
+                className="mr-2 p-2 bg-gray-200 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReturn}
+                className="p-2 bg-blue-600 text-white rounded"
+              >
+                Process Return
+              </button>
+            </div>
           </div>
         </div>
       )}
+
       <DataTable
         columns={columns}
         data={filteredSales}
         pagination
         highlightOnHover
-        subHeader
-        subHeaderComponent={
-          <input
-            type="text"
-            placeholder="Search sales"
-            value={filterText}
-            onChange={handleSearch}
-            className="border p-2 rounded"
-          />
-        }
       />
     </div>
   );

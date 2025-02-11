@@ -2423,6 +2423,7 @@ app.get("/sales", (req, res) => {
         sales.discount_amount, 
         sales.payment_method, 
         products.name AS product_name, 
+        products.id AS product_id, 
         sales.quantity, 
         sales.total_price, 
         sales.return_status, 
@@ -2464,56 +2465,164 @@ app.get("/sales", (req, res) => {
 
 app.post("/sales-return", async (req, res) => {
   const returnData = req.body;
-  console.log("data", returnData);
+
+  // Ensure returnData is an array
+  const returnsArray = Array.isArray(returnData) ? returnData : [returnData];
+
+  if (!returnsArray.length) {
+    return res.status(400).json({ message: "Invalid return data format." });
+  }
+
   try {
     db.run("BEGIN TRANSACTION");
-    const promises = returnData.map((item) => {
+
+    const promises = returnsArray.map((item) => {
       const {
         sale_id,
         product_id,
-        returned_quantity,
         customer_id,
+        reference_number,
+        return_quantity,
+        action, // "restock" or "dispose"
         payment_method,
         selling_price,
-        tax,
+        taxes, // Array of tax strings
         discount_type,
         discount_amount,
+        return_type, // "full" or "partial"
+        status, // "pending" by default
+        reason, // Optional reason for return
       } = item;
+
+      if (!sale_id || !product_id || !customer_id || !reference_number || return_quantity <= 0) {
+        return Promise.reject(new Error("Invalid return data"));
+      }
+
+      // Convert taxes array into a single string
+      const taxString = Array.isArray(taxes) ? taxes.join(" | ") : "";
+      const totalTax = Array.isArray(taxes)
+        ? taxes.reduce((acc, tax) => {
+            const match = tax.match(/(\d+(\.\d+)?)$/); // Extract numeric value from string
+            return match ? acc + parseFloat(match[0]) : acc;
+          }, 0)
+        : 0;
+
+      const total_refund = return_quantity * (selling_price - discount_amount + totalTax);
 
       return new Promise((resolve, reject) => {
         db.run(
           `INSERT INTO returns (
-    sale_id, product_id, customer_id, reference_number, return_quantity, 
-    action, return_date, selling_price, tax, discount_amount, discount_type, 
-    payment_method, returned_quantity, total_refund
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sale_id, product_id, customer_id, reference_number, return_quantity, 
+            action, return_date, selling_price, tax, discount_amount, discount_type, 
+            payment_method, total_refund, return_type, status, reason
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            sale_id, // Sale ID from the request data
-            product_id, // Product ID from the request data
-            customer_id, // Customer ID from the request data
-            reference_number, // Reference number from the request data
-            return_quantity, // Return quantity from the request data
-            action, // Action (either 'restock' or 'dispose')
-            new Date().toISOString(), // Return date (current date and time in ISO format)
-            selling_price, // Selling price from the request data
-            tax, // Tax from the request data
-            discount_amount, // Discount amount from the request data
-            discount_type, // Discount type from the request data
-            payment_method, // Payment method from the request data
-            // Calculate total refund amount based on your logic, e.g.,:
-            return_quantity * (selling_price - discount_amount + tax),
+            sale_id,
+            product_id,
+            customer_id,
+            reference_number,
+            return_quantity,
+            action,
+            new Date().toISOString(),
+            selling_price,
+            taxString,
+            discount_amount,
+            discount_type,
+            payment_method,
+            total_refund,
+            return_type,
+            status || "pending",
+            reason || "No reason provided",
           ],
           (err) => {
             if (err) return reject(err);
 
-            resolve({ product_id, returned_quantity });
+            // Update inventory if action is "restock"
+            const inventoryPromise =
+              action === "restock"
+                ? new Promise((resolveInventory, rejectInventory) => {
+                    db.run(
+                      "UPDATE inventory SET quantity_in_stock = quantity_in_stock + ? WHERE product_id = ?",
+                      [return_quantity, product_id],
+                      (err) => {
+                        if (err) {
+                          console.error("Error updating inventory: ", err.message);
+                          return rejectInventory(err);
+                        }
+                        resolveInventory();
+                      }
+                    );
+                  })
+                : Promise.resolve();
+
+            // Update sales quantity
+            const salesQuantityPromise = new Promise((resolveSales, rejectSales) => {
+              db.get("SELECT quantity FROM sales WHERE id = ?", [sale_id], (err, row) => {
+                if (err) {
+                  console.error("Error fetching sales quantity: ", err.message);
+                  return rejectSales(err);
+                }
+
+                if (!row) {
+                  return rejectSales(new Error("Sale not found"));
+                }
+
+                const newQuantity = row.quantity - return_quantity;
+
+                db.run(
+                  "UPDATE sales SET quantity = ? WHERE id = ?",
+                  [newQuantity, sale_id],
+                  (err) => {
+                    if (err) {
+                      console.error("Error updating sales quantity: ", err.message);
+                      return rejectSales(err);
+                    }
+                    resolveSales();
+                  }
+                );
+              });
+            });
+
+            // Determine new return_status for the sale
+            const returnStatusPromise = new Promise((resolveStatus, rejectStatus) => {
+              db.get(
+                "SELECT quantity FROM sales WHERE id = ?",
+                [sale_id],
+                (err, row) => {
+                  if (err) {
+                    console.error("Error fetching sales return status: ", err.message);
+                    return rejectStatus(err);
+                  }
+
+                  let newReturnStatus = "partial_return"; // Default to "partial"
+                  if (row && return_quantity >= row.quantity) {
+                    newReturnStatus = "returned"; // If all sold items are returned
+                  }
+
+                  db.run(
+                    "UPDATE sales SET return_status = ? WHERE id = ?",
+                    [newReturnStatus, sale_id],
+                    (err) => {
+                      if (err) {
+                        console.error("Error updating return_status: ", err.message);
+                        return rejectStatus(err);
+                      }
+                      resolveStatus();
+                    }
+                  );
+                }
+              );
+            });
+
+            Promise.all([inventoryPromise, salesQuantityPromise, returnStatusPromise])
+              .then(() => resolve({ product_id, return_quantity, total_refund }))
+              .catch(reject);
           }
         );
       });
     });
 
     const results = await Promise.all(promises);
-
     db.run("COMMIT");
 
     res.status(201).json({
@@ -2522,11 +2631,12 @@ app.post("/sales-return", async (req, res) => {
     });
   } catch (error) {
     db.run("ROLLBACK");
-    res.status(400).json({ message: "Error processing sales returns", error });
+    console.error("Error processing sales returns:", error);
+    res.status(500).json({ message: "Error processing sales returns", error });
   }
 });
 
-// Get All Returns
+// Get All Sales Returns
 app.get("/sales/returns", async (req, res) => {
   try {
     db.all("SELECT * FROM returns", (err, rows) => {
