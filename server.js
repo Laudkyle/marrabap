@@ -2162,6 +2162,7 @@ app.delete("/payments/:id", (req, res) => {
 // ===================== Sales Endpoints =====================
 app.post("/sales", async (req, res) => {
   const salesData = Array.isArray(req.body) ? req.body : [req.body];
+
   const dbPromise = new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run("BEGIN TRANSACTION", (err) => {
@@ -2174,13 +2175,12 @@ app.post("/sales", async (req, res) => {
         const customer_id = salesData[0].customer_id;
         const payment_method = salesData[0].payment_method;
 
-        // Process each sale item in the cart
         const processSalePromises = salesData.map(
           ({
             product_id,
             quantity,
             selling_price,
-            tax,
+            taxes, // Now an array of tax IDs
             discount_type,
             discount_amount,
             description,
@@ -2205,63 +2205,133 @@ app.post("/sales", async (req, res) => {
                     return rejectSale("Insufficient stock");
                   }
 
-                  const total_price =
-                    selling_price * quantity - discount_amount; // Discount applied to the total price
-                  totalCartPrice += total_price; // Sum total price for the cart
+                  const itemSubtotal = selling_price * quantity;
+                  const discount =
+                    discount_type === "percentage"
+                      ? (itemSubtotal * discount_amount) / 100
+                      : discount_amount;
 
-                  // Insert the sale record for each item
-                  db.run(
-                    "INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date, selling_price, tax, discount_type, discount_amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [
-                      customer_id,
-                      product_id,
-                      payment_method,
-                      reference_number,
-                      quantity,
-                      total_price,
-                      new Date().toISOString(),
-                      selling_price,
-                      tax,
-                      discount_type,
-                      discount_amount,
-                      description,
-                    ],
-                    (err) => {
-                      if (err) {
-                        errorOccurred = true;
-                        console.error("Error: ", err.message);
-                        return rejectSale("Error inserting sale items");
-                      }
+                  const totalAfterDiscount = itemSubtotal - discount;
+                  let totalTaxAmount = 0;
 
-                      // Update the inventory stock after sale
-                      db.run(
-                        "UPDATE inventory SET quantity_in_stock = quantity_in_stock - ? WHERE product_id = ?",
-                        [quantity, product_id],
-                        (err) => {
-                          if (err) {
-                            errorOccurred = true;
-                            console.error(
-                              "Error updating inventory: ",
-                              err.message
-                            );
+                  // Calculate total tax amount
+                  const taxPromises = taxes.map((tax_id) => {
+                    return new Promise((resolveTax, rejectTax) => {
+                      db.get(
+                        "SELECT * FROM taxes WHERE id = ?",
+                        [tax_id],
+                        (err, taxData) => {
+                          if (err || !taxData) {
+                            console.error(err ? err.message : "Tax not found");
+                            return rejectTax("Tax not found");
                           }
-                          resolveSale({
-                            customer_id,
-                            product_id,
-                            quantity,
-                            total_price,
-                          });
+
+                          let taxAmount = 0;
+
+                          if (taxData.tax_type === "exclusive") {
+                            taxAmount = (totalAfterDiscount * taxData.tax_rate) / 100;
+                          } else if (taxData.tax_type === "inclusive") {
+                            taxAmount = totalAfterDiscount - totalAfterDiscount / (1 + taxData.tax_rate / 100);
+                          }
+
+                          totalTaxAmount += taxAmount;
+                          resolveTax({ tax_id, taxAmount });
                         }
                       );
-                    }
-                  );
+                    });
+                  });
+
+                  Promise.all(taxPromises)
+                    .then((calculatedTaxes) => {
+                      const total_price = totalAfterDiscount + totalTaxAmount;
+                      totalCartPrice += total_price;
+
+                      db.run(
+                        `INSERT INTO sales (customer_id, product_id, payment_method, reference_number, quantity, total_price, date, selling_price, discount_type, discount_amount, description) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                          customer_id,
+                          product_id,
+                          payment_method,
+                          reference_number,
+                          quantity,
+                          total_price,
+                          new Date().toISOString(),
+                          selling_price,
+                          discount_type,
+                          discount_amount,
+                          description,
+                        ],
+                        function (err) {
+                          if (err) {
+                            errorOccurred = true;
+                            console.error("Error: ", err.message);
+                            return rejectSale("Error inserting sale items");
+                          }
+
+                          const sale_id = this.lastID;
+
+                          // Insert tax details into sales_taxes and sale_tax_amounts
+                          const taxInsertPromises = calculatedTaxes.map(({ tax_id, taxAmount }) => {
+                            return new Promise((resolveInsert, rejectInsert) => {
+                              db.run(
+                                "INSERT INTO sales_taxes (sale_id, tax_id) VALUES (?, ?)",
+                                [sale_id, tax_id],
+                                function (err) {
+                                  if (err) {
+                                    errorOccurred = true;
+                                    console.error("Error inserting tax: ", err.message);
+                                    return rejectInsert("Error inserting sales_taxes");
+                                  }
+
+                                  const sale_tax_id = this.lastID;
+                                  db.run(
+                                    "INSERT INTO sale_tax_amounts (sale_tax_id, tax_amount) VALUES (?, ?)",
+                                    [sale_tax_id, taxAmount],
+                                    (err) => {
+                                      if (err) {
+                                        errorOccurred = true;
+                                        console.error("Error inserting tax amount: ", err.message);
+                                        return rejectInsert("Error inserting sale_tax_amounts");
+                                      }
+                                      resolveInsert();
+                                    }
+                                  );
+                                }
+                              );
+                            });
+                          });
+
+                          Promise.all(taxInsertPromises)
+                            .then(() => {
+                              db.run(
+                                "UPDATE inventory SET quantity_in_stock = quantity_in_stock - ? WHERE product_id = ?",
+                                [quantity, product_id],
+                                (err) => {
+                                  if (err) {
+                                    errorOccurred = true;
+                                    console.error("Error updating inventory: ", err.message);
+                                  }
+                                  resolveSale({
+                                    customer_id,
+                                    product_id,
+                                    quantity,
+                                    total_price,
+                                  });
+                                }
+                              );
+                            })
+                            .catch(rejectSale);
+                        }
+                      );
+                    })
+                    .catch(rejectSale);
                 }
               );
             });
           }
         );
 
-        // Wait for all sales items in the cart to be processed
         Promise.allSettled(processSalePromises)
           .then((results) => {
             results.forEach((result, index) => {
@@ -2273,16 +2343,15 @@ app.post("/sales", async (req, res) => {
               }
             });
 
-            // After processing all items, insert the total price for the cart
             if (!errorOccurred) {
               db.run(
                 "INSERT INTO invoices (reference_number, customer_id, total_amount, amount_paid, status) VALUES (?, ?, ?, ?, ?)",
                 [
-                  reference_number, // Reference number for the cart
-                  customer_id, // Customer ID
-                  totalCartPrice, // Total price for the cart
-                  payment_method == "credit" ? 0 : totalCartPrice, // Amount paid: 0 for credit, full amount for cash
-                  payment_method == "credit" ? "unpaid" : "paid", // Status: 'unpaid' for credit, 'paid' for cash
+                  reference_number,
+                  customer_id,
+                  totalCartPrice,
+                  payment_method == "credit" ? 0 : totalCartPrice,
+                  payment_method == "credit" ? "unpaid" : "paid",
                 ],
                 (err) => {
                   if (err) {
@@ -2292,7 +2361,6 @@ app.post("/sales", async (req, res) => {
                 }
               );
 
-              // Update the customer's total_sale_due for credit sales
               if (payment_method === "credit") {
                 db.run(
                   "UPDATE customers SET total_sale_due = total_sale_due + ? WHERE id = ?",
@@ -2300,17 +2368,13 @@ app.post("/sales", async (req, res) => {
                   (err) => {
                     if (err) {
                       errorOccurred = true;
-                      console.error(
-                        "Error updating customer's total_sale_due: ",
-                        err.message
-                      );
+                      console.error("Error updating customer's total_sale_due: ", err.message);
                     }
                   }
                 );
               }
             }
 
-            // If any error occurred, rollback transaction
             if (errorOccurred) {
               db.run("ROLLBACK", (rollbackErr) => {
                 if (rollbackErr) {
@@ -2323,7 +2387,7 @@ app.post("/sales", async (req, res) => {
                 if (err) {
                   return reject(new Error("Failed to commit transaction"));
                 }
-                resolve(saleResponses); // Return successful sale data
+                resolve(saleResponses);
               });
             }
           })
@@ -2341,39 +2405,63 @@ app.post("/sales", async (req, res) => {
 
   try {
     const result = await dbPromise;
-
-    // Respond with a JSON object containing the success data
-    res.status(201).json({
-      message: "Sales processed successfully",
-      sales: result, // Include details of each sale processed
-    });
+    res.status(201).json({ message: "Sales processed successfully", sales: result });
   } catch (error) {
     console.error(error.message);
-
-    // Respond with an error message and status code
-    res.status(400).json({
-      message: "Error processing sales",
-      error: error.message,
-    });
+    res.status(400).json({ message: "Error processing sales", error: error.message });
   }
 });
 
-// Get all sales
 app.get("/sales", (req, res) => {
   db.all(
-    `SELECT sales.id,sales.reference_number, customer_id,selling_price,tax,discount_type,discount_amount,payment_method,products.name AS product_name, sales.quantity, sales.total_price,sales.return_status, sales.date 
-     FROM sales 
-     JOIN products ON sales.product_id = products.id ORDER BY sales.date DESC`,
+    `SELECT 
+        sales.id, 
+        sales.reference_number, 
+        sales.customer_id, 
+        sales.selling_price, 
+        sales.discount_type, 
+        sales.discount_amount, 
+        sales.payment_method, 
+        products.name AS product_name, 
+        sales.quantity, 
+        sales.total_price, 
+        sales.return_status, 
+        sales.date,
+        COALESCE(
+          GROUP_CONCAT(
+            taxes.tax_name || ' (' || COALESCE(taxes.tax_rate, 0) || '%): ' || COALESCE(sale_tax_amounts.tax_amount, 0), ' | '
+          ), ''
+        ) AS applied_taxes
+      FROM sales
+      JOIN products ON sales.product_id = products.id
+      LEFT JOIN sales_taxes ON sales.id = sales_taxes.sale_id
+      LEFT JOIN taxes ON sales_taxes.tax_id = taxes.id
+      LEFT JOIN sale_tax_amounts ON sales_taxes.id = sale_tax_amounts.sale_tax_id
+      GROUP BY 
+        sales.id, 
+        sales.reference_number, 
+        sales.customer_id, 
+        sales.selling_price, 
+        sales.discount_type, 
+        sales.discount_amount, 
+        sales.payment_method, 
+        products.name, 
+        sales.quantity, 
+        sales.total_price, 
+        sales.return_status, 
+        sales.date
+      ORDER BY sales.date DESC`,
     (err, rows) => {
       if (err) {
         console.error(err);
-        res.status(500).send("Error fetching sales");
+        res.status(500).json({ message: "Error fetching sales", error: err.message });
       } else {
         res.json(rows);
       }
     }
   );
 });
+
 app.post("/sales-return", async (req, res) => {
   const returnData = req.body;
   console.log("data", returnData);
