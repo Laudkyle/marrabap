@@ -19,10 +19,11 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [showCompleteSale, setShowCompleteSale] = useState(true);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [sellingPrice, setSellingPrice] = useState(0);
   const [taxes, setTaxes] = useState([]);
-    const [taxRates, setTaxRates] = useState([]);
-  
+  const [taxRates, setTaxRates] = useState([]);
+
   const [discountType, setDiscountType] = useState("percentage");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [description, setDescription] = useState("");
@@ -52,7 +53,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
     }
   };
 
-
   const handleTaxChange = (index, value) => {
     const newTaxes = [...selectedTaxes];
     newTaxes[index] = value;
@@ -76,8 +76,9 @@ function Shop({ companyName, companyAddress, email, phone }) {
   useEffect(() => {
     fetch("http://localhost:5000/taxes")
       .then((response) => response.json())
-      .then((data) => {setTaxes(data)
-        setTaxRates(data)
+      .then((data) => {
+        setTaxes(data);
+        setTaxRates(data);
       })
       .catch((error) => console.error("Error fetching taxes:", error));
   }, []);
@@ -275,40 +276,29 @@ function Shop({ companyName, companyAddress, email, phone }) {
   };
   const generateInvoicePDF = () => {
     const invoiceElement = document.getElementById("invoice"); // Capture the invoice div
-  console.log("called")
+    console.log("called");
     html2canvas(invoiceElement, { scale: 2 }).then((canvas) => {
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
-  
+
       const imgWidth = 210; // A4 size width in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width; // Maintain aspect ratio
-  
+
       pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
       pdf.save(`Invoice_${refNum}.pdf`); // Save the invoice as a PDF file
     });
   };
-  
+
   useEffect(() => {
     if (selectedProduct) {
       setSellingPrice(selectedProduct.sp);
     }
   }, [selectedProduct]);
-  // Updated handleMakeSale function
-  const handleMakeSale = async () => {
-    try {
-      const referenceNumber = refNum; // Generate unique reference number
-      await makeSale(selectedProduct, quantity, referenceNumber); // Pass reference number to makeSale
-      setSaleComplete(!saleComplete); // Trigger product list refresh
-      setSelectedProduct(null);
-      toast.success("Sale completed successfully!");
-    } catch (error) {
-      console.error("Error completing sale:", error);
-      toast.error("An error occurred while processing the sale.");
-    }
-  };
+  
 
   // Updated handleCompleteSale function
   const handleCompleteSale = async (customer_id, paymentMethod) => {
+    setShowInvoicePrint(true)
     try {
       const referenceNumber = refNum; // Generate unique reference number
       const response = await processSale(
@@ -321,6 +311,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         // Check for 200 or 201 status
         setSaleComplete(!saleComplete); // Trigger product list refresh
         generateInvoicePDF(); // Call function to generate invoice PDF
+        setShowInvoicePrint(false)
         setShowInvoice(false); // Close the invoice modal
         clearCart();
         toast.success("Sale completed successfully!");
@@ -347,7 +338,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       date: new Date().toISOString(), // Use ISO 8601 format for date
       status: "pending", // Default status for the draft
     };
-  
+
     try {
       const response = await fetch("http://localhost:5000/drafts", {
         method: "POST",
@@ -356,7 +347,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         },
         body: JSON.stringify(draft),
       });
-  
+
       if (response.status === 201) {
         // Successfully saved draft
         setShowInvoice(false); // Close the invoice modal
@@ -372,7 +363,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
       toast.error("An error occurred while saving the draft.");
     }
   };
-  
 
   useEffect(() => {
     setRefNum(generateReferenceNumber());
@@ -664,129 +654,119 @@ function Shop({ companyName, companyAddress, email, phone }) {
         addTax={addTax}
         removeTax={removeTax}
       />
-<div id="invoice" className="p-6 bg-white rounded-lg shadow-md">
-  <div className="border-b pb-4 mb-4">
-    <h1 className="text-2xl font-bold text-blue-600 mb-1">
-      {companyName || "Company Name"}
-    </h1>
-    <p className="text-sm text-gray-600">
-      {companyAddress || "123 Business St, City, Country"}
-    </p>
-    <p className="text-sm text-gray-600">
-      Email: {email || "support@company.com"} | Phone: {phone || "(123) 456-7890"}
-    </p>
-    <h2 className="text-lg font-semibold mt-4">Invoice</h2>
-    <p className="text-sm text-gray-600">
-      Reference Number: <span className="font-medium">{refNum}</span>
-    </p>
-    <p className="text-sm text-gray-600">
-      Date: <span className="font-medium">{new Date().toLocaleDateString()}</span>
-    </p>
-  </div>
+      {showInvoicePrint && (<div id="invoice" className="p-6 bg-white rounded-lg shadow-md">
+        <div className="border-b pb-4 mb-4">
+          <h1 className="text-2xl font-bold text-blue-600 mb-1">
+            {companyName || "Company Name"}
+          </h1>
+          <p className="text-sm text-gray-600">
+            {companyAddress || "123 Business St, City, Country"}
+          </p>
+          <p className="text-sm text-gray-600">
+            Email: {email || "support@company.com"} | Phone:{" "}
+            {phone || "(123) 456-7890"}
+          </p>
+          <h2 className="text-lg font-semibold mt-4">Invoice</h2>
+          <p className="text-sm text-gray-600">
+            Reference Number: <span className="font-medium">{refNum}</span>
+          </p>
+          <p className="text-sm text-gray-600">
+            Date:{" "}
+            <span className="font-medium">
+              {new Date().toLocaleDateString()}
+            </span>
+          </p>
+        </div>
 
-  <table className="w-full border-collapse border border-gray-300">
-    <thead>
-      <tr className="bg-gray-100">
-        <th className="border p-2">Product</th>
-        <th className="border p-2">Quantity</th>
-        <th className="border p-2">Price</th>
-        <th className="border p-2">Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      {cart.map((item, index) => (
-        <tr key={index} className="text-center">
-          <td className="border p-2">{item.product.name}</td>
-          <td className="border p-2">{item.quantity}</td>
-          <td className="border p-2">${item.sellingPrice.toFixed(2)}</td>
-          <td className="border p-2">${(item.quantity * item.sellingPrice).toFixed(2)}</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
+        <table className="w-full border-collapse border border-gray-300">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border p-2">Product</th>
+              <th className="border p-2">Quantity</th>
+              <th className="border p-2">Price</th>
+              <th className="border p-2">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cart.map((item, index) => (
+              <tr key={index} className="text-center">
+                <td className="border p-2">{item.product.name}</td>
+                <td className="border p-2">{item.quantity}</td>
+                <td className="border p-2">${item.sellingPrice.toFixed(2)}</td>
+                <td className="border p-2">
+                  ${(item.quantity * item.sellingPrice).toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-  <div className="mt-4 text-right">
-    <p className="font-semibold">
-      Total: $
-      {cart.reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0).toFixed(2)}
-    </p>
-  </div>
-  <div className="mt-6">
-                  {/* Actual Subtotal */}
-                  <div className="flex justify-between">
-                    <span className="font-semibold text-gray-700">
-                      Item Total:
-                    </span>
-                    <span>₵{actualSubtotal.toFixed(2)}</span>
-                  </div>
+      
+        <div className="w-full] ">
+          <div className="mt-12">
+            {/* Actual Subtotal */}
+            <div className="flex justify-between">
+              <span className="font-semibold text-gray-700">Item Total:</span>
+              <span>₵{actualSubtotal.toFixed(2)}</span>
+            </div>
 
-                  {/* Discount */}
-                  <div className="flex justify-between mt-2">
-                    <span className="font-semibold text-gray-700">
-                      Discount:
-                    </span>
-                    <span>₵{totalDiscount.toFixed(2)}</span>
-                  </div>
+            {/* Discount */}
+            <div className="flex justify-between mt-2">
+              <span className="font-semibold text-gray-700">Discount:</span>
+              <span>₵{totalDiscount.toFixed(2)}</span>
+            </div>
 
-                  {/* Subtotal After Discount */}
-                  <div className="flex justify-between mt-2">
-                    <span className="font-semibold text-gray-700">
-                      Sub Total:
-                    </span>
-                    <span>₵{subtotal.toFixed(2)}</span>
-                  </div>
+            {/* Subtotal After Discount */}
+            <div className="flex justify-between mt-2">
+              <span className="font-semibold text-gray-700">Sub Total:</span>
+              <span>₵{subtotal.toFixed(2)}</span>
+            </div>
 
-                  {/* Taxes Breakdown */}
-                  <div className="mt-2">
-                    <h3 className="font-semibold text-gray-700">Taxes:</h3>
-                    <ul className="mt-1 space-y-1">
-                      {Object.entries(taxBreakdown).map(
-                        ([taxName, amount], index) => (
-                          <li
-                            key={index}
-                            className="flex justify-between text-xs"
-                          >
-                            <span>{taxName}:</span>
-                            <span>₵{amount.toFixed(2)}</span>
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
+            {/* Taxes Breakdown */}
+            <div className="mt-2">
+              <h3 className="font-semibold text-gray-700">Taxes:</h3>
+              <ul className="mt-1 space-y-1">
+                {Object.entries(taxBreakdown).map(
+                  ([taxName, amount], index) => (
+                    <li key={index} className="flex justify-between text-xs">
+                      <span>{taxName}:</span>
+                      <span>₵{amount.toFixed(2)}</span>
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
 
-                  {/* Total Tax */}
-                  <div className="flex justify-between mt-2">
-                    <span className="font-semibold text-gray-700">
-                      Total Tax:
-                    </span>
-                    <span>₵{totalTax.toFixed(2)}</span>
-                  </div>
+            {/* Total Tax */}
+            <div className="flex justify-between mt-2">
+              <span className="font-semibold text-gray-700">Total Tax:</span>
+              <span>₵{totalTax.toFixed(2)}</span>
+            </div>
 
-                  {/* Grand Total */}
-                  <div className="flex justify-between mt-1 border-t pt-2">
-                    <span className="font-semibold text-lg">Grand Total:</span>
-                    <span className="text-xl font-bold">
-                      ₵{grandTotal.toFixed(2)}
-                    </span>
-                  </div>
+            {/* Grand Total */}
+            <div className="flex justify-between mt-1 border-t pt-2">
+              <span className="font-semibold text-lg">Grand Total:</span>
+              <span className="text-xl font-bold">
+                ₵{grandTotal.toFixed(2)}
+              </span>
+            </div>
 
-                  {/* Note for Inclusive Tax */}
-                  {totalTax > 0 && (
-                    <div className="mt-2 text-sm text-gray-600">
-                      <p>
-                        <em>
-                          Note: Taxes shown above are{" "}
-                          {Object.values(taxBreakdown).some(
-                            (amount) => amount > 0
-                          )
-                            ? "calculated based on the tax type (inclusive or exclusive) applied to the items."
-                            : "inclusive of the item prices where applicable."}
-                        </em>
-                      </p>
-                    </div>
-                  )}
-                </div>
-</div>
+            {/* Note for Inclusive Tax */}
+            {totalTax > 0 && (
+              <div className="mt-2 text-sm text-gray-600">
+                <p>
+                  <em>
+                    Note: Taxes shown above are{" "}
+                    {Object.values(taxBreakdown).some((amount) => amount > 0)
+                      ? "calculated based on the tax type (inclusive or exclusive) applied to the items."
+                      : "inclusive of the item prices where applicable."}
+                  </em>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>)}
 
       <style jsx>
         {`

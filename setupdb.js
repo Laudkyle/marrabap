@@ -13,7 +13,7 @@ db.serialize(() => {
   const defaultAccounts = [
     {
       account_code: "1000",
-      account_name: "Cash",
+      account_name: "Cash In Hand",
       account_type: "asset",
       balance: 0,
     },
@@ -29,15 +29,16 @@ db.serialize(() => {
       account_type: "asset",
       balance: 0,
     },
+    
     {
       account_code: "1010",
-      account_name: "Accounts Receivable",
+      account_name: "Trade Accounts Receivable",
       account_type: "asset",
       balance: 0,
     },
     {
       account_code: "2000",
-      account_name: "Accounts Payable",
+      account_name: "Payables",
       account_type: "liability",
       balance: 0,
     },
@@ -103,7 +104,7 @@ db.serialize(() => {
     },
     {
       account_code: "6000",
-      account_name: "Tax Expense",
+      account_name: "Discounts",
       account_type: "expense",
       balance: 0,
     },
@@ -177,6 +178,35 @@ db.serialize(() => {
       account_code: "7008",
       account_name: "Tax Adjustments",
       account_type: "adjustment",
+      balance: 0,
+    },{
+      account_code: "3000",
+      account_name: "Accounts Receivable",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "1011",
+      account_name: "Notes Receivable",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "1012",
+      account_name: "interests Receivable",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "0101",
+      account_name: "Cash",
+      account_type: "asset",
+      balance: 0,
+    },
+    {
+      account_code: "0202",
+      account_name: "Account Payables",
+      account_type: "liability",
       balance: 0,
     },
   ];
