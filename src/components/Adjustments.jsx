@@ -16,7 +16,6 @@ const AdjustmentsComponent = () => {
     account: "",
     status: "posted",
   });
-  
 
   const adjustmentTypes = [
     { value: "correction", label: "Error Correction" },
@@ -28,7 +27,14 @@ const AdjustmentsComponent = () => {
     { value: "write-off", label: "Bad Debt Write-off" },
     { value: "tax", label: "Tax Adjustment" },
   ];
- 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setCurrentAdjustment((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -74,53 +80,10 @@ const AdjustmentsComponent = () => {
     fetchData();
   }, [filters]);
 
-
-  const [formData, setFormData] = useState({
-    adjustment_type: "",
-    account_id: "",
-    entry_type: "debit",
-    amount: "",
-    date: "",
-    document_reference: "",
-    reason: "",
-  });
-
-
-  useEffect(() => {
-    if (currentAdjustment) {
-      setFormData(currentAdjustment);
-    } else {
-      setFormData({
-        adjustment_type: "",
-        account_id: "",
-        entry_type: "debit",
-        amount: "",
-        date: new Date().toISOString().split("T")[0], // Default to today
-        document_reference: "",
-        reason: "",
-      });
-    }
-  }, [currentAdjustment, isModalOpen]); // Reset when modal opens
-// Handle input changes but keep it local
-const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  }
   const handleSave = async () => {
     if (!validateAdjustment()) return;
 
     try {
-        const updatedAdjustment = {
-            ...formData,
-            created_by: "current_user", // Should come from auth context
-            created_at: new Date().toISOString(),
-            status: "pending",
-            reference_number: generateReferenceNumber(),
-            affected_periods: calculateAffectedPeriods(formData.date),
-          };
-      
-          setCurrentAdjustment(updatedAdjustment); // Update state only on submit
-      
       const endpoint = currentAdjustment.id
         ? `http://localhost:5000/adjustments/${currentAdjustment.id}`
         : "http://localhost:5000/adjustments";
@@ -386,133 +349,167 @@ const handleInputChange = (e) => {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30">
-        <div className="bg-white rounded-2xl shadow-xl p-6 w-1/2 max-w-3xl overflow-auto">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
-            {currentAdjustment?.id ? "Edit Adjustment" : "New Adjustment"}
-          </h3>
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-1/2 max-w-3xl overflow-auto">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">
+              {currentAdjustment?.id ? "Edit Adjustment" : "New Adjustment"}
+            </h3>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Type</label>
-              <select
-                name="adjustment_type"
-                value={formData.adjustment_type}
-                onChange={handleInputChange}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <div className="grid grid-cols-2 gap-4">
+              {/* Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Type
+                </label>
+                <select
+                  value={currentAdjustment?.adjustment_type || ""}
+                  onChange={(e) =>
+                    setCurrentAdjustment({
+                      ...currentAdjustment,
+                      adjustment_type: e.target.value,
+                    })
+                  }
+                  className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select Type</option>
+                  {adjustmentTypes.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Account */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Account
+                </label>
+                <select
+                  value={currentAdjustment?.account_id || ""}
+                  onChange={(e) =>
+                    setCurrentAdjustment({
+                      ...currentAdjustment,
+                      account_id: e.target.value,
+                    })
+                  }
+                  className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.account_name} ({account.account_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Entry Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Entry Type
+                </label>
+                <select
+                  value={currentAdjustment?.entry_type || "debit"}
+                  onChange={(e) =>
+                    setCurrentAdjustment({
+                      ...currentAdjustment,
+                      entry_type: e.target.value,
+                    })
+                  }
+                  className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="debit">Debit</option>
+                  <option value="credit">Credit</option>
+                </select>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Amount
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="amount"
+                  value={currentAdjustment?.amount || ""}
+                  onChange={handleInputChange}
+                  className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={
+                    currentAdjustment?.date || format(new Date(), "yyyy-MM-dd")
+                  }
+                  onChange={(e) =>
+                    setCurrentAdjustment({
+                      ...currentAdjustment,
+                      date: e.target.value,
+                    })
+                  }
+                  className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Supporting Document Reference */}
+              <div>
+  <label className="block text-sm font-medium text-gray-700">Document Reference</label>
+  <input
+    type="text"
+    name="document_reference"
+    value={currentAdjustment?.document_reference || ""}
+    onChange={handleInputChange}
+    className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    placeholder="Enter reference number"
+  />
+</div>
+
+              {/* Reason (Full Width) */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Reason
+                </label>
+                <textarea
+                  value={currentAdjustment?.reason || ""}
+                  onChange={(e) =>
+                    setCurrentAdjustment({
+                      ...currentAdjustment,
+                      reason: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter the reason for this adjustment..."
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
               >
-                <option value="">Select Type</option>
-                {adjustmentTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Account */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Account</label>
-              <select
-                name="account_id"
-                value={formData.account_id}
-                onChange={handleInputChange}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition"
               >
-                <option value="">Select Account</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.account_name} ({account.account_code})
-                  </option>
-                ))}
-              </select>
+                {currentAdjustment?.id ? "Save Changes" : "Create Adjustment"}
+              </button>
             </div>
-
-            {/* Entry Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Entry Type</label>
-              <select
-                name="entry_type"
-                value={formData.entry_type}
-                onChange={handleInputChange}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="debit">Debit</option>
-                <option value="credit">Credit</option>
-              </select>
-            </div>
-
-            {/* Amount */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Amount</label>
-              <input
-                type="number"
-                name="amount"
-                step="0.01"
-                value={formData.amount}
-                onChange={handleInputChange}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Date</label>
-              <input
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Document Reference */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Document Reference</label>
-              <input
-                type="text"
-                name="document_reference"
-                value={formData.document_reference}
-                onChange={handleInputChange}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter reference number"
-              />
-            </div>
-
-            {/* Reason */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Reason</label>
-              <textarea
-                name="reason"
-                value={formData.reason}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full mt-1 p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter the reason for this adjustment..."
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition"
-            >
-              {currentAdjustment?.id ? "Save Changes" : "Create Adjustment"}
-            </button>
           </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
 
       {/* Loading Overlay */}
       {loading && (

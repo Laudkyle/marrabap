@@ -2476,7 +2476,7 @@ app.post("/sales-return", async (req, res) => {
   try {
     db.run("BEGIN TRANSACTION");
 
-    const promises = returnsArray.map((item) => {
+    const promises = returnsArray.map(async (item) => {
       const {
         sale_id,
         product_id,
@@ -2486,7 +2486,6 @@ app.post("/sales-return", async (req, res) => {
         action, // "restock" or "dispose"
         payment_method,
         selling_price,
-        taxes, // Array of tax strings
         discount_type,
         discount_amount,
         return_type, // "full" or "partial"
@@ -2495,21 +2494,42 @@ app.post("/sales-return", async (req, res) => {
       } = item;
 
       if (!sale_id || !product_id || !customer_id || !reference_number || return_quantity <= 0) {
-        return Promise.reject(new Error("Invalid return data"));
+        throw new Error("Invalid return data");
       }
 
-      // Convert taxes array into a single string
-      const taxString = Array.isArray(taxes) ? taxes.join(" | ") : "";
-      const totalTax = Array.isArray(taxes)
-        ? taxes.reduce((acc, tax) => {
-            const match = tax.match(/(\d+(\.\d+)?)$/); // Extract numeric value from string
-            return match ? acc + parseFloat(match[0]) : acc;
-          }, 0)
-        : 0;
+      // Fetch total quantity sold for this sale
+      const totalQuantitySold = await new Promise((resolve, reject) => {
+        db.get("SELECT quantity FROM sales WHERE id = ?", [sale_id], (err, row) => {
+          if (err) return reject(err);
+          if (!row) return reject(new Error("Sale not found"));
+          resolve(row.quantity);
+        });
+      });
 
-      const total_refund = return_quantity * (selling_price - discount_amount + totalTax);
+      // Fetch total tax amount for this sale
+      const totalTax = await new Promise((resolve, reject) => {
+        db.all(
+          `SELECT sta.tax_amount
+           FROM sales_taxes st
+           JOIN sale_tax_amounts sta ON st.id = sta.sale_tax_id
+           WHERE st.sale_id = ?`,
+          [sale_id],
+          (err, rows) => {
+            if (err) return reject(err);
+            const totalTaxAmount = rows.reduce((acc, row) => acc + row.tax_amount, 0);
+            resolve(totalTaxAmount);
+          }
+        );
+      });
 
-      return new Promise((resolve, reject) => {
+      // Calculate tax applicable to the returned items
+      const returnTax = (return_quantity / totalQuantitySold) * totalTax;
+
+      // Calculate total refund
+      const total_refund = return_quantity * (selling_price - discount_amount) + returnTax;
+
+      // Insert return record
+      await new Promise((resolve, reject) => {
         db.run(
           `INSERT INTO returns (
             sale_id, product_id, customer_id, reference_number, return_quantity, 
@@ -2525,7 +2545,7 @@ app.post("/sales-return", async (req, res) => {
             action,
             new Date().toISOString(),
             selling_price,
-            taxString,
+            returnTax,
             discount_amount,
             discount_type,
             payment_method,
@@ -2536,90 +2556,40 @@ app.post("/sales-return", async (req, res) => {
           ],
           (err) => {
             if (err) return reject(err);
-
-            // Update inventory if action is "restock"
-            const inventoryPromise =
-              action === "restock"
-                ? new Promise((resolveInventory, rejectInventory) => {
-                    db.run(
-                      "UPDATE inventory SET quantity_in_stock = quantity_in_stock + ? WHERE product_id = ?",
-                      [return_quantity, product_id],
-                      (err) => {
-                        if (err) {
-                          console.error("Error updating inventory: ", err.message);
-                          return rejectInventory(err);
-                        }
-                        resolveInventory();
-                      }
-                    );
-                  })
-                : Promise.resolve();
-
-            // Update sales quantity
-            const salesQuantityPromise = new Promise((resolveSales, rejectSales) => {
-              db.get("SELECT quantity FROM sales WHERE id = ?", [sale_id], (err, row) => {
-                if (err) {
-                  console.error("Error fetching sales quantity: ", err.message);
-                  return rejectSales(err);
-                }
-
-                if (!row) {
-                  return rejectSales(new Error("Sale not found"));
-                }
-
-                const newQuantity = row.quantity - return_quantity;
-
-                db.run(
-                  "UPDATE sales SET quantity = ? WHERE id = ?",
-                  [newQuantity, sale_id],
-                  (err) => {
-                    if (err) {
-                      console.error("Error updating sales quantity: ", err.message);
-                      return rejectSales(err);
-                    }
-                    resolveSales();
-                  }
-                );
-              });
-            });
-
-            // Determine new return_status for the sale
-            const returnStatusPromise = new Promise((resolveStatus, rejectStatus) => {
-              db.get(
-                "SELECT quantity FROM sales WHERE id = ?",
-                [sale_id],
-                (err, row) => {
-                  if (err) {
-                    console.error("Error fetching sales return status: ", err.message);
-                    return rejectStatus(err);
-                  }
-
-                  let newReturnStatus = "partial_return"; // Default to "partial"
-                  if (row && return_quantity >= row.quantity) {
-                    newReturnStatus = "returned"; // If all sold items are returned
-                  }
-
-                  db.run(
-                    "UPDATE sales SET return_status = ? WHERE id = ?",
-                    [newReturnStatus, sale_id],
-                    (err) => {
-                      if (err) {
-                        console.error("Error updating return_status: ", err.message);
-                        return rejectStatus(err);
-                      }
-                      resolveStatus();
-                    }
-                  );
-                }
-              );
-            });
-
-            Promise.all([inventoryPromise, salesQuantityPromise, returnStatusPromise])
-              .then(() => resolve({ product_id, return_quantity, total_refund }))
-              .catch(reject);
+            resolve();
           }
         );
       });
+
+      // Update inventory if action is "restock"
+      if (action === "restock") {
+        await new Promise((resolve, reject) => {
+          db.run(
+            "UPDATE inventory SET quantity_in_stock = quantity_in_stock + ? WHERE product_id = ?",
+            [return_quantity, product_id],
+            (err) => {
+              if (err) return reject(err);
+              resolve();
+            }
+          );
+        });
+      }
+
+      // Update sales quantity
+      await new Promise((resolve, reject) => {
+        db.get("SELECT quantity FROM sales WHERE id = ?", [sale_id], (err, row) => {
+          if (err) return reject(err);
+          if (!row) return reject(new Error("Sale not found"));
+
+          const newQuantity = row.quantity - return_quantity;
+          db.run("UPDATE sales SET quantity = ? WHERE id = ?", [newQuantity, sale_id], (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+      });
+
+      return { product_id, return_quantity, total_refund };
     });
 
     const results = await Promise.all(promises);
@@ -2635,6 +2605,7 @@ app.post("/sales-return", async (req, res) => {
     res.status(500).json({ message: "Error processing sales returns", error });
   }
 });
+
 
 // Get All Sales Returns
 app.get("/sales/returns", async (req, res) => {

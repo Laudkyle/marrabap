@@ -114,6 +114,12 @@ db.serialize(() => {
       balance: 0,
     },
     {
+      account_code: "6100",
+      account_name: "Loss from Disposal",
+      account_type: "liability",
+      balance: 0,
+    },
+    {
       account_code: "7000",
       account_name: "Contra Account",
       account_type: "adjustment",
@@ -812,7 +818,146 @@ BEGIN
     WHERE st.id = NEW.sale_tax_id;
 END;`)
 
- 
+ db.run(`CREATE TRIGGER handle_returns_updates
+AFTER INSERT ON returns
+BEGIN
+    -- Create a new journal entry for the return
+    INSERT INTO journal_entries (reference_number, date, description, status)
+    VALUES (
+        'RETURN-' || NEW.id,
+        CURRENT_DATE,
+        'Return of sale ' || NEW.sale_id,
+        'posted'
+    );
+    
+    -- Reverse Sales Revenue (match original credit with a debit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    VALUES (
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '4000'),
+        NEW.selling_price * NEW.return_quantity - 
+            CASE 
+                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * NEW.discount_amount / 100)
+                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                ELSE 0
+            END,
+        0
+    );
+
+    -- Reverse Accounts Receivable for credit sales (match original debit with a credit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),
+        0,
+        NEW.total_refund
+    WHERE NEW.payment_method = 'credit';
+
+    -- Reverse Cost of Goods Sold (match original debit with a credit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),
+        0,
+        ROUND((SELECT cost_per_unit * NEW.return_quantity FROM inventory WHERE product_id = NEW.product_id), 2)
+    WHERE NEW.action = 'restock';
+
+    -- Reverse Inventory reduction (match original credit with a debit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),
+        ROUND((SELECT cost_per_unit * NEW.return_quantity FROM inventory WHERE product_id = NEW.product_id), 2),
+        0
+    WHERE NEW.action = 'restock';
+
+    -- For disposal, create Loss entry instead of reversing COGS and Inventory
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '6100'),
+        ROUND((SELECT cost_per_unit * NEW.return_quantity FROM inventory WHERE product_id = NEW.product_id), 2),
+        0
+    WHERE NEW.action = 'dispose';
+
+    -- Reverse Discount Entries (match original debit with a credit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '6000'),
+        0,
+        ROUND(
+            CASE 
+                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * NEW.discount_amount / 100)
+                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                ELSE 0
+            END, 
+            2
+        )
+    WHERE NEW.discount_amount > 0;
+
+    -- Reverse Accounts Receivable adjustment for discount (match original credit with a debit)
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT 
+        (SELECT last_insert_rowid()),
+        (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),
+        ROUND(
+            CASE 
+                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * NEW.discount_amount / 100)
+                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
+                ELSE 0
+            END, 
+            2
+        ),
+        0
+    WHERE NEW.discount_amount > 0 AND NEW.payment_method = 'credit';
+END;
+`)
+// -- Handle tax reversals
+db.run(`
+CREATE TRIGGER handle_return_tax_reversals
+AFTER INSERT ON returns
+BEGIN
+    -- Create tax reversal journal entry
+    INSERT INTO journal_entries (reference_number, date, description, status)
+    VALUES (
+        'RETURN-TAX-' || NEW.id,
+        CURRENT_DATE,
+        'Tax reversal for return ' || NEW.id,
+        'posted'
+    );
+
+    -- Insert tax reversal journal entry lines
+    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+    SELECT
+        (SELECT last_insert_rowid()),  -- Get the last inserted journal entry ID
+        t.account_id,
+        CASE
+            -- Reverse tax based on whether it was exclusive or inclusive
+            WHEN t.tax_type = 'inclusive' THEN  
+                (sta.tax_amount * (NEW.return_quantity * 1.0 / s.quantity))
+            ELSE  
+                (sta.tax_amount * (NEW.return_quantity * 1.0 / s.quantity))
+        END,
+        CASE
+            WHEN coa.account_type IN ('asset', 'expense') THEN
+                CASE
+                    WHEN t.tax_type = 'inclusive' THEN  
+                        (sta.tax_amount * (NEW.return_quantity * 1.0 / s.quantity))
+                    ELSE  
+                        (sta.tax_amount * (NEW.return_quantity * 1.0 / s.quantity))
+                END
+            ELSE 0
+        END
+    FROM sales s
+    JOIN sales_taxes st ON st.sale_id = s.id
+    JOIN sale_tax_amounts sta ON sta.sale_tax_id = st.id
+    JOIN taxes t ON t.id = st.tax_id
+    JOIN chart_of_accounts coa ON coa.id = t.account_id
+    WHERE s.id = NEW.sale_id;
+END;
+
+`)
   db.run(`CREATE TRIGGER update_chart_of_accounts_after_payment
 AFTER INSERT ON payments
 FOR EACH ROW
