@@ -2526,7 +2526,7 @@ app.post("/sales-return", async (req, res) => {
       const returnTax = (return_quantity / totalQuantitySold) * totalTax;
 
       // Calculate total refund
-      const total_refund = return_quantity * (selling_price - discount_amount) + returnTax;
+      const total_refund = (return_quantity * selling_price) + returnTax;
 
       // Insert return record
       await new Promise((resolve, reject) => {

@@ -116,7 +116,7 @@ db.serialize(() => {
     {
       account_code: "6100",
       account_name: "Loss from Disposal",
-      account_type: "liability",
+      account_type: "expense",
       balance: 0,
     },
     {
@@ -785,6 +785,8 @@ BEGIN
         )
     WHERE NEW.discount_amount > 0 AND NEW.payment_method = 'credit';
 END;`)
+
+
   db.run(`CREATE TRIGGER handle_tax_journal_entries
 AFTER INSERT ON sale_tax_amounts
 BEGIN
@@ -853,57 +855,74 @@ BEGIN
         NEW.total_refund
     WHERE NEW.payment_method = 'credit';
 
-    -- Reverse Cost of Goods Sold (match original debit with a credit)
-    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-    SELECT
-        (SELECT last_insert_rowid()),
-        (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),
-        0,
-        ROUND((SELECT cost_per_unit * NEW.return_quantity FROM inventory WHERE product_id = NEW.product_id), 2)
-    WHERE NEW.action = 'restock';
+    -- Reverse Cost of Goods Sold (COGS) when restocking
+INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+SELECT 
+    (SELECT last_insert_rowid()), 
+    (SELECT id FROM chart_of_accounts WHERE account_code = '5000'), -- COGS
+    0, 
+    ROUND(cost_per_unit * NEW.return_quantity, 2) 
+FROM inventory 
+WHERE product_id = NEW.product_id
+AND NEW.action = 'restock';
 
-    -- Reverse Inventory reduction (match original credit with a debit)
-    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-    SELECT
-        (SELECT last_insert_rowid()),
-        (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),
-        ROUND((SELECT cost_per_unit * NEW.return_quantity FROM inventory WHERE product_id = NEW.product_id), 2),
-        0
-    WHERE NEW.action = 'restock';
+-- Reverse Inventory reduction when restocking
+INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+SELECT 
+    (SELECT last_insert_rowid()), 
+    (SELECT id FROM chart_of_accounts WHERE account_code = '1020'), -- Inventory
+    ROUND(cost_per_unit * NEW.return_quantity, 2), 
+    0 
+FROM inventory 
+WHERE product_id = NEW.product_id
+AND NEW.action = 'restock';
 
-    -- For disposal, create Loss entry instead of reversing COGS and Inventory
-    INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-    SELECT
-        (SELECT last_insert_rowid()),
-        (SELECT id FROM chart_of_accounts WHERE account_code = '6100'),
-        ROUND((SELECT cost_per_unit * NEW.return_quantity FROM inventory WHERE product_id = NEW.product_id), 2),
-        0
-    WHERE NEW.action = 'dispose';
+-- Record Loss on Inventory Disposal (instead of reversing COGS)
+INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+SELECT 
+    (SELECT last_insert_rowid()), 
+    (SELECT id FROM chart_of_accounts WHERE account_code = '6100'), -- Loss on Disposal
+    ROUND(cost_per_unit * NEW.return_quantity, 2), 
+    0 
+FROM inventory 
+WHERE product_id = NEW.product_id
+AND NEW.action = 'dispose';
+
+-- Remove disposed goods from Inventory
+INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
+SELECT 
+    (SELECT last_insert_rowid()), 
+    (SELECT id FROM chart_of_accounts WHERE account_code = '1020'), -- Inventory
+    0, 
+    ROUND(cost_per_unit * NEW.return_quantity, 2) 
+FROM inventory 
+WHERE product_id = NEW.product_id
+AND NEW.action = 'dispose';
 
     -- Reverse Discount Entries (match original debit with a credit)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-    SELECT 
-        (SELECT last_insert_rowid()),
-        (SELECT id FROM chart_of_accounts WHERE account_code = '6000'),
-        0,
-        ROUND(
-            CASE 
-                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * NEW.discount_amount / 100)
-                WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
-                ELSE 0
-            END, 
-            2
-        )
-    WHERE NEW.discount_amount > 0;
+SELECT 
+    (SELECT last_insert_rowid()),
+    (SELECT id FROM chart_of_accounts WHERE account_code = '6000'),
+    0,
+    ROUND(
+        CASE 
+            WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * NEW.discount_amount / 100)
+            WHEN NEW.discount_type = 'fixed' THEN (NEW.discount_amount / (SELECT quantity FROM sales WHERE id = NEW.sale_id) * NEW.return_quantity) -- Corrected for partial return
+            ELSE 0
+        END, 
+        2
+    )
+WHERE NEW.discount_amount > 0;
 
-    -- Reverse Accounts Receivable adjustment for discount (match original credit with a debit)
+   -- Reverse Accounts Receivable adjustment for discount (match original credit with a debit)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT 
         (SELECT last_insert_rowid()),
         (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),
         ROUND(
             CASE 
-                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * NEW.discount_amount / 100)
+                WHEN NEW.discount_type = 'percentage' THEN (NEW.selling_price * NEW.return_quantity * (NEW.discount_amount / 100))
                 WHEN NEW.discount_type = 'fixed' THEN NEW.discount_amount
                 ELSE 0
             END, 

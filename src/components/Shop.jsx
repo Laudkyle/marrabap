@@ -5,6 +5,8 @@ import { FaShoppingCart, FaTrash } from "react-icons/fa";
 import { useCart } from "../CartContext";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import Invoice from "./Invoice";
 import "react-toastify/dist/ReactToastify.css";
 import { AiOutlinePlus, AiOutlineMinus } from "react-icons/ai";
@@ -195,6 +197,21 @@ function Shop({ companyName, companyAddress, email, phone }) {
       return updatedCart;
     });
   };
+  const generateInvoicePDF = () => {
+    const invoiceElement = document.getElementById("invoice"); // Capture the invoice div
+  console.log("called")
+    html2canvas(invoiceElement, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+  
+      const imgWidth = 210; // A4 size width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width; // Maintain aspect ratio
+  
+      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+      pdf.save(`Invoice_${refNum}.pdf`); // Save the invoice as a PDF file
+    });
+  };
+  
   useEffect(() => {
     if (selectedProduct) {
       setSellingPrice(selectedProduct.sp);
@@ -227,6 +244,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       if (response.status === 200 || response.status === 201) {
         // Check for 200 or 201 status
         setSaleComplete(!saleComplete); // Trigger product list refresh
+        generateInvoicePDF(); // Call function to generate invoice PDF
         setShowInvoice(false); // Close the invoice modal
         clearCart();
         toast.success("Sale completed successfully!");
@@ -570,6 +588,54 @@ function Shop({ companyName, companyAddress, email, phone }) {
         addTax={addTax}
         removeTax={removeTax}
       />
+<div id="invoice" className="p-6 bg-white rounded-lg shadow-md">
+  <div className="border-b pb-4 mb-4">
+    <h1 className="text-2xl font-bold text-blue-600 mb-1">
+      {companyName || "Company Name"}
+    </h1>
+    <p className="text-sm text-gray-600">
+      {companyAddress || "123 Business St, City, Country"}
+    </p>
+    <p className="text-sm text-gray-600">
+      Email: {email || "support@company.com"} | Phone: {phone || "(123) 456-7890"}
+    </p>
+    <h2 className="text-lg font-semibold mt-4">Invoice</h2>
+    <p className="text-sm text-gray-600">
+      Reference Number: <span className="font-medium">{refNum}</span>
+    </p>
+    <p className="text-sm text-gray-600">
+      Date: <span className="font-medium">{new Date().toLocaleDateString()}</span>
+    </p>
+  </div>
+
+  <table className="w-full border-collapse border border-gray-300">
+    <thead>
+      <tr className="bg-gray-100">
+        <th className="border p-2">Product</th>
+        <th className="border p-2">Quantity</th>
+        <th className="border p-2">Price</th>
+        <th className="border p-2">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {cart.map((item, index) => (
+        <tr key={index} className="text-center">
+          <td className="border p-2">{item.product.name}</td>
+          <td className="border p-2">{item.quantity}</td>
+          <td className="border p-2">${item.sellingPrice.toFixed(2)}</td>
+          <td className="border p-2">${(item.quantity * item.sellingPrice).toFixed(2)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <div className="mt-4 text-right">
+    <p className="font-semibold">
+      Total: $
+      {cart.reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0).toFixed(2)}
+    </p>
+  </div>
+</div>
 
       <style jsx>
         {`
