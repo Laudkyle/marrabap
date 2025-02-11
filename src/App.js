@@ -7,7 +7,7 @@ import Settings from "./components/Settings";
 import "typeface-inter";
 import Header from "./components/Header";
 import ProductList from "./components/ProductList";
-import StockList from "./components/StockList";
+import Transactions from "./components/Transactions";
 import Adjustments from "./components/Adjustments";
 import AddPurchaseOrder from "./components/AddPurchaseOrder";
 import EditPurchaseOrder from "./components/EditPurchaseOrder";
@@ -118,6 +118,7 @@ import { toastOptions } from "./toastConfig"; // Import the config
             <Route path="/tax-reports" element={<TaxReport />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/expense" element={<ExpenseComponent />} />
+            <Route path="/transactions" element={<Transactions />} />
             <Route path="/income-statement" element={<IncomeStatement />} />
             <Route path="/balance-sheet" element={<BalanceSheet />} />
             <Route path="/trial-balance" element={<TrailBalance />} />

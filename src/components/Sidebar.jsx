@@ -162,6 +162,18 @@ const Sidebar = ({ isExpanded, companyName }) => {
       ],
     },
     {
+      name: "Transactions",
+      icon: <Calculator className="w-4 h-4" />,
+      dropdown: "transactions",
+      links: [
+        {
+          path: "/transactions",
+          label: "Transactions",
+          icon: <Calculator className="w-4 h-4" />,
+        },
+      ],
+    },
+    {
       name: "Accounts",
       icon: <BookCheck className="w-4 h-4" />,
       dropdown: "accounts",

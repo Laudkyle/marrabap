@@ -1,0 +1,212 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
+import DataTable from "react-data-table-component";
+import { FaEdit, FaTrash, FaPlus } from "react-icons/fa";
+import { toast } from "react-toastify";
+
+const Transactions = () => {
+  const [transactions, setTransactions] = useState([]);
+  const [formData, setFormData] = useState({
+    transaction_date: "",
+    amount: "",
+    account_id: "",
+    payment_method_id: "",
+    description: "",
+  });
+  const [editId, setEditId] = useState(null);
+  const [accounts, setAccounts] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+
+  useEffect(() => {
+    fetchTransactions();
+    fetchAccounts();
+    fetchPayAccounts()
+  }, []);
+
+  // Fetch Transactions
+  const fetchTransactions = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/transactions");
+      setTransactions(response.data);
+    } catch (error) {
+      toast.error("Error fetching transactions");
+    }
+  };
+
+  // Fetch Accounts (Chart of Accounts)
+  const fetchAccounts = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/accounts");
+      setAccounts(response.data);
+    } catch (error) {
+      toast.error("Error fetching accounts");
+    }
+  };
+  // Fetch Accounts (Chart of Accounts)
+  const fetchPayAccounts = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/payment-methods");
+      setPaymentMethods(response.data);
+    } catch (error) {
+      toast.error("Error fetching accounts");
+    }
+  };
+
+  // Handle Form Input Change
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Handle Form Submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editId) {
+        await axios.put(`http://localhost:5000/transactions/${editId}`, formData);
+        toast.success("Transaction updated successfully");
+      } else {
+        await axios.post("http://localhost:5000/transactions", formData);
+        toast.success("Transaction added successfully");
+      }
+      setFormData({ transaction_date: "", amount: "", account_id: "", payment_method_id: "", description: "" });
+      setEditId(null);
+      fetchTransactions();
+    } catch (error) {
+      toast.error("Error saving transaction");
+    }
+  };
+
+  // Handle Edit
+  const handleEdit = (transaction) => {
+    setEditId(transaction.id);
+    setFormData({
+      transaction_date: transaction.transaction_date,
+      amount: transaction.amount,
+      account_id: transaction.account_id,
+      payment_method_id: transaction.payment_method_id,
+      description: transaction.description,
+    });
+  };
+
+  // Handle Delete
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this transaction?")) {
+      try {
+        await axios.delete(`http://localhost:5000/transactions/${id}`);
+        toast.success("Transaction deleted");
+        fetchTransactions();
+      } catch (error) {
+        toast.error("Error deleting transaction");
+      }
+    }
+  };
+
+  // Table Columns
+  const columns = [
+    { name: "Date", selector: (row) => row.transaction_date, sortable: true },
+    { name: "Amount", selector: (row) => row.amount, sortable: true },
+    { name: "Account", selector: (row) => row.account_name, sortable: true },
+    { name: "Payment Method", selector: (row) => row.payment_method_name, sortable: true },
+    { name: "Description", selector: (row) => row.description, sortable: true },
+    {
+      name: "Actions",
+      cell: (row) => (
+        <div className="flex space-x-2">
+          <button className="text-blue-500" onClick={() => handleEdit(row)}>
+            <FaEdit />
+          </button>
+          <button className="text-red-500" onClick={() => handleDelete(row.id)}>
+            <FaTrash />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <h2 className="text-2xl font-bold mb-4">Transactions</h2>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="bg-white p-4 shadow-md rounded-lg mb-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700">Date</label>
+            <input
+              type="date"
+              name="transaction_date"
+              value={formData.transaction_date}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700">Amount</label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700">Credit Account</label>
+            <select
+              name="account_id"
+              value={formData.account_id}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="">Select Account</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.account_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-gray-700">Debit</label>
+            <select
+              name="payment_method_id"
+              value={formData.payment_method_id}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="">Select Payment Method</option>
+              {paymentMethods.map((pay) => (
+                <option key={pay.id} value={pay.id}>
+                  {pay.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-gray-700">Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+        </div>
+        <button type="submit" className="mt-4 bg-blue-500 text-white py-2 px-4 rounded">
+          {editId ? "Update Transaction" : "Add Transaction"}
+        </button>
+      </form>
+
+      {/* Table */}
+      <div className="bg-white p-4 shadow-md rounded-lg">
+        <DataTable columns={columns} data={transactions} pagination highlightOnHover />
+      </div>
+    </div>
+  );
+};
+
+export default Transactions;

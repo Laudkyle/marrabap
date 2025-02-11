@@ -649,6 +649,19 @@ db.run(`CREATE TABLE expense_invoices (
   FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
 );
 `)
+db.run(`CREATE TABLE transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  transaction_date DATE NOT NULL,
+  amount DECIMAL NOT NULL,
+  account_id INTEGER,           -- Refers to an account from the chart_of_accounts (e.g., revenue, bank, or expense)
+  payment_method VARCHAR,       -- Cash, bank transfer, credit card, etc.
+  description TEXT,             -- A short description of the transaction
+  status VARCHAR DEFAULT 'pending', -- Status of the transaction (pending or completed)
+  journal_entry_id INTEGER,     -- Links to the journal entry created for this transaction
+  FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id),
+  FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id)
+);
+`);
 
   // Triggers
   db.run(`CREATE TRIGGER after_supplier_insert
