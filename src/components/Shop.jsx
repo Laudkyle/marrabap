@@ -21,6 +21,8 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [showCompleteSale, setShowCompleteSale] = useState(true);
   const [sellingPrice, setSellingPrice] = useState(0);
   const [taxes, setTaxes] = useState([]);
+    const [taxRates, setTaxRates] = useState([]);
+  
   const [discountType, setDiscountType] = useState("percentage");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [description, setDescription] = useState("");
@@ -74,7 +76,9 @@ function Shop({ companyName, companyAddress, email, phone }) {
   useEffect(() => {
     fetch("http://localhost:5000/taxes")
       .then((response) => response.json())
-      .then((data) => setTaxes(data))
+      .then((data) => {setTaxes(data)
+        setTaxRates(data)
+      })
       .catch((error) => console.error("Error fetching taxes:", error));
   }, []);
 
@@ -166,9 +170,81 @@ function Shop({ companyName, companyAddress, email, phone }) {
     toast.success(`${product.name} added to cart`);
   };
   const [editDraftId, setEditDraftId] = useState(null);
+  const calculateTotal = () => {
+    let actualSubtotal = 0; // Total before any discounts
+    let subtotal = 0; // Total after discounts
+    let totalTax = 0;
+    let totalDiscount = 0;
+    const taxBreakdown = {};
 
-  const calculateTotal = () =>
-    cart.reduce((acc, item) => acc + item.quantity * item.product.sp, 0);
+    cart.forEach((item) => {
+      // Calculate item total before discount
+      const itemActualTotal = item.sellingPrice * item.quantity;
+      actualSubtotal += itemActualTotal;
+
+      // Calculate discount
+      const discount =
+        item.discountType == "percentage"
+          ? (itemActualTotal * item.discountAmount) / 100
+          : item.discountAmount;
+      totalDiscount += discount;
+
+      let itemTotal = itemActualTotal - discount; // Default to exclusive tax scenario
+      let itemTotalTax = 0;
+
+      // Process each tax in the taxes array
+      item.taxes.forEach((taxId) => {
+        const tax = taxRates.find((t) => t.id == taxId);
+        if (!tax) {
+          console.log("not found");
+          return;
+        } // Skip if tax is not found
+
+        const { tax_name: taxName, tax_rate: taxRate, tax_type: taxType } = tax;
+
+        let itemTax = 0;
+        if (taxType === "exclusive") {
+          // Tax is added to the item total after discount
+          itemTax = (itemTotal * taxRate) / 100;
+        } else if (taxType === "inclusive") {
+          // Tax is included in the selling price, extract it
+          itemTax = itemTotal - itemTotal / (1 + taxRate / 100);
+          itemTotal -= itemTax; // Adjust item total to exclude tax
+        }
+
+        itemTotalTax += itemTax;
+
+        // Add tax breakdown for each tax type
+        if (taxBreakdown[taxName]) {
+          taxBreakdown[taxName] += itemTax;
+        } else {
+          taxBreakdown[taxName] = itemTax;
+        }
+      });
+
+      totalTax += itemTotalTax;
+      subtotal += itemTotal;
+    });
+
+    return {
+      actualSubtotal,
+      subtotal,
+      totalDiscount,
+      totalTax,
+      grandTotal: subtotal + totalTax, // For inclusive taxes, `subtotal` already includes tax
+      taxBreakdown,
+    };
+  };
+
+  // Use the updated function to calculate totals
+  const {
+    subtotal,
+    actualSubtotal,
+    totalTax,
+    grandTotal,
+    totalDiscount,
+    taxBreakdown,
+  } = calculateTotal();
 
   // Utility function to generate a unique reference number
   const generateReferenceNumber = () => {
@@ -635,6 +711,81 @@ function Shop({ companyName, companyAddress, email, phone }) {
       {cart.reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0).toFixed(2)}
     </p>
   </div>
+  <div className="mt-6">
+                  {/* Actual Subtotal */}
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-700">
+                      Item Total:
+                    </span>
+                    <span>₵{actualSubtotal.toFixed(2)}</span>
+                  </div>
+
+                  {/* Discount */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Discount:
+                    </span>
+                    <span>₵{totalDiscount.toFixed(2)}</span>
+                  </div>
+
+                  {/* Subtotal After Discount */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Sub Total:
+                    </span>
+                    <span>₵{subtotal.toFixed(2)}</span>
+                  </div>
+
+                  {/* Taxes Breakdown */}
+                  <div className="mt-2">
+                    <h3 className="font-semibold text-gray-700">Taxes:</h3>
+                    <ul className="mt-1 space-y-1">
+                      {Object.entries(taxBreakdown).map(
+                        ([taxName, amount], index) => (
+                          <li
+                            key={index}
+                            className="flex justify-between text-xs"
+                          >
+                            <span>{taxName}:</span>
+                            <span>₵{amount.toFixed(2)}</span>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+
+                  {/* Total Tax */}
+                  <div className="flex justify-between mt-2">
+                    <span className="font-semibold text-gray-700">
+                      Total Tax:
+                    </span>
+                    <span>₵{totalTax.toFixed(2)}</span>
+                  </div>
+
+                  {/* Grand Total */}
+                  <div className="flex justify-between mt-1 border-t pt-2">
+                    <span className="font-semibold text-lg">Grand Total:</span>
+                    <span className="text-xl font-bold">
+                      ₵{grandTotal.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Note for Inclusive Tax */}
+                  {totalTax > 0 && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      <p>
+                        <em>
+                          Note: Taxes shown above are{" "}
+                          {Object.values(taxBreakdown).some(
+                            (amount) => amount > 0
+                          )
+                            ? "calculated based on the tax type (inclusive or exclusive) applied to the items."
+                            : "inclusive of the item prices where applicable."}
+                        </em>
+                      </p>
+                    </div>
+                  )}
+                </div>
 </div>
 
       <style jsx>
