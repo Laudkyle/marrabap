@@ -1152,8 +1152,7 @@ END;
 `);
   db.run(`INSERT OR IGNORE INTO payment_methods (name, account_id, description, is_active)
     VALUES 
-      ('Cash', 1, 'Payment using cash', 1), -- Linked to Cash account (ID: 1)
-      ('Bank', 2, 'Payment through bank account', 1); -- Linked to Bank account (ID: 2)`);
+      ('Cash', 1, 'Payment using cash', 1), -- Linked to Cash account (ID: 1)`);
 });
 db.run(`INSERT INTO taxes (tax_name, tax_rate, tax_type, account_id)
 VALUES ('No Tax', 0, 'exclusive', (SELECT id FROM chart_of_accounts WHERE account_code = '2010'));
