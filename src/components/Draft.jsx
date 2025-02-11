@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaEye, FaEdit, FaTrashAlt, FaMoneyBillWave } from "react-icons/fa";
 import { useCart } from "../CartContext";
-import { toast, ToastContainer } from "react-toastify";
+import { toast} from "react-toastify";
 import Invoice from "./Invoice";
 import ProcessSaleModal from "./ProcessSaleModal";
 import DataTable from "react-data-table-component";
@@ -356,30 +356,29 @@ const Draft = () => {
     setShowDraft(true);
     setShowCompleteSale(true);
     setEditDraftId(draftId);
-
+  
     try {
       // Fetch draft details
-      const response = await axios.get(
-        `http://localhost:5000/drafts/${draftId}`
-      );
+      const response = await axios.get(`http://localhost:5000/drafts/${draftId}`);
       const draft = response.data;
-
+  
       // Populate draft details
       setShowInvoice(true);
       setRefNum(draft.reference_number);
-
-      // Fetch product details and populate the cart with additional attributes
+  
+      // Fetch product details and populate the cart with multiple taxes
       const draftItems = await Promise.all(
         JSON.parse(draft.details).map(async (item) => {
           const productResponse = await axios.get(
             `http://localhost:5000/products/${item.product_id}`
           );
           const product = productResponse.data;
+  
           return {
             product,
             quantity: item.quantity,
             sellingPrice: item.sellingPrice,
-            tax: item.tax,
+            taxes: Array.isArray(item.taxes) ? item.taxes : [], // Ensure tax is an array
             discountType: item.discountType,
             discountAmount: item.discountAmount,
             description: item.description,
@@ -387,7 +386,7 @@ const Draft = () => {
         })
       );
       setCart(draftItems);
-
+  
       // Fetch documents
       const documentsResponse = await axios.get(
         `http://localhost:5000/documents/by-reference/${draft.reference_number}`
@@ -396,43 +395,44 @@ const Draft = () => {
     } catch (error) {
       console.error("Error fetching draft details:", error);
     }
+  
     console.log("this is cart after:", cart);
   };
   const handleViewDraft = async (draftId) => {
     setEditDraftId(draftId);
-
+  
     try {
       // Fetch draft details
-      const response = await axios.get(
-        `http://localhost:5000/drafts/${draftId}`
-      );
+      const response = await axios.get(`http://localhost:5000/drafts/${draftId}`);
       const draft = response.data;
-
+  
       // Populate draft details
       setShowInvoice(true);
       setRefNum(draft.reference_number);
       setShowDraft(false);
-
-      // Fetch product details and populate the cart with additional attributes
+  
+      // Fetch product details and populate the cart with multiple taxes
       const draftItems = await Promise.all(
         JSON.parse(draft.details).map(async (item) => {
           const productResponse = await axios.get(
             `http://localhost:5000/products/${item.product_id}`
           );
           const product = productResponse.data;
+  
           return {
             product,
             quantity: item.quantity,
             sellingPrice: item.sellingPrice,
-            tax: item.tax,
+            taxes: Array.isArray(item.taxes) ? item.taxes : [], // Ensure tax is an array
             discountType: item.discountType,
             discountAmount: item.discountAmount,
             description: item.description,
           };
         })
       );
+  
       setCart(draftItems);
-
+  
       // Fetch documents
       const documentsResponse = await axios.get(
         `http://localhost:5000/documents/by-reference/${draft.reference_number}`
@@ -443,6 +443,7 @@ const Draft = () => {
       console.error("Error fetching draft details:", error);
     }
   };
+  
   const handleDraft = async (draftId) => {
     setEditDraftId(draftId);
 
@@ -469,7 +470,7 @@ const Draft = () => {
             product,
             quantity: item.quantity,
             sellingPrice: item.sellingPrice,
-            tax: item.tax,
+            taxes: Array.isArray(item.taxes) ? item.taxes : [], // Ensure tax is an array
             discountType: item.discountType,
             discountAmount: item.discountAmount,
             description: item.description,
@@ -492,7 +493,7 @@ const Draft = () => {
     product,
     quantity,
     sellingPrice,
-    selectedTax,
+    selectedTaxes,
     discountType,
     discountAmount,
     description
@@ -510,7 +511,7 @@ const Draft = () => {
                 ...item,
                 quantity: item.quantity + quantity,
                 sellingPrice: sellingPrice || item.sellingPrice,
-                tax: selectedTax || item.tax,
+                taxes: selectedTaxes || item.taxes,
                 discountType: discountType || item.discountType,
                 discountAmount: discountAmount || item.discountAmount,
                 description: description || item.description,
@@ -526,7 +527,7 @@ const Draft = () => {
           product,
           quantity,
           sellingPrice,
-          tax: selectedTax,
+          taxes: selectedTaxes,
           discountType,
           discountAmount,
           description,
@@ -547,7 +548,7 @@ const Draft = () => {
         quantity: updatedQuantity,
         // Preserve additional attributes
         sellingPrice: item.sellingPrice,
-        tax: item.tax,
+        taxes: item.taxes,
         discountType: item.discountType,
         discountAmount: item.discountAmount,
         description: item.description,
@@ -638,6 +639,7 @@ const Draft = () => {
         setNewDocument={setDocuments}
         setShowProcessSaleModal={setShowProcessSaleModal}
         handleSaleDraft={handleSaleDraft}
+        
       />
       <ProcessSaleModal
         refNum={refNum}

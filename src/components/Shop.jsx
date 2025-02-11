@@ -19,7 +19,6 @@ function Shop({ companyName, companyAddress, email, phone }) {
   const [showCompleteSale, setShowCompleteSale] = useState(true);
   const [sellingPrice, setSellingPrice] = useState(0);
   const [taxes, setTaxes] = useState([]);
-  const [selectedTax, setSelectedTax] = useState("");
   const [discountType, setDiscountType] = useState("percentage");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [description, setDescription] = useState("");
@@ -246,7 +245,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         product_id: item.product.id, // Use product ID
         quantity: item.quantity,
         sellingPrice: item.sellingPrice, // Selling price of the product
-        tax: item.tax, // Tax applied
+        taxes: Array.isArray(item.taxes) ? item.taxes : [], // Ensure taxes is an array
         discountType: item.discountType, // Type of discount (e.g., fixed, percentage)
         discountAmount: item.discountAmount, // Amount of discount
         description: item.description, // Optional description for the item
@@ -254,7 +253,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       date: new Date().toISOString(), // Use ISO 8601 format for date
       status: "pending", // Default status for the draft
     };
-
+  
     try {
       const response = await fetch("http://localhost:5000/drafts", {
         method: "POST",
@@ -263,7 +262,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         },
         body: JSON.stringify(draft),
       });
-
+  
       if (response.status === 201) {
         // Successfully saved draft
         setShowInvoice(false); // Close the invoice modal
@@ -279,6 +278,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
       toast.error("An error occurred while saving the draft.");
     }
   };
+  
 
   useEffect(() => {
     setRefNum(generateReferenceNumber());
@@ -566,6 +566,9 @@ function Shop({ companyName, companyAddress, email, phone }) {
         email={email}
         phone={phone}
         companyAddress={companyAddress}
+        handleTaxChange={handleTaxChange}
+        addTax={addTax}
+        removeTax={removeTax}
       />
 
       <style jsx>

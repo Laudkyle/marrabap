@@ -21,7 +21,7 @@ function ProcessSaleModal({
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethod, setPaymentMethod] = useState("credit");
  const [taxRates, setTaxRates] = useState([]);
   const { cart, setCart, clearCart } = useCart();
   const [selectedCustomer, setSelectedCustomer] = useState(1);
@@ -368,20 +368,7 @@ function ProcessSaleModal({
                 </div>
                 {showDraft && (
                   <div className="mt-6">
-                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
-                      Select Payment Method
-                    </h2>
-                    <div className="w-full p-2 border rounded mb-4">
-                      {/* Select Dropdown for Payment Method */}
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full p-2 border rounded "
-                      >
-                        <option value="cash">Cash</option>
-                        <option value="credit">Credit</option>
-                      </select>
-                    </div>
+                
                     <h2 className="text-lg font-semibold text-blue-600 mb-4">
                       Documents
                     </h2>
@@ -450,20 +437,7 @@ function ProcessSaleModal({
                 )}
                 {!showDraft && (
                   <div className="mt-6">
-                    <h2 className="text-lg font-semibold text-blue-600 mb-4">
-                      Select Payment Method
-                    </h2>
-                    <div className="w-full p-2 border rounded mb-4">
-                      {/* Select Dropdown for Payment Method */}
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full p-2 border rounded "
-                      >
-                        <option value="cash">Cash</option>
-                        <option value="credit">Credit</option>
-                      </select>
-                    </div>
+                    
 
                     <h2 className="text-lg font-semibold text-blue-600 mb-4">
                       Documents

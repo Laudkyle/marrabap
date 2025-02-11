@@ -3,6 +3,7 @@ import axios from "axios";
 import { useCart } from "../CartContext";
 import { FaEye, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { AiOutlinePlus, AiOutlineMinus } from "react-icons/ai";
 
 function Invoice({
   showInvoice,
@@ -22,6 +23,7 @@ function Invoice({
   handleSaleDraft,
   showClearCart,
   setShowClearCart,
+
 }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [newItemQuantity, setNewItemQuantity] = useState(1);
@@ -33,12 +35,14 @@ function Invoice({
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(1);
   const [sellingPrice, setSellingPrice] = useState(0); // Selling price
-  const [selectedTaxes, setSelectedTaxes] = useState(""); // Tax
+  const [selectedTaxes, setSelectedTaxes] = useState([""]); // Tax
   const [discountType, setDiscountType] = useState("percentage"); // Discount type
   const [discountAmount, setDiscountAmount] = useState(0); // Discount amount
   const [description, setDescription] = useState(""); // Description
   const [error, setError] = useState(""); // Error handling
   const [showModal, setShowModal] = useState(false);
+  const [taxes, setTaxes] = useState([]);
+
   // Fetch customers from the database
   const fetchCustomers = async () => {
     try {
@@ -61,6 +65,7 @@ function Invoice({
       const response = await axios.get("http://localhost:5000/taxes", {
         timeout: 5000,
       });
+      setTaxes(response.data); // Assume response.data is an array of taxes
       setTaxRates(response.data); // Assume response.data is an array of taxes
     } catch (error) {
       console.error("Failed to fetch taxes:", error);
@@ -111,6 +116,21 @@ function Invoice({
   useEffect(() => {
     fetchProducts();
   }, []);
+  const handleTaxChange = (index, value) => {
+    const newTaxes = [...selectedTaxes];
+    newTaxes[index] = value;
+    setSelectedTaxes(newTaxes);
+  };
+
+  const addTax = () => {
+    if (selectedTaxes.length < taxes.length) {
+      setSelectedTaxes([...selectedTaxes, ""]); // Add an empty tax selection
+    }
+  };
+
+  const removeTax = (index) => {
+    setSelectedTaxes(selectedTaxes.filter((_, i) => i !== index));
+  };
 
   const removeDocument = async (index, documentId) => {
     // Remove the document from the UI first
@@ -136,31 +156,32 @@ function Invoice({
     let totalTax = 0;
     let totalDiscount = 0;
     const taxBreakdown = {};
-  
+
     cart.forEach((item) => {
       // Calculate item total before discount
       const itemActualTotal = item.sellingPrice * item.quantity;
       actualSubtotal += itemActualTotal;
-  
+
       // Calculate discount
       const discount =
         item.discountType == "percentage"
           ? (itemActualTotal * item.discountAmount) / 100
           : item.discountAmount;
       totalDiscount += discount;
-  
+
       let itemTotal = itemActualTotal - discount; // Default to exclusive tax scenario
       let itemTotalTax = 0;
-  
+
       // Process each tax in the taxes array
       item.taxes.forEach((taxId) => {
         const tax = taxRates.find((t) => t.id == taxId);
         if (!tax) {
-          console.log("not found")
-          return}; // Skip if tax is not found
-  
+          console.log("not found");
+          return;
+        } // Skip if tax is not found
+
         const { tax_name: taxName, tax_rate: taxRate, tax_type: taxType } = tax;
-  
+
         let itemTax = 0;
         if (taxType === "exclusive") {
           // Tax is added to the item total after discount
@@ -170,9 +191,9 @@ function Invoice({
           itemTax = itemTotal - itemTotal / (1 + taxRate / 100);
           itemTotal -= itemTax; // Adjust item total to exclude tax
         }
-  
+
         itemTotalTax += itemTax;
-  
+
         // Add tax breakdown for each tax type
         if (taxBreakdown[taxName]) {
           taxBreakdown[taxName] += itemTax;
@@ -180,11 +201,11 @@ function Invoice({
           taxBreakdown[taxName] = itemTax;
         }
       });
-  
+
       totalTax += itemTotalTax;
       subtotal += itemTotal;
     });
-  
+
     return {
       actualSubtotal,
       subtotal,
@@ -194,7 +215,7 @@ function Invoice({
       taxBreakdown,
     };
   };
-  
+
   // Use the updated function to calculate totals
   const {
     subtotal,
@@ -204,7 +225,6 @@ function Invoice({
     totalDiscount,
     taxBreakdown,
   } = calculateTotal();
-  
 
   return (
     <div>
@@ -275,7 +295,7 @@ function Invoice({
                           setSelectedProduct(product);
                           setSellingPrice(product.price || 0); // Set initial selling price
                           setNewItemQuantity(1); // Set initial quantity
-                          setSelectedTaxes(""); // Reset tax selection
+                          setSelectedTaxes([""]); // Reset tax selection
                           setDiscountType("percentage"); // Default discount type
                           setDiscountAmount(0); // Default discount amount
                           setDescription(""); // Default description
@@ -357,29 +377,62 @@ function Invoice({
                         </div>
                       </div>
 
-                      {/* Tax Selection */}
+                      {/* Tax Selection (Multiple Taxes) */}
                       <div className="mb-4">
-                        <label
-                          htmlFor="tax"
-                          className="block font-medium text-gray-700"
-                        >
-                          Select Tax:
+                        <label className="block font-medium text-gray-700">
+                          Select Taxes:
                         </label>
-                        <select
-                          id="tax"
-                          value={selectedTaxes}
-                          onChange={(e) => setSelectedTaxes(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        >
-                          <option value="">-- Select Tax --</option>
-                          {taxRates.map((tax) => (
-                            <option key={tax.id} value={tax.id}>
-                              {tax.tax_name} ({tax.tax_rate}%)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
 
+                        {selectedTaxes.map((taxId, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center space-x-2 mb-2"
+                          >
+                            <select
+                              value={taxId}
+                              onChange={(e) =>
+                                handleTaxChange(index, e.target.value)
+                              }
+                              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            >
+                              <option value="">-- Select Tax --</option>
+                              {taxes
+                                .filter(
+                                  (tax) =>
+                                    !selectedTaxes.includes(tax.id) ||
+                                    tax.id === taxId
+                                ) // Prevent duplicate selection
+                                .map((tax) => (
+                                  <option key={tax.id} value={tax.id}>
+                                    {tax.tax_name} ({tax.tax_rate}%)
+                                  </option>
+                                ))}
+                            </select>
+
+                            {/* Remove Button (Only if more than one tax) */}
+                            {selectedTaxes.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeTax(index)}
+                                className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none"
+                              >
+                                <AiOutlineMinus size={20} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Add New Tax Button */}
+                        {selectedTaxes.length < taxes.length && ( // Prevent adding more than available taxes
+                          <button
+                            type="button"
+                            onClick={addTax}
+                            className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none flex items-center"
+                          >
+                            <AiOutlinePlus size={20} className="mr-2" /> Add Tax
+                          </button>
+                        )}
+                      </div>
                       {/* Discount Type and Amount */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         {/* Discount Type */}
@@ -626,7 +679,6 @@ function Invoice({
 
                 {showDraft && (
                   <div className="mt-6">
-                    
                     <h2 className="text-lg font-semibold text-blue-600 mb-4">
                       Documents
                     </h2>
