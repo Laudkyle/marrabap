@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import DataTable from "react-data-table-component";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaEdit, FaTrashAlt } from "react-icons/fa";
 import EditPurchaseOrder from "./EditPurchaseOrder";
@@ -16,9 +16,9 @@ const PurchaseOrdersTable = () => {
   const [dropdownStatus, setDropdownStatus] = useState(null);
 
   const dropdownRef = useRef(null); // Ref for the dropdown container
-
   // Fetch suppliers and purchase orders
   useEffect(() => {
+    
     const fetchSuppliersAndOrders = async () => {
       setLoading(true);
       try {
@@ -143,14 +143,12 @@ const PurchaseOrdersTable = () => {
             {row.order_status}
           </button>
           {dropdownStatus === row.id && (
-            <div className="absolute z-10 bg-white border rounded-md shadow-lg mt-1 w-full">
+            <div className="absolute z-50 bg-white border rounded-md shadow-lg mt-1 w-full">
               <ul className="text-gray-700">
                 {["pending", "received", "cancelled"].map((status) => (
                   <li
                     key={status}
-                    onClick={() => {
-
-                        handleStatusChange(row.id, status,row.reference_number)}}
+                    onClick={() => handleStatusChange(row.id, status, row.reference_number)}
                     className="px-2 py-2 hover:bg-gray-200 cursor-pointer"
                   >
                     {status}
@@ -201,7 +199,7 @@ const PurchaseOrdersTable = () => {
 
   // Handle status change and update in the database
   const handleStatusChange = async (id, newStatus,reference_number) => {
-
+setLoading(true)
     try {
       await axios.patch(
         `http://localhost:5000/purchase_orders/${id}/order_status`,
@@ -219,16 +217,23 @@ const PurchaseOrdersTable = () => {
       );
 
       toast.success(`Purchase order status updated to "${newStatus}"!`);
-      setDropdownStatus(null); // Close the dropdown after selection
+      setDropdownStatus(null); 
 
     } catch (error) {
       console.error("Error changing status:", error);
       toast.error("Failed to update purchase order status. Please try again.");
-    }
+    }finally{setLoading(false)}
   };
 
-
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-32">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  
   return (
+
     <div className="container mx-auto p-6 bg-gray-100 shadow-lg rounded-lg">
       <h2 className="text-2xl font-semibold text-gray-800 mb-6">
         Purchase Order List
@@ -263,20 +268,21 @@ const PurchaseOrdersTable = () => {
         customStyles={{
           table: {
             style: {
-              overflowY: 'auto', // Allow vertical scrolling
-              maxHeight: 'calc(100vh - 260px)', // Set a maximum height for the table
-              zIndex: 0,
+              overflowY: 'auto',
+              maxHeight: 'calc(100vh - 260px)',
             },
           },
           headCells: {
             style: {
-              backgroundColor: '#f5f5f5', // Custom header background color
-              fontWeight: 'bold', // Make the header bold
+              backgroundColor: '#f5f5f5',
+              fontWeight: 'bold',
+              position: 'relative', // Add this
             },
           },
           cells: {
             style: {
-              padding: '8px', // Adjust cell padding
+              padding: '8px',
+              position: 'relative', // Add this
             },
           },
         }}

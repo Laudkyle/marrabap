@@ -501,7 +501,7 @@ app.post("/purchase_orders", (req, res) => {
 
 // Get all purchase orders
 app.get("/purchase_orders", (req, res) => {
-  db.all("SELECT * FROM purchase_orders", (err, rows) => {
+  db.all("SELECT * FROM purchase_orders ORDER BY id DESC", (err, rows) => {
     if (err) {
       console.error(err);
       res.status(500).send("Error fetching purchase orders");
