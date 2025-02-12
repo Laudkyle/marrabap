@@ -59,10 +59,26 @@ const GeneralLedgerComponent = () => {
   );
 
   const columns = [
-    { name: "Date", selector: (row) => format(new Date(row.date), "dd MMM yyyy"), sortable: true },
-    { name: "Description", selector: (row) => row.description || "N/A", grow: 2 },
-    { name: "Debit ", selector: (row) => (row.debit > 0 ? row.debit.toFixed(2) : ""), right: true },
-    { name: "Credit", selector: (row) => (row.credit > 0 ? row.credit.toFixed(2) : ""), right: true },
+    {
+      name: "Date",
+      selector: (row) => format(new Date(row.date), "dd MMM yyyy"),
+      sortable: true,
+    },
+    {
+      name: "Description",
+      selector: (row) => row.description || "N/A",
+      grow: 2,
+    },
+    {
+      name: "Debit ",
+      selector: (row) => (row.debit > 0 ? row.debit.toFixed(2) : ""),
+      right: true,
+    },
+    {
+      name: "Credit",
+      selector: (row) => (row.credit > 0 ? row.credit.toFixed(2) : ""),
+      right: true,
+    },
     { name: "Balance", selector: (row) => row.balance.toFixed(2), right: true },
   ];
 
@@ -103,17 +119,26 @@ const GeneralLedgerComponent = () => {
       <div className="w-3/4 p-6 bg-white shadow-lg rounded-lg">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">General Ledger</h2>
-          <div className="flex space-x-2">
+          <div className="flex space-x-4 items-center">
+            {/* From Date */}
+            <label className="text-gray-700 font-medium">From:</label>
             <input
               type="date"
               value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, startDate: e.target.value })
+              }
               className="border rounded-md p-2 focus:ring focus:ring-blue-200"
             />
+
+            {/* To Date */}
+            <label className="text-gray-700 font-medium">To:</label>
             <input
               type="date"
               value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, endDate: e.target.value })
+              }
               className="border rounded-md p-2 focus:ring focus:ring-blue-200"
             />
           </div>
@@ -131,7 +156,11 @@ const GeneralLedgerComponent = () => {
             customStyles={{
               rows: { style: { minHeight: "50px", fontSize: "14px" } },
               headCells: {
-                style: { backgroundColor: "#f3f4f6", fontWeight: "bold", fontSize: "15px" },
+                style: {
+                  backgroundColor: "#f3f4f6",
+                  fontWeight: "bold",
+                  fontSize: "15px",
+                },
               },
               pagination: { style: { fontSize: "14px" } },
             }}
