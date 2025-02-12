@@ -3860,23 +3860,28 @@ app.delete("/adjustments/:id", (req, res) => {
     if (err || !adjustment)
       return res.status(404).json({ error: "Adjustment not found" });
 
-    db.run(
-      `DELETE FROM journal_entries WHERE id = ?`,
-      [adjustment.journal_entry_id],
-      (err) => {
-        if (err) return res.status(500).json({ error: err.message });
+    const journalEntryId = adjustment.journal_entry_id;
 
-        db.run(`DELETE FROM adjustments WHERE id = ?`, [id], function (err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({
-            message:
-              "Adjustment and related journal entry deleted successfully",
+    db.serialize(() => {
+      db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journalEntryId], (err) => {
+        if (err) return res.status(500).json({ error: "Failed to delete journal entry lines." });
+
+        db.run(`DELETE FROM journal_entries WHERE id = ?`, [journalEntryId], (err) => {
+          if (err) return res.status(500).json({ error: "Failed to delete journal entry." });
+
+          db.run(`DELETE FROM adjustments WHERE id = ?`, [id], function (err) {
+            if (err) return res.status(500).json({ error: "Failed to delete adjustment." });
+
+            res.json({
+              message: "Adjustment, related journal entry, and journal entry lines deleted successfully.",
+            });
           });
         });
-      }
-    );
+      });
+    });
   });
 });
+
 
 // ===================== Customer Groups Endpoints =====================
 

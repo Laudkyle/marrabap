@@ -589,7 +589,7 @@ db.run(`CREATE TABLE IF NOT EXISTS journal_entry_lines (
   debit REAL DEFAULT 0 CHECK(debit >= 0),
   credit REAL DEFAULT 0 CHECK(credit >= 0),
   entry_type TEXT NOT NULL DEFAULT 'GENERAL',
-  FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id)
+  FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE
 )`);
 
 
