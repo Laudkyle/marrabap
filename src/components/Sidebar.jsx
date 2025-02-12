@@ -31,6 +31,7 @@ import {
   Cog,
   BookCheck,
   CogIcon,
+  BookOpenCheck,
 
 } from "lucide-react";
 import { FaMoneyBill1,FaMoneyBill } from "react-icons/fa6";
@@ -197,6 +198,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/adjustments",
           label: "Adjustments",
           icon: <UserCogIcon className="w-4 h-4" />, // Adjust icon as needed
+        },
+        {
+          path: "/general-ledger",
+          label: "General Ledger",
+          icon: <BookOpenCheck className="w-4 h-4" />, // Adjust icon as needed
         },
       ],
     },

@@ -5997,6 +5997,66 @@ app.get("/reports/trial-balance", (req, res) => {
     res.status(500).send("Failed to generate trial balance.");
   }
 });
+// API endpoint to fetch ledger with balances
+
+app.get("/ledger", (req, res) => {
+  const { accountId, startDate, endDate } = req.query;
+
+  if (!accountId || !startDate || !endDate) {
+    return res.status(400).json({ error: "Missing required parameters" });
+  }
+
+  // Step 1: Check if the account is a parent
+  const parentQuery = `
+    SELECT id FROM chart_of_accounts WHERE parent_account_id = ? OR id = ?;
+  `;
+
+  db.all(parentQuery, [accountId, accountId], (err, accounts) => {
+    if (err) {
+      console.error("Error checking parent account:", err.message);
+      return res.status(500).json({ error: "Database query failed" });
+    }
+
+    if (!accounts || accounts.length === 0) {
+      return res.status(404).json({ error: "Account not found" });
+    }
+
+    // Extract all related account IDs (parent + children)
+    const accountIds = accounts.map((acc) => acc.id);
+
+    // Step 2: Fetch transactions for all related accounts
+    const query = `
+      SELECT 
+        je.date, 
+        je.description, 
+        jel.debit, 
+        jel.credit,
+        jel.account_id
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON jel.journal_entry_id = je.id
+      WHERE jel.account_id IN (${accountIds.join(",")})
+      AND DATE(je.date) BETWEEN DATE(?) AND DATE(?)
+      ORDER BY je.date ASC;
+    `;
+
+    db.all(query, [startDate, endDate], (err, rows) => {
+      if (err) {
+        console.error("Error fetching ledger transactions:", err.message);
+        return res.status(500).json({ error: "Database query failed" });
+      }
+
+      let runningBalance = 0;
+
+      // Compute running balance
+      const transactionsWithBalance = rows.map((row) => {
+        runningBalance += (row.debit || 0) - (row.credit || 0);
+        return { ...row, balance: runningBalance };
+      });
+
+      res.json(transactionsWithBalance);
+    });
+  });
+});
 
 // API endpoint to fetch chart of accounts with balances
 app.get("/chart-of-accounts", (req, res) => {

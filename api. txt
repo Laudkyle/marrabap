@@ -29,6 +29,7 @@ audit_trails
 
 
 get transactions, payments, expense related to each account
-transaction UI
-adjustments remake
 audit trails for auditing
+funds transfer
+journal entries (multiple and single)
+bank and cash etc
