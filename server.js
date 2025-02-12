@@ -2229,9 +2229,12 @@ app.post("/sales", async (req, res) => {
                           let taxAmount = 0;
 
                           if (taxData.tax_type === "exclusive") {
-                            taxAmount = (totalAfterDiscount * taxData.tax_rate) / 100;
+                            taxAmount =
+                              (totalAfterDiscount * taxData.tax_rate) / 100;
                           } else if (taxData.tax_type === "inclusive") {
-                            taxAmount = totalAfterDiscount - totalAfterDiscount / (1 + taxData.tax_rate / 100);
+                            taxAmount =
+                              totalAfterDiscount -
+                              totalAfterDiscount / (1 + taxData.tax_rate / 100);
                           }
 
                           totalTaxAmount += taxAmount;
@@ -2272,35 +2275,49 @@ app.post("/sales", async (req, res) => {
                           const sale_id = this.lastID;
 
                           // Insert tax details into sales_taxes and sale_tax_amounts
-                          const taxInsertPromises = calculatedTaxes.map(({ tax_id, taxAmount }) => {
-                            return new Promise((resolveInsert, rejectInsert) => {
-                              db.run(
-                                "INSERT INTO sales_taxes (sale_id, tax_id) VALUES (?, ?)",
-                                [sale_id, tax_id],
-                                function (err) {
-                                  if (err) {
-                                    errorOccurred = true;
-                                    console.error("Error inserting tax: ", err.message);
-                                    return rejectInsert("Error inserting sales_taxes");
-                                  }
-
-                                  const sale_tax_id = this.lastID;
+                          const taxInsertPromises = calculatedTaxes.map(
+                            ({ tax_id, taxAmount }) => {
+                              return new Promise(
+                                (resolveInsert, rejectInsert) => {
                                   db.run(
-                                    "INSERT INTO sale_tax_amounts (sale_tax_id, tax_amount) VALUES (?, ?)",
-                                    [sale_tax_id, taxAmount],
-                                    (err) => {
+                                    "INSERT INTO sales_taxes (sale_id, tax_id) VALUES (?, ?)",
+                                    [sale_id, tax_id],
+                                    function (err) {
                                       if (err) {
                                         errorOccurred = true;
-                                        console.error("Error inserting tax amount: ", err.message);
-                                        return rejectInsert("Error inserting sale_tax_amounts");
+                                        console.error(
+                                          "Error inserting tax: ",
+                                          err.message
+                                        );
+                                        return rejectInsert(
+                                          "Error inserting sales_taxes"
+                                        );
                                       }
-                                      resolveInsert();
+
+                                      const sale_tax_id = this.lastID;
+                                      db.run(
+                                        "INSERT INTO sale_tax_amounts (sale_tax_id, tax_amount) VALUES (?, ?)",
+                                        [sale_tax_id, taxAmount],
+                                        (err) => {
+                                          if (err) {
+                                            errorOccurred = true;
+                                            console.error(
+                                              "Error inserting tax amount: ",
+                                              err.message
+                                            );
+                                            return rejectInsert(
+                                              "Error inserting sale_tax_amounts"
+                                            );
+                                          }
+                                          resolveInsert();
+                                        }
+                                      );
                                     }
                                   );
                                 }
                               );
-                            });
-                          });
+                            }
+                          );
 
                           Promise.all(taxInsertPromises)
                             .then(() => {
@@ -2310,7 +2327,10 @@ app.post("/sales", async (req, res) => {
                                 (err) => {
                                   if (err) {
                                     errorOccurred = true;
-                                    console.error("Error updating inventory: ", err.message);
+                                    console.error(
+                                      "Error updating inventory: ",
+                                      err.message
+                                    );
                                   }
                                   resolveSale({
                                     customer_id,
@@ -2368,7 +2388,10 @@ app.post("/sales", async (req, res) => {
                   (err) => {
                     if (err) {
                       errorOccurred = true;
-                      console.error("Error updating customer's total_sale_due: ", err.message);
+                      console.error(
+                        "Error updating customer's total_sale_due: ",
+                        err.message
+                      );
                     }
                   }
                 );
@@ -2405,10 +2428,14 @@ app.post("/sales", async (req, res) => {
 
   try {
     const result = await dbPromise;
-    res.status(201).json({ message: "Sales processed successfully", sales: result });
+    res
+      .status(201)
+      .json({ message: "Sales processed successfully", sales: result });
   } catch (error) {
     console.error(error.message);
-    res.status(400).json({ message: "Error processing sales", error: error.message });
+    res
+      .status(400)
+      .json({ message: "Error processing sales", error: error.message });
   }
 });
 
@@ -2455,7 +2482,9 @@ app.get("/sales", (req, res) => {
     (err, rows) => {
       if (err) {
         console.error(err);
-        res.status(500).json({ message: "Error fetching sales", error: err.message });
+        res
+          .status(500)
+          .json({ message: "Error fetching sales", error: err.message });
       } else {
         res.json(rows);
       }
@@ -2493,17 +2522,27 @@ app.post("/sales-return", async (req, res) => {
         reason, // Optional reason for return
       } = item;
 
-      if (!sale_id || !product_id || !customer_id || !reference_number || return_quantity <= 0) {
+      if (
+        !sale_id ||
+        !product_id ||
+        !customer_id ||
+        !reference_number ||
+        return_quantity <= 0
+      ) {
         throw new Error("Invalid return data");
       }
 
       // Fetch total quantity sold for this sale
       const totalQuantitySold = await new Promise((resolve, reject) => {
-        db.get("SELECT quantity FROM sales WHERE id = ?", [sale_id], (err, row) => {
-          if (err) return reject(err);
-          if (!row) return reject(new Error("Sale not found"));
-          resolve(row.quantity);
-        });
+        db.get(
+          "SELECT quantity FROM sales WHERE id = ?",
+          [sale_id],
+          (err, row) => {
+            if (err) return reject(err);
+            if (!row) return reject(new Error("Sale not found"));
+            resolve(row.quantity);
+          }
+        );
       });
 
       // Fetch total tax amount for this sale
@@ -2516,7 +2555,10 @@ app.post("/sales-return", async (req, res) => {
           [sale_id],
           (err, rows) => {
             if (err) return reject(err);
-            const totalTaxAmount = rows.reduce((acc, row) => acc + row.tax_amount, 0);
+            const totalTaxAmount = rows.reduce(
+              (acc, row) => acc + row.tax_amount,
+              0
+            );
             resolve(totalTaxAmount);
           }
         );
@@ -2526,7 +2568,7 @@ app.post("/sales-return", async (req, res) => {
       const returnTax = (return_quantity / totalQuantitySold) * totalTax;
 
       // Calculate total refund
-      const total_refund = (return_quantity * selling_price) + returnTax;
+      const total_refund = return_quantity * selling_price + returnTax;
 
       // Insert return record
       await new Promise((resolve, reject) => {
@@ -2577,16 +2619,24 @@ app.post("/sales-return", async (req, res) => {
 
       // Update sales quantity
       await new Promise((resolve, reject) => {
-        db.get("SELECT quantity FROM sales WHERE id = ?", [sale_id], (err, row) => {
-          if (err) return reject(err);
-          if (!row) return reject(new Error("Sale not found"));
-
-          const newQuantity = row.quantity - return_quantity;
-          db.run("UPDATE sales SET quantity = ? WHERE id = ?", [newQuantity, sale_id], (err) => {
+        db.get(
+          "SELECT quantity FROM sales WHERE id = ?",
+          [sale_id],
+          (err, row) => {
             if (err) return reject(err);
-            resolve();
-          });
-        });
+            if (!row) return reject(new Error("Sale not found"));
+
+            const newQuantity = row.quantity - return_quantity;
+            db.run(
+              "UPDATE sales SET quantity = ? WHERE id = ?",
+              [newQuantity, sale_id],
+              (err) => {
+                if (err) return reject(err);
+                resolve();
+              }
+            );
+          }
+        );
       });
 
       return { product_id, return_quantity, total_refund };
@@ -2605,7 +2655,6 @@ app.post("/sales-return", async (req, res) => {
     res.status(500).json({ message: "Error processing sales returns", error });
   }
 });
-
 
 // Get All Sales Returns
 app.get("/sales/returns", async (req, res) => {
@@ -3501,35 +3550,37 @@ app.patch("/customers/:id", (req, res) => {
 // Helper function to create journal entry
 const createJournalEntry = (adjustment) => {
   return new Promise((resolve, reject) => {
-    const { 
-      id, 
-      account_id, 
-      adjustment_type, 
-      amount, 
-      reason, 
-      date, 
+    const {
+      id,
+      account_id,
+      adjustment_type,
+      amount,
+      reason,
+      date,
       entry_type,
-      reference_number 
+      reference_number,
     } = adjustment;
-    
+
     // Handle different account mappings based on adjustment type
     const getAccountMapping = (type) => {
       const mappings = {
-        'correction': { contra_account: 7001 },
-        'reconciliation': { contra_account: 7002 },
-        'depreciation': { contra_account: 7003 },
-        'accrual': { contra_account: 7004 },
-        'prepaid': { contra_account: 7005 },
-        'deferral': { contra_account: 7006 },
-        'write-off': { contra_account: 7007 },
-        'tax': { contra_account: 7008 }
+        correction: { contra_account: 7001 },
+        reconciliation: { contra_account: 7002 },
+        depreciation: { contra_account: 7003 },
+        accrual: { contra_account: 7004 },
+        prepaid: { contra_account: 7005 },
+        deferral: { contra_account: 7006 },
+        "write-off": { contra_account: 7007 },
+        tax: { contra_account: 7008 },
       };
       return mappings[type] || { contra_account: 7000 }; // Default contra account
     };
 
     const { contra_account } = getAccountMapping(adjustment_type);
-    const debit_account_id = entry_type === 'debit' ? account_id : contra_account;
-    const credit_account_id = entry_type === 'credit' ? account_id : contra_account;
+    const debit_account_id =
+      entry_type === "debit" ? account_id : contra_account;
+    const credit_account_id =
+      entry_type === "credit" ? account_id : contra_account;
     db.run(
       `INSERT INTO journal_entries (
         reference_number, 
@@ -3538,13 +3589,7 @@ const createJournalEntry = (adjustment) => {
         status,
         adjustment_type
       ) VALUES (?, ?, ?, ?, ?)`,
-      [
-        reference_number,
-        date,
-        reason,
-        'posted',
-        adjustment_type      
-      ],
+      [reference_number, date, reason, "posted", adjustment_type],
       function (err) {
         if (err) return reject(err);
         const journal_entry_id = this.lastID;
@@ -3558,7 +3603,7 @@ const createJournalEntry = (adjustment) => {
             credit,
             entry_type
           ) VALUES (?, ?, ?, ?, ?)`,
-          [journal_entry_id, debit_account_id, amount, 0, 'debit'],
+          [journal_entry_id, debit_account_id, amount, 0, "debit"],
           function (err) {
             if (err) return reject(err);
 
@@ -3571,7 +3616,7 @@ const createJournalEntry = (adjustment) => {
                 credit,
                 entry_type
               ) VALUES (?, ?, ?, ?, ?)`,
-              [journal_entry_id, credit_account_id, 0, amount, 'credit'],
+              [journal_entry_id, credit_account_id, 0, amount, "credit"],
               function (err) {
                 if (err) return reject(err);
 
@@ -3600,10 +3645,13 @@ app.post("/adjustments", (req, res) => {
     entry_type,
     document_reference,
     created_by,
-    affected_periods
+    affected_periods,
   } = req.body;
 
-  const reference_number = `ADJ-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+  const reference_number = `ADJ-${new Date().getFullYear()}-${Math.random()
+    .toString(36)
+    .substr(2, 9)
+    .toUpperCase()}`;
 
   db.run(
     `INSERT INTO adjustments (
@@ -3630,13 +3678,13 @@ app.post("/adjustments", (req, res) => {
       date,
       entry_type,
       reference_number,
-      'posted',
+      "posted",
       document_reference,
       created_by,
       new Date().toISOString(),
       affected_periods.fiscal_year,
       affected_periods.fiscal_quarter,
-      affected_periods.fiscal_month
+      affected_periods.fiscal_month,
     ],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
@@ -3645,14 +3693,16 @@ app.post("/adjustments", (req, res) => {
         id: this.lastID,
         ...req.body,
         reference_number,
-        status: 'posted'
+        status: "posted",
       };
 
       createJournalEntry(adjustment)
-        .then(() => res.json({ 
-          message: "Adjustment created successfully", 
-          adjustment 
-        }))
+        .then(() =>
+          res.json({
+            message: "Adjustment created successfully",
+            adjustment,
+          })
+        )
         .catch((error) => res.status(500).json({ error }));
     }
   );
@@ -3661,7 +3711,7 @@ app.post("/adjustments", (req, res) => {
 // READ ADJUSTMENTS
 app.get("/adjustments", (req, res) => {
   const { startDate, endDate, type, account, status } = req.query;
-  
+
   let query = `
     SELECT 
       a.*,
@@ -3671,29 +3721,29 @@ app.get("/adjustments", (req, res) => {
     LEFT JOIN chart_of_accounts acc ON a.account_id = acc.id
     WHERE 1=1
   `;
-  
+
   const params = [];
-  
+
   if (startDate && endDate) {
     query += ` AND date BETWEEN ? AND ?`;
     params.push(startDate, endDate);
   }
-  
+
   if (type) {
     query += ` AND adjustment_type = ?`;
     params.push(type);
   }
-  
+
   if (account) {
     query += ` AND account_id = ?`;
     params.push(account);
   }
-  
+
   if (status) {
     query += ` AND status = ?`;
     params.push(status);
   }
-  
+
   query += ` ORDER BY date DESC`;
 
   db.all(query, params, (err, rows) => {
@@ -3713,14 +3763,18 @@ app.put("/adjustments/:id", (req, res) => {
     date,
     entry_type,
     document_reference,
-    status
+    status,
   } = req.body;
 
-  db.get(`SELECT * FROM adjustments WHERE id = ?`, [id], (err, oldAdjustment) => {
-    if (err || !oldAdjustment) return res.status(404).json({ error: "Adjustment not found" });
+  db.get(
+    `SELECT * FROM adjustments WHERE id = ?`,
+    [id],
+    (err, oldAdjustment) => {
+      if (err || !oldAdjustment)
+        return res.status(404).json({ error: "Adjustment not found" });
 
-    db.run(
-      `UPDATE adjustments 
+      db.run(
+        `UPDATE adjustments 
        SET account_id = ?,
            adjustment_type = ?,
            amount = ?,
@@ -3731,41 +3785,48 @@ app.put("/adjustments/:id", (req, res) => {
            status = ?,
            updated_at = ?
        WHERE id = ?`,
-      [
-        account_id,
-        adjustment_type,
-        amount,
-        reason,
-        date,
-        entry_type,
-        document_reference,
-        status,
-        new Date().toISOString(),
-        id
-      ],
-      function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-
-        // Delete old journal entry
-        db.run(`DELETE FROM journal_entries WHERE id = ?`, [oldAdjustment.journal_entry_id], (err) => {
+        [
+          account_id,
+          adjustment_type,
+          amount,
+          reason,
+          date,
+          entry_type,
+          document_reference,
+          status,
+          new Date().toISOString(),
+          id,
+        ],
+        function (err) {
           if (err) return res.status(500).json({ error: err.message });
 
-          const updatedAdjustment = {
-            id,
-            ...req.body,
-            reference_number: oldAdjustment.reference_number
-          };
+          // Delete old journal entry
+          db.run(
+            `DELETE FROM journal_entries WHERE id = ?`,
+            [oldAdjustment.journal_entry_id],
+            (err) => {
+              if (err) return res.status(500).json({ error: err.message });
 
-          createJournalEntry(updatedAdjustment)
-            .then(() => res.json({ 
-              message: "Adjustment updated successfully",
-              adjustment: updatedAdjustment
-            }))
-            .catch((error) => res.status(500).json({ error }));
-        });
-      }
-    );
-  });
+              const updatedAdjustment = {
+                id,
+                ...req.body,
+                reference_number: oldAdjustment.reference_number,
+              };
+
+              createJournalEntry(updatedAdjustment)
+                .then(() =>
+                  res.json({
+                    message: "Adjustment updated successfully",
+                    adjustment: updatedAdjustment,
+                  })
+                )
+                .catch((error) => res.status(500).json({ error }));
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // DELETE ADJUSTMENT
@@ -3773,18 +3834,24 @@ app.delete("/adjustments/:id", (req, res) => {
   const { id } = req.params;
 
   db.get(`SELECT * FROM adjustments WHERE id = ?`, [id], (err, adjustment) => {
-    if (err || !adjustment) return res.status(404).json({ error: "Adjustment not found" });
+    if (err || !adjustment)
+      return res.status(404).json({ error: "Adjustment not found" });
 
-    db.run(`DELETE FROM journal_entries WHERE id = ?`, [adjustment.journal_entry_id], (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      db.run(`DELETE FROM adjustments WHERE id = ?`, [id], function (err) {
+    db.run(
+      `DELETE FROM journal_entries WHERE id = ?`,
+      [adjustment.journal_entry_id],
+      (err) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ 
-          message: "Adjustment and related journal entry deleted successfully" 
+
+        db.run(`DELETE FROM adjustments WHERE id = ?`, [id], function (err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({
+            message:
+              "Adjustment and related journal entry deleted successfully",
+          });
         });
-      });
-    });
+      }
+    );
   });
 });
 
@@ -4165,12 +4232,16 @@ app.delete("/taxes/:id", (req, res) => {
 // ==================== CREATE TRANSACTION ====================
 // ✅ 1. Get all transactions
 app.get("/transactions", (req, res) => {
-  db.all("SELECT * FROM transactions ORDER BY transaction_date DESC", [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  db.all(
+    "SELECT * FROM transactions ORDER BY transaction_date DESC",
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows);
     }
-    res.json(rows);
-  });
+  );
 });
 
 // ✅ 2. Get a single transaction by ID
@@ -4189,7 +4260,13 @@ app.get("/transactions/:id", (req, res) => {
 
 // ✅ 3. Create a new transaction
 app.post("/transactions", (req, res) => {
-  const { transaction_date, amount, account_id, description, payment_method_id } = req.body;
+  const {
+    transaction_date,
+    amount,
+    account_id,
+    description,
+    payment_method_id,
+  } = req.body;
 
   const reference_number = `TXN${Date.now()}`;
   const date = transaction_date;
@@ -4207,182 +4284,298 @@ app.post("/transactions", (req, res) => {
       const journal_entry_id = this.lastID;
 
       // Fetch account types for the transaction account and payment method
-      db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [account_id], (err, account) => {
-        if (err || !account) {
-          console.error("Error fetching account type:", err?.message || "Account not found");
-          return res.status(500).send("Error fetching account type");
-        }
-
-        db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [payment_method_id], (err, payment_account) => {
-          if (err || !payment_account) {
-            console.error("Error fetching payment account type:", err?.message || "Payment account not found");
-            return res.status(500).send("Error fetching payment account type");
+      db.get(
+        `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+        [account_id],
+        (err, account) => {
+          if (err || !account) {
+            console.error(
+              "Error fetching account type:",
+              err?.message || "Account not found"
+            );
+            return res.status(500).send("Error fetching account type");
           }
 
-          const transactionAccountType = account.account_type;
-          const paymentAccountType = payment_account.account_type;
-
-          // Determine debit and credit based on account types
-          let debitAmount = 0, creditAmount = 0;
-          if (["asset", "expense"].includes(transactionAccountType)) {
-            debitAmount = amount;
-          } else {
-            creditAmount = amount;
-          }
-
-          db.run(
-            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-            [journal_entry_id, account_id, debitAmount, creditAmount],
-            function (err) {
-              if (err) {
-                console.error("Error creating transaction journal entry line:", err.message);
-                return res.status(500).send("Error creating transaction journal entry line");
-              }
-
-              // Determine debit and credit for payment method
-              let paymentDebitAmount = 0, paymentCreditAmount = 0;
-              if (["asset", "expense"].includes(paymentAccountType)) {
-                paymentDebitAmount = amount;
-                paymentCreditAmount = 0;
-              } else {
-                paymentDebitAmount = 0;
-                paymentCreditAmount = amount;
-              }
-
-              db.run(
-                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                [journal_entry_id, payment_method_id, paymentDebitAmount, paymentCreditAmount],
-                function (err) {
-                  if (err) {
-                    console.error("Error creating payment journal entry line:", err.message);
-                    return res.status(500).send("Error creating payment journal entry line");
-                  }
-
-                  // Final response
-                  res.status(201).json({
-                    message: "Transaction recorded successfully",
-                    journal_entry_id: journal_entry_id,
-                  });
-                }
-              );
-            }
-          );
-        });
-      });
-    }
-  );
-});
-
-
-app.put("/transactions/:id", (req, res) => {
-  const transactionId = req.params.id;
-  const { transaction_date, amount, account_id, description, payment_method_id } = req.body;
-
-  db.get(`SELECT journal_entry_id FROM transactions WHERE id = ?`, [transactionId], (err, transaction) => {
-    if (err || !transaction) {
-      console.error("Transaction not found:", err?.message || "Transaction does not exist");
-      return res.status(404).send("Transaction not found");
-    }
-
-    const journal_entry_id = transaction.journal_entry_id;
-
-    // Step 1: Update the journal entry
-    db.run(
-      `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
-      [transaction_date, description || "Updated transaction entry", journal_entry_id],
-      function (err) {
-        if (err) {
-          console.error("Error updating journal entry:", err.message);
-          return res.status(500).send("Error updating journal entry");
-        }
-
-        // Step 2: Remove existing journal entry lines
-        db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journal_entry_id], function (err) {
-          if (err) {
-            console.error("Error deleting journal entry lines:", err.message);
-            return res.status(500).send("Error deleting journal entry lines");
-          }
-
-          // Step 3: Fetch new account types
-          db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [account_id], (err, account) => {
-            if (err || !account) {
-              console.error("Error fetching account type:", err?.message || "Account not found");
-              return res.status(500).send("Error fetching account type");
-            }
-
-            db.get(`SELECT account_type FROM chart_of_accounts WHERE id = ?`, [payment_method_id], (err, payment_account) => {
+          db.get(
+            `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+            [payment_method_id],
+            (err, payment_account) => {
               if (err || !payment_account) {
-                console.error("Error fetching payment account type:", err?.message || "Payment account not found");
-                return res.status(500).send("Error fetching payment account type");
+                console.error(
+                  "Error fetching payment account type:",
+                  err?.message || "Payment account not found"
+                );
+                return res
+                  .status(500)
+                  .send("Error fetching payment account type");
               }
 
               const transactionAccountType = account.account_type;
               const paymentAccountType = payment_account.account_type;
 
-              // Step 4: Determine new debit and credit values
-              let debitAmount = 0, creditAmount = 0;
+              // Determine debit and credit based on account types
+              let debitAmount = 0,
+                creditAmount = 0;
               if (["asset", "expense"].includes(transactionAccountType)) {
                 debitAmount = amount;
               } else {
                 creditAmount = amount;
               }
 
-              // Step 5: Insert updated journal entry lines for the transaction
               db.run(
                 `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
                 [journal_entry_id, account_id, debitAmount, creditAmount],
                 function (err) {
                   if (err) {
-                    console.error("Error inserting transaction journal entry line:", err.message);
-                    return res.status(500).send("Error inserting transaction journal entry line");
+                    console.error(
+                      "Error creating transaction journal entry line:",
+                      err.message
+                    );
+                    return res
+                      .status(500)
+                      .send("Error creating transaction journal entry line");
                   }
 
-                  // Step 6: Determine debit/credit for payment method
-                  let paymentDebitAmount = 0, paymentCreditAmount = 0;
+                  // Determine debit and credit for payment method
+                  let paymentDebitAmount = 0,
+                    paymentCreditAmount = 0;
                   if (["asset", "expense"].includes(paymentAccountType)) {
-                    paymentDebitAmount = 0;
-                    paymentCreditAmount = amount;
-                  } else {
                     paymentDebitAmount = amount;
                     paymentCreditAmount = 0;
+                  } else {
+                    paymentDebitAmount = 0;
+                    paymentCreditAmount = amount;
                   }
 
-                  // Step 7: Insert updated journal entry lines for payment method
                   db.run(
                     `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                    [journal_entry_id, payment_method_id, paymentDebitAmount, paymentCreditAmount],
+                    [
+                      journal_entry_id,
+                      payment_method_id,
+                      paymentDebitAmount,
+                      paymentCreditAmount,
+                    ],
                     function (err) {
                       if (err) {
-                        console.error("Error inserting payment journal entry line:", err.message);
-                        return res.status(500).send("Error inserting payment journal entry line");
+                        console.error(
+                          "Error creating payment journal entry line:",
+                          err.message
+                        );
+                        return res
+                          .status(500)
+                          .send("Error creating payment journal entry line");
                       }
 
-                      // Step 8: Update the transaction record
+                      // Final response
+                      res.status(201).json({
+                        message: "Transaction recorded successfully",
+                        journal_entry_id: journal_entry_id,
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+app.put("/transactions/:id", (req, res) => {
+  const transactionId = req.params.id;
+  const {
+    transaction_date,
+    amount,
+    account_id,
+    description,
+    payment_method_id,
+  } = req.body;
+
+  db.get(
+    `SELECT journal_entry_id FROM transactions WHERE id = ?`,
+    [transactionId],
+    (err, transaction) => {
+      if (err || !transaction) {
+        console.error(
+          "Transaction not found:",
+          err?.message || "Transaction does not exist"
+        );
+        return res.status(404).send("Transaction not found");
+      }
+
+      const journal_entry_id = transaction.journal_entry_id;
+
+      // Step 1: Update the journal entry
+      db.run(
+        `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
+        [
+          transaction_date,
+          description || "Updated transaction entry",
+          journal_entry_id,
+        ],
+        function (err) {
+          if (err) {
+            console.error("Error updating journal entry:", err.message);
+            return res.status(500).send("Error updating journal entry");
+          }
+
+          // Step 2: Remove existing journal entry lines
+          db.run(
+            `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
+            [journal_entry_id],
+            function (err) {
+              if (err) {
+                console.error(
+                  "Error deleting journal entry lines:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error deleting journal entry lines");
+              }
+
+              // Step 3: Fetch new account types
+              db.get(
+                `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+                [account_id],
+                (err, account) => {
+                  if (err || !account) {
+                    console.error(
+                      "Error fetching account type:",
+                      err?.message || "Account not found"
+                    );
+                    return res.status(500).send("Error fetching account type");
+                  }
+
+                  db.get(
+                    `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+                    [payment_method_id],
+                    (err, payment_account) => {
+                      if (err || !payment_account) {
+                        console.error(
+                          "Error fetching payment account type:",
+                          err?.message || "Payment account not found"
+                        );
+                        return res
+                          .status(500)
+                          .send("Error fetching payment account type");
+                      }
+
+                      const transactionAccountType = account.account_type;
+                      const paymentAccountType = payment_account.account_type;
+
+                      // Step 4: Determine new debit and credit values
+                      let debitAmount = 0,
+                        creditAmount = 0;
+                      if (
+                        ["asset", "expense"].includes(transactionAccountType)
+                      ) {
+                        debitAmount = amount;
+                      } else {
+                        creditAmount = amount;
+                      }
+
+                      // Step 5: Insert updated journal entry lines for the transaction
                       db.run(
-                        `UPDATE transactions SET transaction_date = ?, amount = ?, account_id = ?, description = ?, payment_method_id = ? WHERE id = ?`,
-                        [transaction_date, amount, account_id, description, payment_method_id, transactionId],
+                        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                        [
+                          journal_entry_id,
+                          account_id,
+                          debitAmount,
+                          creditAmount,
+                        ],
                         function (err) {
                           if (err) {
-                            console.error("Error updating transaction:", err.message);
-                            return res.status(500).send("Error updating transaction");
+                            console.error(
+                              "Error inserting transaction journal entry line:",
+                              err.message
+                            );
+                            return res
+                              .status(500)
+                              .send(
+                                "Error inserting transaction journal entry line"
+                              );
                           }
 
-                          res.status(200).json({
-                            message: "Transaction updated successfully",
-                            journal_entry_id: journal_entry_id,
-                          });
+                          // Step 6: Determine debit/credit for payment method
+                          let paymentDebitAmount = 0,
+                            paymentCreditAmount = 0;
+                          if (
+                            ["asset", "expense"].includes(paymentAccountType)
+                          ) {
+                            paymentDebitAmount = 0;
+                            paymentCreditAmount = amount;
+                          } else {
+                            paymentDebitAmount = amount;
+                            paymentCreditAmount = 0;
+                          }
+
+                          // Step 7: Insert updated journal entry lines for payment method
+                          db.run(
+                            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                            [
+                              journal_entry_id,
+                              payment_method_id,
+                              paymentDebitAmount,
+                              paymentCreditAmount,
+                            ],
+                            function (err) {
+                              if (err) {
+                                console.error(
+                                  "Error inserting payment journal entry line:",
+                                  err.message
+                                );
+                                return res
+                                  .status(500)
+                                  .send(
+                                    "Error inserting payment journal entry line"
+                                  );
+                              }
+
+                              // Step 8: Update the transaction record
+                              db.run(
+                                `UPDATE transactions SET transaction_date = ?, amount = ?, account_id = ?, description = ?, payment_method_id = ? WHERE id = ?`,
+                                [
+                                  transaction_date,
+                                  amount,
+                                  account_id,
+                                  description,
+                                  payment_method_id,
+                                  transactionId,
+                                ],
+                                function (err) {
+                                  if (err) {
+                                    console.error(
+                                      "Error updating transaction:",
+                                      err.message
+                                    );
+                                    return res
+                                      .status(500)
+                                      .send("Error updating transaction");
+                                  }
+
+                                  res.status(200).json({
+                                    message: "Transaction updated successfully",
+                                    journal_entry_id: journal_entry_id,
+                                  });
+                                }
+                              );
+                            }
+                          );
                         }
                       );
                     }
                   );
                 }
               );
-            });
-          });
-        });
-      }
-    );
-  });
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // ✅ 5. Delete a transaction
@@ -4396,6 +4589,306 @@ app.delete("/transactions/:id", (req, res) => {
       return res.status(404).json({ message: "Transaction not found" });
     }
     res.json({ message: "Transaction deleted successfully" });
+  });
+});
+// ==================== CREATE PROCESS PAYMENT ====================
+
+// ✅ 1. Get all payments
+app.get("/processpayment", (req, res) => {
+  db.all(
+    `SELECT p.*, a.account_name AS account_name, pm.account_name AS payment_method_name 
+     FROM processpayments p
+     JOIN chart_of_accounts a ON p.account_id = a.id
+     JOIN chart_of_accounts pm ON p.payment_method_id = pm.id
+     ORDER BY p.payment_date DESC`,
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// ✅ 2. Get a single payment by ID
+app.get("/processpayment/:id", (req, res) => {
+  const { id } = req.params;
+  db.get("SELECT * FROM payments WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+    res.json(row);
+  });
+});
+
+// ✅ 3. Create a new payment
+app.post("/processpayment", (req, res) => {
+  const { payment_date, amount, account_id, payment_method_id, description } =
+    req.body;
+
+  const reference_number = `PAY-${Date.now()}`;
+  const payment_description = description || "Payment processed";
+
+  db.run(
+    `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+    [reference_number, payment_date, payment_description],
+    function (err) {
+      if (err) {
+        console.error("Error creating journal entry:", err.message);
+        return res.status(500).send("Error creating journal entry");
+      }
+
+      const journal_entry_id = this.lastID;
+
+      // Fetch account types
+      db.get(
+        `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+        [account_id],
+        (err, account) => {
+          if (err || !account) {
+            console.error(
+              "Error fetching account type:",
+              err?.message || "Account not found"
+            );
+            return res.status(500).send("Error fetching account type");
+          }
+
+          db.get(
+            `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+            [payment_method_id],
+            (err, payment_account) => {
+              if (err || !payment_account) {
+                console.error(
+                  "Error fetching payment method account type:",
+                  err?.message || "Payment method not found"
+                );
+                return res
+                  .status(500)
+                  .send("Error fetching payment method account type");
+              }
+
+              const transactionAccountType = account.account_type;
+              const paymentAccountType = payment_account.account_type;
+
+              // Determine debit/credit for transaction account
+              let debitAmount = 0,
+                creditAmount = 0;
+              if (
+                transactionAccountType === "liability" ||
+                transactionAccountType === "equity"
+              ) {
+                debitAmount = amount; // Reduce liability or equity
+              } else {
+                creditAmount = amount; // Other account types are credited
+              }
+
+              db.run(
+                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                [journal_entry_id, account_id, debitAmount, creditAmount],
+                function (err) {
+                  if (err) {
+                    console.error(
+                      "Error creating transaction journal entry line:",
+                      err.message
+                    );
+                    return res
+                      .status(500)
+                      .send("Error creating transaction journal entry line");
+                  }
+
+                  // Determine debit/credit for payment method
+                  let paymentDebitAmount = 0,
+                    paymentCreditAmount = 0;
+
+                  if (
+                    paymentAccountType === "asset" ||
+                    paymentAccountType === "expense"
+                  ) {
+                    paymentCreditAmount = amount; // Reduce assets (Cash, Bank) or expenses
+                  } else {
+                    paymentDebitAmount = amount; // Other account types are debited
+                  }
+
+                  db.run(
+                    `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                    [
+                      journal_entry_id,
+                      payment_method_id,
+                      paymentDebitAmount,
+                      paymentCreditAmount,
+                    ],
+                    function (err) {
+                      if (err) {
+                        console.error(
+                          "Error creating payment journal entry line:",
+                          err.message
+                        );
+                        return res
+                          .status(500)
+                          .send("Error creating payment journal entry line");
+                      }
+
+                      // Insert into payments table
+                      db.run(
+                        `INSERT INTO processpayments (reference_number,payment_date, amount, account_id, payment_method_id, description, journal_entry_id) 
+                     VALUES (?,?, ?, ?, ?, ?, ?)`,
+                        [
+                          reference_number,
+                          payment_date,
+                          amount,
+                          account_id,
+                          payment_method_id,
+                          description,
+                          journal_entry_id,
+                        ],
+                        function (err) {
+                          if (err) {
+                            console.error(
+                              "Error recording payment:",
+                              err.message
+                            );
+                            return res
+                              .status(500)
+                              .send("Error recording payment");
+                          }
+
+                          res.status(201).json({
+                            message: "Payment processed successfully",
+                            journal_entry_id: journal_entry_id,
+                          });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// ✅ 4. Update a payment
+app.put("/processpayment/:id", (req, res) => {
+  const paymentId = req.params.id;
+  const { payment_date, amount, account_id, payment_method_id, description } =
+    req.body;
+
+  db.get(
+    `SELECT journal_entry_id FROM processpayments WHERE id = ?`,
+    [paymentId],
+    (err, payment) => {
+      if (err || !payment) {
+        console.error(
+          "Payment not found:",
+          err?.message || "Payment does not exist"
+        );
+        return res.status(404).send("Payment not found");
+      }
+
+      const journal_entry_id = payment.journal_entry_id;
+
+      // Step 1: Update the journal entry
+      db.run(
+        `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
+        [
+          payment_date,
+          description || "Updated payment entry",
+          journal_entry_id,
+        ],
+        function (err) {
+          if (err) {
+            console.error("Error updating journal entry:", err.message);
+            return res.status(500).send("Error updating journal entry");
+          }
+
+          // Step 2: Remove existing journal entry lines
+          db.run(
+            `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
+            [journal_entry_id],
+            function (err) {
+              if (err) {
+                console.error(
+                  "Error deleting journal entry lines:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error deleting journal entry lines");
+              }
+
+              // Reinsert new journal entry lines with the updated data
+              db.run(
+                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                [journal_entry_id, account_id, amount, 0], // Debit the liability
+                function (err) {
+                  if (err) {
+                    return res
+                      .status(500)
+                      .send("Error updating transaction journal entry line");
+                  }
+
+                  db.run(
+                    `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                    [journal_entry_id, payment_method_id, 0, amount], // Credit the asset
+                    function (err) {
+                      if (err) {
+                        return res
+                          .status(500)
+                          .send("Error updating payment journal entry line");
+                      }
+
+                      db.run(
+                        `UPDATE processpayments SET payment_date = ?, amount = ?, account_id = ?, payment_method_id = ?, description = ? WHERE id = ?`,
+                        [
+                          payment_date,
+                          amount,
+                          account_id,
+                          payment_method_id,
+                          description,
+                          paymentId,
+                        ],
+                        function (err) {
+                          if (err) {
+                            return res
+                              .status(500)
+                              .send("Error updating payment");
+                          }
+
+                          res
+                            .status(200)
+                            .json({ message: "Payment updated successfully" });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// ✅ 5. Delete a payment
+app.delete("/processpayment/:id", (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM processpayments WHERE id = ?", [id], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+    res.json({ message: "Payment deleted successfully" });
   });
 });
 // ==================== CREATE EXPENSE ====================
@@ -4651,8 +5144,13 @@ app.put("/expenses/pay/:id", (req, res) => {
             [journal_entry_id, paymentAccountId, 0, payAmount],
             function (err) {
               if (err) {
-                console.error("Error creating debit journal entry line:", err.message);
-                return res.status(500).send("Error creating journal entry line");
+                console.error(
+                  "Error creating debit journal entry line:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error creating journal entry line");
               }
 
               // Credit: Reduce liability
@@ -4662,14 +5160,22 @@ app.put("/expenses/pay/:id", (req, res) => {
                 [journal_entry_id, accountsPayableId, payAmount, 0],
                 function (err) {
                   if (err) {
-                    console.error("Error creating credit journal entry line:", err.message);
-                    return res.status(500).send("Error creating journal entry line");
+                    console.error(
+                      "Error creating credit journal entry line:",
+                      err.message
+                    );
+                    return res
+                      .status(500)
+                      .send("Error creating journal entry line");
                   }
 
                   // Step 3: Update Payment Records
-                  const newAmountPaid = parseFloat(expense.amount_paid) + parseFloat(payAmount);
+                  const newAmountPaid =
+                    parseFloat(expense.amount_paid) + parseFloat(payAmount);
 
-                  const newBalanceDue = parseFloat(expense.total_amount) - parseFloat(newAmountPaid);
+                  const newBalanceDue =
+                    parseFloat(expense.total_amount) -
+                    parseFloat(newAmountPaid);
                   const newStatus = newBalanceDue === 0 ? "paid" : "partial";
 
                   db.run(
@@ -4679,8 +5185,13 @@ app.put("/expenses/pay/:id", (req, res) => {
                     [newAmountPaid, newStatus, expense.invoice_id],
                     function (err) {
                       if (err) {
-                        console.error("Error updating expense status:", err.message);
-                        return res.status(500).send("Error updating expense status");
+                        console.error(
+                          "Error updating expense status:",
+                          err.message
+                        );
+                        return res
+                          .status(500)
+                          .send("Error updating expense status");
                       }
 
                       res.status(200).json({
@@ -4724,7 +5235,7 @@ app.put("/expenses/:id", (req, res) => {
 
       const journal_entry_id = row.journal_entry_id;
       const invoice_id = row.invoice_id;
-      
+
       // Step 2: Update the journal entry (date, description)
       db.run(
         `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
@@ -4765,7 +5276,9 @@ app.put("/expenses/:id", (req, res) => {
 
                   // Step 5: Update the expense invoice (if applicable)
                   updateExpenseInvoice(invoice_id, amount, res, () => {
-                    res.status(200).json({ message: "Expense updated successfully" });
+                    res
+                      .status(200)
+                      .json({ message: "Expense updated successfully" });
                   });
                 }
               );
@@ -4866,7 +5379,6 @@ function updateExpenseInvoice(invoice_id, amount, res, callback) {
   );
 }
 
-
 app.patch("/expenses/payment/:id", (req, res) => {
   const { id } = req.params;
   const { payment_method_id, amount } = req.body;
@@ -4950,117 +5462,159 @@ app.delete("/expenses/:id", (req, res) => {
   const { id } = req.params;
 
   // Step 1: Get journal entry ID for the expense
-  db.get(`SELECT journal_entry_id FROM expenses WHERE id = ?`, [id], (err, row) => {
-    if (err) {
-      console.error("Error fetching journal entry ID:", err.message);
-      return res.status(500).send("Error fetching journal entry ID");
-    }
-
-    if (!row) {
-      return res.status(404).send("Expense not found");
-    }
-
-    const journal_entry_id = row.journal_entry_id;
-    const reversal_reference = `REV${Date.now()}`;
-    const reversal_date = new Date().toISOString().split("T")[0];
-
-    // Step 2: Fetch existing journal entry lines
-    db.all(`SELECT account_id, debit, credit FROM journal_entry_lines WHERE journal_entry_id = ?`, 
-      [journal_entry_id], 
-      (err, lines) => {
-        if (err) {
-          console.error("Error fetching journal entry lines:", err.message);
-          return res.status(500).send("Error fetching journal entry lines");
-        }
-
-        if (!lines || lines.length === 0) {
-          return res.status(404).send("No journal entry lines found for expense.");
-        }
-
-        // Step 3: Insert a new reversing journal entry
-        db.run(
-          `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-          [reversal_reference, reversal_date, `Reversal for Expense #${id}`],
-          function (err) {
-            if (err) {
-              console.error("Error creating reversing journal entry:", err.message);
-              return res.status(500).send("Error creating reversing journal entry");
-            }
-
-            const reversal_entry_id = this.lastID;
-
-            // Step 4: Insert reversing journal entry lines
-            let insertQueries = lines.map(line => {
-              return new Promise((resolve, reject) => {
-                db.run(
-                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                  [reversal_entry_id, line.account_id, line.credit, line.debit], // Reversing debit & credit
-                  function (err) {
-                    if (err) {
-                      console.error("Error inserting reversing journal entry line:", err.message);
-                      reject(err);
-                    } else {
-                      resolve();
-                    }
-                  }
-                );
-              });
-            });
-
-            Promise.all(insertQueries)
-              .then(() => {
-                // Step 5: Proceed with deleting original journal entry and expense
-                deleteExpenseAndInvoice(journal_entry_id, id, res);
-              })
-              .catch(err => {
-                console.error("Error inserting reversing journal entry lines:", err.message);
-                res.status(500).send("Error inserting reversing journal entry lines");
-              });
-          }
-        );
+  db.get(
+    `SELECT journal_entry_id FROM expenses WHERE id = ?`,
+    [id],
+    (err, row) => {
+      if (err) {
+        console.error("Error fetching journal entry ID:", err.message);
+        return res.status(500).send("Error fetching journal entry ID");
       }
-    );
-  });
+
+      if (!row) {
+        return res.status(404).send("Expense not found");
+      }
+
+      const journal_entry_id = row.journal_entry_id;
+      const reversal_reference = `REV${Date.now()}`;
+      const reversal_date = new Date().toISOString().split("T")[0];
+
+      // Step 2: Fetch existing journal entry lines
+      db.all(
+        `SELECT account_id, debit, credit FROM journal_entry_lines WHERE journal_entry_id = ?`,
+        [journal_entry_id],
+        (err, lines) => {
+          if (err) {
+            console.error("Error fetching journal entry lines:", err.message);
+            return res.status(500).send("Error fetching journal entry lines");
+          }
+
+          if (!lines || lines.length === 0) {
+            return res
+              .status(404)
+              .send("No journal entry lines found for expense.");
+          }
+
+          // Step 3: Insert a new reversing journal entry
+          db.run(
+            `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+            [reversal_reference, reversal_date, `Reversal for Expense #${id}`],
+            function (err) {
+              if (err) {
+                console.error(
+                  "Error creating reversing journal entry:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error creating reversing journal entry");
+              }
+
+              const reversal_entry_id = this.lastID;
+
+              // Step 4: Insert reversing journal entry lines
+              let insertQueries = lines.map((line) => {
+                return new Promise((resolve, reject) => {
+                  db.run(
+                    `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                    [
+                      reversal_entry_id,
+                      line.account_id,
+                      line.credit,
+                      line.debit,
+                    ], // Reversing debit & credit
+                    function (err) {
+                      if (err) {
+                        console.error(
+                          "Error inserting reversing journal entry line:",
+                          err.message
+                        );
+                        reject(err);
+                      } else {
+                        resolve();
+                      }
+                    }
+                  );
+                });
+              });
+
+              Promise.all(insertQueries)
+                .then(() => {
+                  // Step 5: Proceed with deleting original journal entry and expense
+                  deleteExpenseAndInvoice(journal_entry_id, id, res);
+                })
+                .catch((err) => {
+                  console.error(
+                    "Error inserting reversing journal entry lines:",
+                    err.message
+                  );
+                  res
+                    .status(500)
+                    .send("Error inserting reversing journal entry lines");
+                });
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // Function to delete the journal entry, invoice, and expense
 function deleteExpenseAndInvoice(journal_entry_id, expense_id, res) {
   db.serialize(() => {
     // Delete Journal Entry Lines
-    db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journal_entry_id], function (err) {
-      if (err) {
-        console.error("Error deleting journal entry lines:", err.message);
-        return res.status(500).send("Error deleting journal entry lines");
-      }
-
-      // Delete Journal Entry
-      db.run(`DELETE FROM journal_entries WHERE id = ?`, [journal_entry_id], function (err) {
+    db.run(
+      `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
+      [journal_entry_id],
+      function (err) {
         if (err) {
-          console.error("Error deleting journal entry:", err.message);
-          return res.status(500).send("Error deleting journal entry");
+          console.error("Error deleting journal entry lines:", err.message);
+          return res.status(500).send("Error deleting journal entry lines");
         }
 
-        // Delete Expense Invoice
-        db.run(`DELETE FROM expense_invoices WHERE id = ?`, [expense_id], function (err) {
-          if (err) {
-            console.error("Error deleting expense invoice:", err.message);
-            return res.status(500).send("Error deleting expense invoice");
-          }
-
-          // Delete Expense Record
-          db.run(`DELETE FROM expenses WHERE id = ?`, [expense_id], function (err) {
+        // Delete Journal Entry
+        db.run(
+          `DELETE FROM journal_entries WHERE id = ?`,
+          [journal_entry_id],
+          function (err) {
             if (err) {
-              console.error("Error deleting expense:", err.message);
-              return res.status(500).send("Error deleting expense");
+              console.error("Error deleting journal entry:", err.message);
+              return res.status(500).send("Error deleting journal entry");
             }
 
-            res.status(200).json({
-              message: "Expense deleted successfully, and reversal entry recorded.",
-            });
-          });
-        });
-      });
-    });
+            // Delete Expense Invoice
+            db.run(
+              `DELETE FROM expense_invoices WHERE id = ?`,
+              [expense_id],
+              function (err) {
+                if (err) {
+                  console.error("Error deleting expense invoice:", err.message);
+                  return res.status(500).send("Error deleting expense invoice");
+                }
+
+                // Delete Expense Record
+                db.run(
+                  `DELETE FROM expenses WHERE id = ?`,
+                  [expense_id],
+                  function (err) {
+                    if (err) {
+                      console.error("Error deleting expense:", err.message);
+                      return res.status(500).send("Error deleting expense");
+                    }
+
+                    res.status(200).json({
+                      message:
+                        "Expense deleted successfully, and reversal entry recorded.",
+                    });
+                  }
+                );
+              }
+            );
+          }
+        );
+      }
+    );
   });
 }
 

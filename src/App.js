@@ -113,6 +113,7 @@ import { toastOptions } from "./toastConfig"; // Import the config
             <Route path="/supplier-payment" element={<SupplierPayment />} />
             <Route path="/customer-payment" element={<CustomerPayment />} />
             <Route path="/payment-history" element={<PaymentList />} />
+            <Route path="/process-payment" element={<ProcessPayment />} />
             <Route path="/taxes" element={<Taxes />} />
             <Route path="/tax-settings" element={<TaxSettings />} />
             <Route path="/tax-reports" element={<TaxReport />} />
