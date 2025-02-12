@@ -9,18 +9,17 @@ const Transactions = () => {
   const [formData, setFormData] = useState({
     transaction_date: "",
     amount: "",
-    account_id: "",
-    payment_method_id: "",
+    credit_account_id: "",
+    debit_account_id: "",
     description: "",
   });
   const [editId, setEditId] = useState(null);
   const [accounts, setAccounts] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
     fetchAccounts();
-    fetchPayAccounts()
   }, []);
 
   // Fetch Transactions
@@ -42,15 +41,6 @@ const Transactions = () => {
       toast.error("Error fetching accounts");
     }
   };
-  // Fetch Accounts (Chart of Accounts)
-  const fetchPayAccounts = async () => {
-    try {
-      const response = await axios.get("http://localhost:5000/payment-methods");
-      setPaymentMethods(response.data);
-    } catch (error) {
-      toast.error("Error fetching accounts");
-    }
-  };
 
   // Handle Form Input Change
   const handleChange = (e) => {
@@ -68,7 +58,8 @@ const Transactions = () => {
         await axios.post("http://localhost:5000/transactions", formData);
         toast.success("Transaction added successfully");
       }
-      setFormData({ transaction_date: "", amount: "", account_id: "", payment_method_id: "", description: "" });
+      setIsModalOpen(false);
+      setFormData({ transaction_date: "", amount: "", credit_account_id: "", debit_account_id: "", description: "" });
       setEditId(null);
       fetchTransactions();
     } catch (error) {
@@ -82,10 +73,11 @@ const Transactions = () => {
     setFormData({
       transaction_date: transaction.transaction_date,
       amount: transaction.amount,
-      account_id: transaction.account_id,
-      payment_method_id: transaction.payment_method_id,
+      credit_account_id: transaction.credit_account_id,
+      debit_account_id: transaction.debit_account_id,
       description: transaction.description,
     });
+    setIsModalOpen(true);
   };
 
   // Handle Delete
@@ -105,8 +97,8 @@ const Transactions = () => {
   const columns = [
     { name: "Date", selector: (row) => row.transaction_date, sortable: true },
     { name: "Amount", selector: (row) => row.amount, sortable: true },
-    { name: "Account", selector: (row) => row.account_name, sortable: true },
-    { name: "Payment Method", selector: (row) => row.payment_method_name, sortable: true },
+    { name: "Credit Account", selector: (row) => row.credit_account_name, sortable: true },
+    { name: "Debit Account", selector: (row) => row.debit_account_name, sortable: true },
     { name: "Description", selector: (row) => row.description, sortable: true },
     {
       name: "Actions",
@@ -124,87 +116,106 @@ const Transactions = () => {
   ];
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="p-6 bg-gray-100 max-h-[calc(100vh-100px)] overflow-y-scroll">
       <h2 className="text-2xl font-bold mb-4">Transactions</h2>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white p-4 shadow-md rounded-lg mb-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-700">Date</label>
-            <input
-              type="date"
-              name="transaction_date"
-              value={formData.transaction_date}
-              onChange={handleChange}
-              className="w-full p-2 border rounded"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700">Amount</label>
-            <input
-              type="number"
-              name="amount"
-              value={formData.amount}
-              onChange={handleChange}
-              className="w-full p-2 border rounded"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700">Credit Account</label>
-            <select
-              name="account_id"
-              value={formData.account_id}
-              onChange={handleChange}
-              className="w-full p-2 border rounded"
-              required
-            >
-              <option value="">Select Account</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.account_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700">Debit</label>
-            <select
-              name="payment_method_id"
-              value={formData.payment_method_id}
-              onChange={handleChange}
-              className="w-full p-2 border rounded"
-              required
-            >
-              <option value="">Select Payment Method</option>
-              {paymentMethods.map((pay) => (
-                <option key={pay.id} value={pay.id}>
-                  {pay.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-2">
-            <label className="block text-gray-700">Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-        </div>
-        <button type="submit" className="mt-4 bg-blue-500 text-white py-2 px-4 rounded">
-          {editId ? "Update Transaction" : "Add Transaction"}
-        </button>
-      </form>
+      {/* Add Transaction Button */}
+      <button
+        className="mb-4 bg-blue-600 text-white py-2 px-4 rounded flex items-center"
+        onClick={() => setIsModalOpen(true)}
+      >
+        <FaPlus className="mr-2" /> Add Transaction
+      </button>
 
-      {/* Table */}
+      {/* Transactions Table */}
       <div className="bg-white p-4 shadow-md rounded-lg">
         <DataTable columns={columns} data={transactions} pagination highlightOnHover />
       </div>
+
+      {/* Modal for Adding/Editing Transaction */}
+      {isModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-1/2">
+            <h3 className="text-xl font-bold mb-4">{editId ? "Edit Transaction" : "Add Transaction"}</h3>
+            
+            <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-700">Date</label>
+                <input
+                  type="date"
+                  name="transaction_date"
+                  value={formData.transaction_date}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700">Amount</label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700">Credit Account</label>
+                <select
+                  name="credit_account_id"
+                  value={formData.credit_account_id}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  required
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.account_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-gray-700">Debit Account</label>
+                <select
+                  name="debit_account_id"
+                  value={formData.debit_account_id}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  required
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.account_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-gray-700">Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div className="col-span-2 flex justify-end space-x-2">
+                <button type="button" className="bg-gray-500 text-white py-2 px-4 rounded" onClick={() => setIsModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded">
+                  {editId ? "Update" : "Add"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

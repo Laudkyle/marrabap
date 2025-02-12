@@ -133,12 +133,6 @@ db.serialize(() => {
       balance: 0,
     },
     {
-      account_code: "7001",
-      account_name: "Correction Adjustments",
-      account_type: "adjustment",
-      balance: 0,
-    },
-    {
       account_code: "7002",
       account_name: "Reconciliation Adjustments",
       account_type: "adjustment",
@@ -216,7 +210,7 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY,
     account_code TEXT NOT NULL UNIQUE, -- Unique identifier for the account
     account_name TEXT NOT NULL, -- Name of the account
-    account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')), -- Type of account
+    account_type TEXT NOT NULL CHECK(account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense','adjustment')), -- Type of account
     balance FLOAT DEFAULT 0,
     is_current BOOLEAN DEFAULT 1,
     opening_balance_journal_entry_id INTEGER,

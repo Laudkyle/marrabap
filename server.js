@@ -3547,12 +3547,11 @@ app.patch("/customers/:id", (req, res) => {
   });
 });
 // ===================== Adjsutments Endpoints =====================
-// Helper function to create journal entry
 const createJournalEntry = (adjustment) => {
   return new Promise((resolve, reject) => {
     const {
       id,
-      account_id,
+      account_id, // Use account_code instead of account_id
       adjustment_type,
       amount,
       reason,
@@ -3564,67 +3563,91 @@ const createJournalEntry = (adjustment) => {
     // Handle different account mappings based on adjustment type
     const getAccountMapping = (type) => {
       const mappings = {
-        correction: { contra_account: 7001 },
-        reconciliation: { contra_account: 7002 },
-        depreciation: { contra_account: 7003 },
-        accrual: { contra_account: 7004 },
-        prepaid: { contra_account: 7005 },
-        deferral: { contra_account: 7006 },
-        "write-off": { contra_account: 7007 },
-        tax: { contra_account: 7008 },
+        correction: { contra_account: "7001" },
+        reconciliation: { contra_account: "7002" },
+        depreciation: { contra_account: "7003" },
+        accrual: { contra_account: "7004" },
+        prepaid: { contra_account: "7005" },
+        deferral: { contra_account: "7006" },
+        "write-off": { contra_account: "7007" },
+        tax: { contra_account: "7008" },
       };
-      return mappings[type] || { contra_account: 7000 }; // Default contra account
+      return mappings[type] || { contra_account: "7000" }; // Default contra account
     };
 
     const { contra_account } = getAccountMapping(adjustment_type);
-    const debit_account_id =
-      entry_type === "debit" ? account_id : contra_account;
-    const credit_account_id =
-      entry_type === "credit" ? account_id : contra_account;
-    db.run(
-      `INSERT INTO journal_entries (
-        reference_number, 
-        date, 
-        description, 
-        status,
-        adjustment_type
-      ) VALUES (?, ?, ?, ?, ?)`,
-      [reference_number, date, reason, "posted", adjustment_type],
-      function (err) {
-        if (err) return reject(err);
-        const journal_entry_id = this.lastID;
 
-        // Create debit entry
-        db.run(
-          `INSERT INTO journal_entry_lines (
-            journal_entry_id, 
-            account_id, 
-            debit, 
-            credit,
-            entry_type
-          ) VALUES (?, ?, ?, ?, ?)`,
-          [journal_entry_id, debit_account_id, amount, 0, "debit"],
-          function (err) {
-            if (err) return reject(err);
+    // Fetch account_id for both main and contra accounts
+    db.get(
+      `SELECT id FROM chart_of_accounts WHERE id = ?`,
+      [account_id],
+      (err, account) => {
+        if (err || !account) return reject(err || "Account not found");
+        const main_account_id = account.id;
 
-            // Create credit entry
+        db.get(
+          `SELECT id FROM chart_of_accounts WHERE account_code = ?`,
+          [contra_account],
+          (err, contraAccount) => {
+            if (err || !contraAccount) return reject(err || "Contra account not found");
+            const contra_account_id = contraAccount.id;
+
+            // Determine debit and credit accounts
+            const debit_account_id =
+              entry_type === "debit" ? main_account_id : contra_account_id;
+            const credit_account_id =
+              entry_type === "credit" ? main_account_id : contra_account_id;
+
+            // Insert into journal_entries
             db.run(
-              `INSERT INTO journal_entry_lines (
-                journal_entry_id, 
-                account_id, 
-                debit, 
-                credit,
-                entry_type
+              `INSERT INTO journal_entries (
+                reference_number, 
+                date, 
+                description, 
+                status,
+                adjustment_type
               ) VALUES (?, ?, ?, ?, ?)`,
-              [journal_entry_id, credit_account_id, 0, amount, "credit"],
+              [reference_number, date, reason, "posted", adjustment_type],
               function (err) {
                 if (err) return reject(err);
+                const journal_entry_id = this.lastID;
 
+                // Insert debit entry
                 db.run(
-                  `UPDATE adjustments SET journal_entry_id = ? WHERE id = ?`,
-                  [journal_entry_id, id]
+                  `INSERT INTO journal_entry_lines (
+                    journal_entry_id, 
+                    account_id, 
+                    debit, 
+                    credit,
+                    entry_type
+                  ) VALUES (?, ?, ?, ?, ?)`,
+                  [journal_entry_id, debit_account_id, amount, 0, "debit"],
+                  function (err) {
+                    if (err) return reject(err);
+
+                    // Insert credit entry
+                    db.run(
+                      `INSERT INTO journal_entry_lines (
+                        journal_entry_id, 
+                        account_id, 
+                        debit, 
+                        credit,
+                        entry_type
+                      ) VALUES (?, ?, ?, ?, ?)`,
+                      [journal_entry_id, credit_account_id, 0, amount, "credit"],
+                      function (err) {
+                        if (err) return reject(err);
+
+                        // Update adjustment record with journal_entry_id
+                        db.run(
+                          `UPDATE adjustments SET journal_entry_id = ? WHERE id = ?`,
+                          [journal_entry_id, id]
+                        );
+                        resolve(journal_entry_id);
+                      }
+                    );
+                  }
                 );
-                resolve(journal_entry_id);
               }
             );
           }
@@ -3695,7 +3718,7 @@ app.post("/adjustments", (req, res) => {
         reference_number,
         status: "posted",
       };
-
+console.log(adjustment)
       createJournalEntry(adjustment)
         .then(() =>
           res.json({
@@ -4263,11 +4286,13 @@ app.post("/transactions", (req, res) => {
   const {
     transaction_date,
     amount,
-    account_id,
+    credit_account_id,
     description,
-    payment_method_id,
+    debit_account_id,
   } = req.body;
-
+  account_id=credit_account_id
+  payment_method_id = debit_account_id
+console.log("account id",account_id)
   const reference_number = `TXN${Date.now()}`;
   const date = transaction_date;
   const transaction_description = description || "Transaction entry";
@@ -5940,22 +5965,23 @@ app.get("/reports/balance-sheet", async (req, res) => {
 
 app.get("/reports/trial-balance", (req, res) => {
   try {
-    // Query to calculate total debits and credits for each account
     const query = `
- SELECT
-  c.id,
-  c.account_name,
-  c.parent_account_id,
-  SUM(jel.debit) AS debit,
-  SUM(jel.credit) AS credit
-FROM
-  chart_of_accounts c
-LEFT JOIN
-  journal_entry_lines jel ON jel.account_id = c.id
-GROUP BY
-  c.id, c.account_name, c.parent_account_id
-ORDER BY
-  COALESCE(c.parent_account_id, c.id), c.id;
+    SELECT
+      c.id,
+      c.account_name,
+      c.parent_account_id,
+      SUM(jel.debit) AS debit,
+      SUM(jel.credit) AS credit
+    FROM
+      chart_of_accounts c
+    LEFT JOIN
+      journal_entry_lines jel ON jel.account_id = c.id
+    WHERE
+      c.account_type != 'adjustment' 
+    GROUP BY
+      c.id, c.account_name, c.parent_account_id
+    ORDER BY
+      COALESCE(c.parent_account_id, c.id), c.id;
     `;
 
     db.all(query, [], (err, rows) => {

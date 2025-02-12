@@ -380,7 +380,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative max-h-[calc(100vh-100px)] overflow-y-scroll">
       {/* Search and Cart UI */}
       <div className="sticky top-0 z-2 p-4 bg-gray-800 text-white">
         <div className="flex justify-end items-center">
@@ -415,7 +415,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
         </div>
       </div>
 
-      <div className="overflow-y-auto h-[calc(100vh-8rem)] p-4 pl-20">
+      <div className="overflow-y-auto p-4 pl-20">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
