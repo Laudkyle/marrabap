@@ -94,7 +94,7 @@ const generateRefreshToken = (user) => {
 
 // REGISTER
 // REGISTER NEW USER (Only Admins)
-app.post("/register", authenticateUser, async (req, res) => {
+app.post("/register", authenticateUser,async(req, res) => {
   const { email, username, phone, password } = req.body;
   
   // Ensure only admins can register users
@@ -146,7 +146,7 @@ app.post("/login", (req, res) => {
 });
 
 // REFRESH TOKEN
-app.post("/refresh", (req, res) => {
+app.post("/refresh",authenticateUser, (req, res) => {
   const refreshToken = req.cookies.refreshToken;
   if (!refreshToken)
     return res.status(403).json({ error: "Refresh token required." });
@@ -194,7 +194,7 @@ app.get("/products", (req, res) => {
 });
 
 // Get a specific product by ID with quantity in stock from inventory
-app.get("/products/:id", (req, res) => {
+app.get("/products/:id", authenticateUser,(req, res) => {
   const { id } = req.params;
   const query = `
     SELECT 
@@ -223,7 +223,7 @@ app.get("/products/:id", (req, res) => {
   });
 });
 
-app.post("/products/bulk", (req, res) => {
+app.post("/products/bulk",authenticateUser,(req, res) => {
   const { suppliers_id, products } = req.body;
 
   // Validate input
@@ -330,7 +330,7 @@ app.post("/products/bulk", (req, res) => {
 });
 
 // Add a new product
-app.post("/products", upload.single("image"), (req, res) => {
+app.post("/products", upload.single("image"),authenticateUser, (req, res) => {
   const { name, cp, sp, suppliers_id } = req.body;
   const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
 
@@ -362,7 +362,7 @@ app.post("/products", upload.single("image"), (req, res) => {
 });
 
 // Update a product
-app.put("/products/:id", upload.single("image"), (req, res) => {
+app.put("/products/:id", upload.single("image"), authenticateUser,(req, res) => {
   const { id } = req.params;
   const { name, cp, sp, suppliers_id } = req.body;
   const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
@@ -420,7 +420,7 @@ app.put("/products/:id", upload.single("image"), (req, res) => {
 });
 
 // Delete a product
-app.delete("/products/:id", (req, res) => {
+app.delete("/products/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
     if (err) {
@@ -436,7 +436,7 @@ app.delete("/products/:id", (req, res) => {
 
 // ===================== Inventoty Endpoints =====================
 /// Create Inventory
-app.post("/inventory", (req, res) => {
+app.post("/inventory",authenticateUser, (req, res) => {
   const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
   if (!product_id || !quantity_in_stock || !cost_per_unit) {
@@ -459,7 +459,7 @@ app.post("/inventory", (req, res) => {
 });
 
 // Read All Inventory Items
-app.get("/inventory", (req, res) => {
+app.get("/inventory",authenticateUser, (req, res) => {
   db.all("SELECT * FROM inventory", [], (err, rows) => {
     if (err) {
       return res.status(500).send("Failed to retrieve inventory.");
@@ -469,7 +469,7 @@ app.get("/inventory", (req, res) => {
 });
 
 // Read Single Inventory Item by ID
-app.get("/inventory/:id", (req, res) => {
+app.get("/inventory/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get("SELECT * FROM inventory WHERE id = ?", [id], (err, row) => {
@@ -484,7 +484,7 @@ app.get("/inventory/:id", (req, res) => {
 });
 
 // Update Inventory
-app.put("/inventory/:id", (req, res) => {
+app.put("/inventory/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
@@ -510,7 +510,7 @@ app.put("/inventory/:id", (req, res) => {
 });
 
 // Delete Inventory Item
-app.delete("/inventory/:id", (req, res) => {
+app.delete("/inventory/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   const stmt = db.prepare("DELETE FROM inventory WHERE id = ?");
@@ -527,7 +527,7 @@ app.delete("/inventory/:id", (req, res) => {
 });
 
 // ===================== Purchase order Endpoints =====================
-app.post("/purchase_orders", (req, res) => {
+app.post("/purchase_orders",authenticateUser, (req, res) => {
   const { reference_number, supplier_id, total_amount, status, items } =
     req.body;
   if (!Array.isArray(items) || items.length === 0) {
@@ -605,7 +605,7 @@ app.get("/purchase_orders", (req, res) => {
 });
 
 // Get a single purchase order by ID
-app.get("/purchase_orders/:id", (req, res) => {
+app.get("/purchase_orders/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get("SELECT * FROM purchase_orders WHERE id = ?", [id], (err, row) => {
@@ -620,7 +620,7 @@ app.get("/purchase_orders/:id", (req, res) => {
   });
 });
 
-app.patch("/purchase_orders/:id/order_status", async (req, res) => {
+app.patch("/purchase_orders/:id/order_status",authenticateUser, async(req, res) => {
   const { id } = req.params;
   const { order_status, reference_number } = req.body;
   const user_id = 1; // Replace with actual logged-in user ID
@@ -855,7 +855,7 @@ app.patch("/purchase_orders/:id/order_status", async (req, res) => {
   }
 });
 // Update a purchase order
-app.put("/purchase_orders/:id", (req, res) => {
+app.put("/purchase_orders/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { reference_number, supplier_id, total_amount } = req.body;
   const query =
@@ -882,7 +882,7 @@ app.put("/purchase_orders/:id", (req, res) => {
 });
 
 // Delete a purchase order
-app.delete("/purchase_orders/:id", async (req, res) => {
+app.delete("/purchase_orders/:id",authenticateUser, async(req, res) => {
   const { id } = req.params;
 
   // Get the purchase order details before deleting
@@ -934,7 +934,7 @@ app.delete("/purchase_orders/:id", async (req, res) => {
 });
 
 // Get purchase order details by purchase order ID
-app.get("/purchase_orders/:id/details", (req, res) => {
+app.get("/purchase_orders/:id/details",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.all(
@@ -1081,7 +1081,7 @@ app.post(
 
 // ===================== Accounts Endpoints =====================
 // Get all accounts
-app.get("/accounts", (req, res) => {
+app.get("/accounts",authenticateUser, (req, res) => {
   db.all("SELECT * FROM chart_of_accounts", [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -1090,7 +1090,7 @@ app.get("/accounts", (req, res) => {
     }
   });
 });
-app.post("/accounts", (req, res) => {
+app.post("/accounts",authenticateUser, (req, res) => {
   const { account_name, account_type, balance, parent_account_id } = req.body;
 
   if (!account_name || !account_type) {
@@ -1231,7 +1231,7 @@ app.post("/accounts", (req, res) => {
 });
 
 // Delete an account
-app.delete("/accounts/:id", (req, res) => {
+app.delete("/accounts/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.run("DELETE FROM chart_of_accounts WHERE id = ?", id, function (err) {
@@ -1242,7 +1242,7 @@ app.delete("/accounts/:id", (req, res) => {
     }
   });
 });
-app.put("/accounts/:id", (req, res) => {
+app.put("/accounts/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { account_name, account_type, balance, parent_account_id } = req.body;
 
@@ -1529,7 +1529,7 @@ const updateParentBalance = (parentId, callback) => {
 // ===================== Draft Endpoints =====================
 
 // Get all drafts
-app.get("/drafts", (req, res) => {
+app.get("/drafts",authenticateUser, (req, res) => {
   db.all("SELECT * FROM drafts ORDER BY date DESC", (err, rows) => {
     if (err) {
       console.error("Error fetching drafts:", err.message);
@@ -1541,7 +1541,7 @@ app.get("/drafts", (req, res) => {
 });
 
 // Get a specific draft by ID
-app.get("/drafts/:id", (req, res) => {
+app.get("/drafts/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM drafts WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -1556,7 +1556,7 @@ app.get("/drafts/:id", (req, res) => {
 });
 
 // Add a new draft
-app.post("/drafts", (req, res) => {
+app.post("/drafts",authenticateUser, (req, res) => {
   const { referenceNumber, details, date, status } = req.body;
 
   if (!referenceNumber || !details || !date) {
@@ -1588,7 +1588,7 @@ app.post("/drafts", (req, res) => {
 });
 
 // Update a draft
-app.put("/drafts/:id", (req, res) => {
+app.put("/drafts/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { referenceNumber, details, date, status } = req.body;
 
@@ -1633,7 +1633,7 @@ app.put("/drafts/:id", (req, res) => {
 });
 
 // Delete a draft
-app.delete("/drafts/:id", (req, res) => {
+app.delete("/drafts/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM drafts WHERE id = ?", [id], function (err) {
     if (err) {
@@ -1649,7 +1649,7 @@ app.delete("/drafts/:id", (req, res) => {
 // ===================== Invoice Endpoints =====================
 
 // Create invoice (POST request)
-app.post("/invoices", (req, res) => {
+app.post("/invoices",authenticateUser, (req, res) => {
   const {
     reference_number,
     customer_id,
@@ -1685,7 +1685,7 @@ app.post("/invoices", (req, res) => {
 });
 
 // Get all invoices (GET request)
-app.get("/invoices", (req, res) => {
+app.get("/invoices",authenticateUser, (req, res) => {
   const sql = "SELECT * FROM invoices";
 
   db.all(sql, [], (err, rows) => {
@@ -1698,7 +1698,7 @@ app.get("/invoices", (req, res) => {
 });
 
 // Get a single invoice by reference_number (GET request)
-app.get("/invoices/:reference_number", (req, res) => {
+app.get("/invoices/:reference_number",authenticateUser, (req, res) => {
   const { reference_number } = req.params;
 
   const sql = "SELECT * FROM invoices WHERE reference_number = ?";
@@ -1714,7 +1714,7 @@ app.get("/invoices/:reference_number", (req, res) => {
   });
 });
 // Get invoices by customer and status (unpaid or partial)
-app.get("/invoices/customer/:customer_id", (req, res) => {
+app.get("/invoices/customer/:customer_id",authenticateUser, (req, res) => {
   const { customer_id } = req.params;
   const sql =
     'SELECT * FROM invoices WHERE customer_id = ? AND (status = "unpaid" OR status = "partial")';
@@ -1729,7 +1729,7 @@ app.get("/invoices/customer/:customer_id", (req, res) => {
 });
 
 // Update an invoice (PUT request)
-app.put("/invoices/:reference_number", (req, res) => {
+app.put("/invoices/:reference_number",authenticateUser, (req, res) => {
   const { reference_number } = req.params;
   const { total_amount, amount_paid, due_date, status } = req.body;
 
@@ -1755,7 +1755,7 @@ app.put("/invoices/:reference_number", (req, res) => {
 });
 
 // Delete an invoice (DELETE request)
-app.delete("/invoices/:reference_number", (req, res) => {
+app.delete("/invoices/:reference_number",authenticateUser, (req, res) => {
   const { reference_number } = req.params;
 
   const sql = "DELETE FROM invoices WHERE reference_number = ?";
@@ -1772,7 +1772,7 @@ app.delete("/invoices/:reference_number", (req, res) => {
 });
 
 // ===================== Supplier Payments Endpoints =====================
-app.post("/supplier_payments", (req, res) => {
+app.post("/supplier_payments",authenticateUser, (req, res) => {
   const {
     supplier_id,
     purchase_order_id,
@@ -1863,7 +1863,7 @@ app.post("/supplier_payments", (req, res) => {
 });
 
 // READ: Get all supplier payments
-app.get("/supplier_payments", (req, res) => {
+app.get("/supplier_payments",authenticateUser, (req, res) => {
   const query = "SELECT * FROM supplier_payments";
 
   db.all(query, [], (err, rows) => {
@@ -1875,7 +1875,7 @@ app.get("/supplier_payments", (req, res) => {
   });
 });
 // READ: Get a specific supplier payment by ID
-app.get("/supplier_payments/:id", (req, res) => {
+app.get("/supplier_payments/:id",authenticateUser, (req, res) => {
   const query = "SELECT * FROM supplier_payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -1891,7 +1891,7 @@ app.get("/supplier_payments/:id", (req, res) => {
   });
 });
 // UPDATE: Update a supplier payment
-app.put("/supplier_payments/:id", (req, res) => {
+app.put("/supplier_payments/:id",authenticateUser, (req, res) => {
   const {
     supplier_id,
     purchase_order_id,
@@ -1926,7 +1926,7 @@ app.put("/supplier_payments/:id", (req, res) => {
   });
 });
 // DELETE: Delete a supplier payment
-app.delete("/supplier_payments/:id", (req, res) => {
+app.delete("/supplier_payments/:id",authenticateUser, (req, res) => {
   const query = "DELETE FROM supplier_payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -1943,7 +1943,7 @@ app.delete("/supplier_payments/:id", (req, res) => {
 });
 
 // ===================== Payments Methods Endpoints =====================
-app.post("/payment-methods", (req, res) => {
+app.post("/payment-methods",authenticateUser, (req, res) => {
   const { name, account_id, description } = req.body;
 
   if (!name || !account_id) {
@@ -1964,7 +1964,7 @@ app.post("/payment-methods", (req, res) => {
       .send({ id: this.lastID, message: "Payment method created." });
   });
 });
-app.get("/payment-methods", (req, res) => {
+app.get("/payment-methods",authenticateUser, (req, res) => {
   const query = `
     SELECT 
       pm.id, 
@@ -1985,7 +1985,7 @@ app.get("/payment-methods", (req, res) => {
     res.status(200).json(rows);
   });
 });
-app.get("/payment-methods/:id", (req, res) => {
+app.get("/payment-methods/:id",authenticateUser, (req, res) => {
   const query = `
     SELECT 
       pm.id, 
@@ -2008,7 +2008,7 @@ app.get("/payment-methods/:id", (req, res) => {
     res.status(200).json(row);
   });
 });
-app.put("/payment-methods/:id", (req, res) => {
+app.put("/payment-methods/:id",authenticateUser, (req, res) => {
   const { name, account_id, description, is_active } = req.body;
 
   if (!name && !account_id && !description && is_active == null) {
@@ -2039,7 +2039,7 @@ app.put("/payment-methods/:id", (req, res) => {
     }
   );
 });
-app.delete("/payment-methods/:id", (req, res) => {
+app.delete("/payment-methods/:id",authenticateUser, (req, res) => {
   const query = "DELETE FROM payment_methods WHERE id = ?";
   db.run(query, [req.params.id], function (err) {
     if (err) {
@@ -2053,7 +2053,7 @@ app.delete("/payment-methods/:id", (req, res) => {
 });
 
 // ===================== Payments Endpoints =====================
-app.post("/payments", (req, res) => {
+app.post("/payments",authenticateUser, (req, res) => {
   const {
     customerId,
     reference_number,
@@ -2170,7 +2170,7 @@ app.post("/payments", (req, res) => {
 });
 
 // READ: Get all payments
-app.get("/payments", (req, res) => {
+app.get("/payments",authenticateUser, (req, res) => {
   const query = "SELECT * FROM payments";
 
   db.all(query, [], (err, rows) => {
@@ -2183,7 +2183,7 @@ app.get("/payments", (req, res) => {
 });
 
 // READ: Get a specific payment by ID
-app.get("/payments/:id", (req, res) => {
+app.get("/payments/:id",authenticateUser, (req, res) => {
   const query = "SELECT * FROM payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -2200,7 +2200,7 @@ app.get("/payments/:id", (req, res) => {
 });
 
 // UPDATE: Update a payment
-app.put("/payments/:id", (req, res) => {
+app.put("/payments/:id",authenticateUser, (req, res) => {
   const {
     reference_number,
     payment_date,
@@ -2236,7 +2236,7 @@ app.put("/payments/:id", (req, res) => {
 });
 
 // DELETE: Delete a payment
-app.delete("/payments/:id", (req, res) => {
+app.delete("/payments/:id",authenticateUser, (req, res) => {
   const query = "DELETE FROM payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -2253,7 +2253,7 @@ app.delete("/payments/:id", (req, res) => {
 });
 
 // ===================== Sales Endpoints =====================
-app.post("/sales", async (req, res) => {
+app.post("/sales",authenticateUser, async(req, res) => {
   const salesData = Array.isArray(req.body) ? req.body : [req.body];
 
   const dbPromise = new Promise((resolve, reject) => {
@@ -2585,7 +2585,7 @@ app.get("/sales", (req, res) => {
   );
 });
 
-app.post("/sales-return", async (req, res) => {
+app.post("/sales-return",authenticateUser, async(req, res) => {
   const returnData = req.body;
 
   // Ensure returnData is an array
@@ -2750,7 +2750,7 @@ app.post("/sales-return", async (req, res) => {
 });
 
 // Get All Sales Returns
-app.get("/sales/returns", async (req, res) => {
+app.get("/sales/returns", async(req, res) => {
   try {
     db.all("SELECT * FROM returns", (err, rows) => {
       if (err) {
@@ -2767,7 +2767,7 @@ app.get("/sales/returns", async (req, res) => {
 });
 
 // Get Single Return by ID
-app.get("/sales/returns/:id", async (req, res) => {
+app.get("/sales/returns/:id", async(req, res) => {
   const { id } = req.params;
 
   try {
@@ -2792,7 +2792,7 @@ app.get("/sales/returns/:id", async (req, res) => {
 // ===================== Suppliers Endpoints =====================
 
 // Get all suppliers
-app.get("/suppliers", (req, res) => {
+app.get("/suppliers",authenticateUser, (req, res) => {
   db.all("SELECT * FROM suppliers", (err, rows) => {
     if (err) {
       console.error(err);
@@ -2804,7 +2804,7 @@ app.get("/suppliers", (req, res) => {
 });
 
 // Get a specific supplier by ID
-app.get("/suppliers/:id", (req, res) => {
+app.get("/suppliers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM suppliers WHERE contact_id = ?", [id], (err, row) => {
     if (err) {
@@ -2817,7 +2817,7 @@ app.get("/suppliers/:id", (req, res) => {
     }
   });
 });
-app.post("/suppliers", (req, res) => {
+app.post("/suppliers",authenticateUser, (req, res) => {
   const {
     type,
     contact_id,
@@ -2943,7 +2943,7 @@ app.post("/suppliers", (req, res) => {
     }
   );
 });
-app.put("/suppliers/:id", (req, res) => {
+app.put("/suppliers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     type,
@@ -3078,7 +3078,7 @@ app.put("/suppliers/:id", (req, res) => {
 });
 
 // Delete a supplier
-app.delete("/suppliers/:id", (req, res) => {
+app.delete("/suppliers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM suppliers WHERE contact_id = ?", [id], function (err) {
     if (err) {
@@ -3093,7 +3093,7 @@ app.delete("/suppliers/:id", (req, res) => {
 });
 
 // Get all purchase orders for a specific supplier
-app.get("/suppliers/purchase_orders/:supplierId", (req, res) => {
+app.get("/suppliers/purchase_orders/:supplierId",authenticateUser, (req, res) => {
   const { supplierId } = req.params;
 
   const query = `
@@ -3115,7 +3115,7 @@ app.get("/suppliers/purchase_orders/:supplierId", (req, res) => {
 });
 
 // Update supplier active status
-app.patch("/suppliers/:id", (req, res) => {
+app.patch("/suppliers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { active_status } = req.body;
 
@@ -3137,7 +3137,7 @@ app.patch("/suppliers/:id", (req, res) => {
 // ===================== Documents Endpoints =====================
 
 // CREATE: Add multiple or single documents
-app.post("/documents", documentUpload.array("files"), async (req, res) => {
+app.post("/documents", documentUpload.array("files"),authenticateUser, async(req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ message: "No files uploaded" });
   }
@@ -3178,7 +3178,7 @@ app.post("/documents", documentUpload.array("files"), async (req, res) => {
 });
 
 // READ: Get all documents
-app.get("/documents", (req, res) => {
+app.get("/documents",authenticateUser, (req, res) => {
   const query = `SELECT * FROM documents`;
   db.all(query, [], (err, rows) => {
     if (err) {
@@ -3189,7 +3189,7 @@ app.get("/documents", (req, res) => {
 });
 
 // READ: Get a document by ID
-app.get("/documents/:id", (req, res) => {
+app.get("/documents/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `SELECT * FROM documents WHERE id = ?`;
   db.get(query, [id], (err, row) => {
@@ -3204,7 +3204,7 @@ app.get("/documents/:id", (req, res) => {
 });
 
 // DELETE: Delete a document by ID
-app.delete("/documents/:id", (req, res) => {
+app.delete("/documents/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `DELETE FROM documents WHERE id = ?`;
   db.run(query, [id], function (err) {
@@ -3218,7 +3218,7 @@ app.delete("/documents/:id", (req, res) => {
   });
 });
 
-app.get("/documents/by-reference/:referenceNumber", (req, res) => {
+app.get("/documents/by-reference/:referenceNumber",authenticateUser, (req, res) => {
   const { referenceNumber } = req.params;
   const query = `SELECT * FROM documents WHERE reference_number = ?`;
 
@@ -3233,7 +3233,7 @@ app.get("/documents/by-reference/:referenceNumber", (req, res) => {
 // ===================== Customers Endpoints =====================
 
 // Get all customers
-app.get("/customers", (req, res) => {
+app.get("/customers",authenticateUser, (req, res) => {
   db.all("SELECT * FROM customers", (err, rows) => {
     if (err) {
       console.error(err);
@@ -3245,7 +3245,7 @@ app.get("/customers", (req, res) => {
 });
 
 // Get a specific customer by ID
-app.get("/customers/:id", (req, res) => {
+app.get("/customers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM customers WHERE contact_id = ?", [id], (err, row) => {
     if (err) {
@@ -3259,7 +3259,7 @@ app.get("/customers/:id", (req, res) => {
   });
 });
 
-app.post("/customers", (req, res) => {
+app.post("/customers",authenticateUser, (req, res) => {
   const {
     contact_id,
     customer_type,
@@ -3409,7 +3409,7 @@ app.post("/customers", (req, res) => {
   );
 });
 
-app.put("/customers/:id", (req, res) => {
+app.put("/customers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     contact_id,
@@ -3607,7 +3607,7 @@ app.put("/customers/:id", (req, res) => {
 });
 
 // Delete a customer
-app.delete("/customers/:id", (req, res) => {
+app.delete("/customers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM customers WHERE contact_id = ?", [id], function (err) {
     if (err) {
@@ -3621,7 +3621,7 @@ app.delete("/customers/:id", (req, res) => {
   });
 });
 // Update customer active status
-app.patch("/customers/:id", (req, res) => {
+app.patch("/customers/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { active_status } = req.body;
 
@@ -3758,7 +3758,7 @@ const createJournalEntry = (adjustment) => {
 };
 
 // CREATE ADJUSTMENT
-app.post("/adjustments", (req, res) => {
+app.post("/adjustments",authenticateUser, (req, res) => {
   const {
     account_id,
     adjustment_type,
@@ -3832,7 +3832,7 @@ app.post("/adjustments", (req, res) => {
 });
 
 // READ ADJUSTMENTS
-app.get("/adjustments", (req, res) => {
+app.get("/adjustments",authenticateUser, (req, res) => {
   const { startDate, endDate, type, account, status } = req.query;
 
   let query = `
@@ -3876,7 +3876,7 @@ app.get("/adjustments", (req, res) => {
 });
 
 // UPDATE ADJUSTMENT
-app.put("/adjustments/:id", (req, res) => {
+app.put("/adjustments/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     account_id,
@@ -3953,7 +3953,7 @@ app.put("/adjustments/:id", (req, res) => {
 });
 
 // DELETE ADJUSTMENT
-app.delete("/adjustments/:id", (req, res) => {
+app.delete("/adjustments/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get(`SELECT * FROM adjustments WHERE id = ?`, [id], (err, adjustment) => {
@@ -4005,7 +4005,7 @@ app.delete("/adjustments/:id", (req, res) => {
 });
 
 // ===================== Funds Transfer Endpoints =====================
-app.post("/funds-transfer", (req, res) => {
+app.post("/funds-transfer",authenticateUser, (req, res) => {
   const { fromAccount, toAccount, amount, description, date } = req.body;
   const user_id = 1;
 
@@ -4103,7 +4103,7 @@ app.post("/funds-transfer", (req, res) => {
 });
 
 // GET ALL FUNDS TRANSFERS
-app.get("/funds-transfer", (req, res) => {
+app.get("/funds-transfer",authenticateUser, (req, res) => {
   db.all(
     `SELECT ft.id, ft.reference_number, ft.date, ft.amount, ft.description, ft.status,
             ca_from.account_name AS from_account, 
@@ -4118,7 +4118,7 @@ app.get("/funds-transfer", (req, res) => {
   );
 });
 
-app.post("/funds-transfer/reverse/:id", (req, res) => {
+app.post("/funds-transfer/reverse/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const user_id = 1;
   db.get(
@@ -4215,7 +4215,7 @@ app.post("/funds-transfer/reverse/:id", (req, res) => {
 });
 
 // DELETE FUNDS TRANSFER
-app.delete("/funds-transfer/:id", (req, res) => {
+app.delete("/funds-transfer/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get(
@@ -4255,7 +4255,7 @@ app.delete("/funds-transfer/:id", (req, res) => {
 // ===================== Customer Groups Endpoints =====================
 
 // Get all customer groups
-app.get("/customer_groups", (req, res) => {
+app.get("/customer_groups",authenticateUser, (req, res) => {
   db.all("SELECT * FROM customer_groups", (err, rows) => {
     if (err) {
       console.error(err);
@@ -4267,7 +4267,7 @@ app.get("/customer_groups", (req, res) => {
 });
 
 // Get a specific customer group by ID
-app.get("/customer_groups/:id", (req, res) => {
+app.get("/customer_groups/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM customer_groups WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -4282,7 +4282,7 @@ app.get("/customer_groups/:id", (req, res) => {
 });
 
 // Add a new customer group
-app.post("/customer_groups", (req, res) => {
+app.post("/customer_groups",authenticateUser, (req, res) => {
   const {
     group_name,
     discount,
@@ -4321,7 +4321,7 @@ app.post("/customer_groups", (req, res) => {
 });
 
 // Update a customer group
-app.put("/customer_groups/:id", (req, res) => {
+app.put("/customer_groups/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     group_name,
@@ -4387,7 +4387,7 @@ app.put("/customer_groups/:id", (req, res) => {
 });
 
 // Delete a customer group
-app.delete("/customer_groups/:id", (req, res) => {
+app.delete("/customer_groups/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM customer_groups WHERE id = ?", [id], function (err) {
     if (err) {
@@ -4402,7 +4402,7 @@ app.delete("/customer_groups/:id", (req, res) => {
 });
 
 // Update customer group active status
-app.patch("/customer_groups/:id", (req, res) => {
+app.patch("/customer_groups/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { active_status } = req.body;
 
@@ -4423,7 +4423,7 @@ app.patch("/customer_groups/:id", (req, res) => {
 
 // ===================== Server Initialization =====================
 // CREATE - Add a new tax
-app.post("/taxes", async (req, res) => {
+app.post("/taxes",authenticateUser, async(req, res) => {
   const { tax_name, tax_rate, tax_type, account_code } = req.body;
 
   // Validate required fields
@@ -4492,7 +4492,7 @@ app.post("/taxes", async (req, res) => {
 });
 
 // READ - Get all taxes
-app.get("/taxes", (req, res) => {
+app.get("/taxes",authenticateUser, (req, res) => {
   db.all(
     `SELECT t.id, t.tax_name, t.tax_rate, t.tax_type, coa.account_code, coa.account_name, coa.account_type
      FROM taxes t
@@ -4510,7 +4510,7 @@ app.get("/taxes", (req, res) => {
 });
 
 // READ - Get a single tax by ID
-app.get("/taxes/:id", (req, res) => {
+app.get("/taxes/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get(
@@ -4533,7 +4533,7 @@ app.get("/taxes/:id", (req, res) => {
 });
 
 // UPDATE - Update a tax
-app.put("/taxes/:id", async (req, res) => {
+app.put("/taxes/:id",authenticateUser, async(req, res) => {
   const { id } = req.params;
   const { tax_name, tax_rate, tax_type, account_code } = req.body;
 
@@ -4609,7 +4609,7 @@ app.put("/taxes/:id", async (req, res) => {
 });
 
 // DELETE - Delete a tax
-app.delete("/taxes/:id", (req, res) => {
+app.delete("/taxes/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.run("DELETE FROM taxes WHERE id = ?", [id], function (err) {
@@ -4628,7 +4628,7 @@ app.delete("/taxes/:id", (req, res) => {
 
 // ==================== CREATE TRANSACTION ====================
 // ✅ 1. Get all transactions
-app.get("/transactions", (req, res) => {
+app.get("/transactions",authenticateUser, (req, res) => {
   db.all(
     "SELECT * FROM transactions ORDER BY transaction_date DESC",
     [],
@@ -4642,7 +4642,7 @@ app.get("/transactions", (req, res) => {
 });
 
 // ✅ 2. Get a single transaction by ID
-app.get("/transactions/:id", (req, res) => {
+app.get("/transactions/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM transactions WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -4656,7 +4656,7 @@ app.get("/transactions/:id", (req, res) => {
 });
 
 // ✅ 3. Create a new transaction
-app.post("/transactions", (req, res) => {
+app.post("/transactions",authenticateUser, (req, res) => {
   const {
     transaction_date,
     amount,
@@ -4782,7 +4782,7 @@ app.post("/transactions", (req, res) => {
   );
 });
 
-app.put("/transactions/:id", (req, res) => {
+app.put("/transactions/:id",authenticateUser, (req, res) => {
   const transactionId = req.params.id;
   const {
     transaction_date,
@@ -4978,7 +4978,7 @@ app.put("/transactions/:id", (req, res) => {
 });
 
 // ✅ 5. Delete a transaction
-app.delete("/transactions/:id", (req, res) => {
+app.delete("/transactions/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM transactions WHERE id = ?", [id], function (err) {
     if (err) {
@@ -4993,7 +4993,7 @@ app.delete("/transactions/:id", (req, res) => {
 // ==================== CREATE PROCESS PAYMENT ====================
 
 // ✅ 1. Get all payments
-app.get("/processpayment", (req, res) => {
+app.get("/processpayment",authenticateUser, (req, res) => {
   db.all(
     `SELECT p.*, a.account_name AS account_name, pm.account_name AS payment_method_name 
      FROM processpayments p
@@ -5011,7 +5011,7 @@ app.get("/processpayment", (req, res) => {
 });
 
 // ✅ 2. Get a single payment by ID
-app.get("/processpayment/:id", (req, res) => {
+app.get("/processpayment/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM payments WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -5025,7 +5025,7 @@ app.get("/processpayment/:id", (req, res) => {
 });
 
 // ✅ 3. Create a new payment
-app.post("/processpayment", (req, res) => {
+app.post("/processpayment",authenticateUser, (req, res) => {
   const { payment_date, amount, account_id, payment_method_id, description } =
     req.body;
 
@@ -5174,7 +5174,7 @@ app.post("/processpayment", (req, res) => {
 });
 
 // ✅ 4. Update a payment
-app.put("/processpayment/:id", (req, res) => {
+app.put("/processpayment/:id",authenticateUser, (req, res) => {
   const paymentId = req.params.id;
   const { payment_date, amount, account_id, payment_method_id, description } =
     req.body;
@@ -5278,7 +5278,7 @@ app.put("/processpayment/:id", (req, res) => {
 });
 
 // ✅ 5. Delete a payment
-app.delete("/processpayment/:id", (req, res) => {
+app.delete("/processpayment/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM processpayments WHERE id = ?", [id], function (err) {
     if (err) {
@@ -5291,7 +5291,7 @@ app.delete("/processpayment/:id", (req, res) => {
   });
 });
 // ==================== CREATE EXPENSE ====================
-app.post("/expenses", (req, res) => {
+app.post("/expenses",authenticateUser, (req, res) => {
   const {
     expense_date,
     amount,
@@ -5454,7 +5454,7 @@ function createExpenseInvoice(expense_id, total_amount, payment_method, res) {
 }
 
 // ==================== READ EXPENSES ====================
-app.get("/expenses", (req, res) => {
+app.get("/expenses",authenticateUser, (req, res) => {
   const query = `
     SELECT e.*, ei.status, ei.balance_due
     FROM expenses e
@@ -5472,7 +5472,7 @@ app.get("/expenses", (req, res) => {
 });
 
 // ==================== READ SINGLE EXPENSE ====================
-app.get("/expenses/:id", (req, res) => {
+app.get("/expenses/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `SELECT * FROM expenses WHERE id = ?`;
 
@@ -5490,7 +5490,7 @@ app.get("/expenses/:id", (req, res) => {
   });
 });
 
-app.put("/expenses/pay/:id", (req, res) => {
+app.put("/expenses/pay/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { payment_method_id, payAmount } = req.body;
 
@@ -5608,7 +5608,7 @@ app.put("/expenses/pay/:id", (req, res) => {
   );
 });
 // ==================== UPDATE EXPENSE ====================
-app.put("/expenses/:id", (req, res) => {
+app.put("/expenses/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     expense_date,
@@ -5778,7 +5778,7 @@ function updateExpenseInvoice(invoice_id, amount, res, callback) {
   );
 }
 
-app.patch("/expenses/payment/:id", (req, res) => {
+app.patch("/expenses/payment/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { payment_method_id, amount } = req.body;
 
@@ -5857,7 +5857,7 @@ app.patch("/expenses/payment/:id", (req, res) => {
 });
 
 // ==================== DELETE EXPENSE ====================
-app.delete("/expenses/:id", (req, res) => {
+app.delete("/expenses/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   // Step 1: Get journal entry ID for the expense
@@ -6018,7 +6018,7 @@ function deleteExpenseAndInvoice(journal_entry_id, expense_id, res) {
 }
 
 // 🔹 Get All Invoices
-app.get("/expense-invoices", (req, res) => {
+app.get("/expense-invoices",authenticateUser, (req, res) => {
   db.all("SELECT * FROM expense_invoices", [], (err, rows) => {
     if (err) {
       console.error("Error fetching invoices:", err.message);
@@ -6029,7 +6029,7 @@ app.get("/expense-invoices", (req, res) => {
 });
 
 // 🔹 Get Single Invoice by ID
-app.get("/expense-invoices/:id", (req, res) => {
+app.get("/expense-invoices/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM expense_invoices WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -6042,7 +6042,7 @@ app.get("/expense-invoices/:id", (req, res) => {
 });
 
 // 🔹 Create New Invoice
-app.post("/expense-invoices", (req, res) => {
+app.post("/expense-invoices",authenticateUser, (req, res) => {
   const { expense_id, total_amount } = req.body;
   if (!expense_id || !total_amount) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -6066,7 +6066,7 @@ app.post("/expense-invoices", (req, res) => {
 });
 
 // 🔹 Update Invoice (Payment)
-app.put("/expense-invoices/:id", (req, res) => {
+app.put("/expense-invoices/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { amount_paid } = req.body;
 
@@ -6095,7 +6095,7 @@ app.put("/expense-invoices/:id", (req, res) => {
 });
 
 // 🔹 Delete Invoice
-app.delete("/expense-invoices/:id", (req, res) => {
+app.delete("/expense-invoices/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM expense_invoices WHERE id = ?", [id], function (err) {
     if (err) {
@@ -6107,7 +6107,7 @@ app.delete("/expense-invoices/:id", (req, res) => {
 });
 
 // ===================== income statement =====================
-app.get("/reports/income-statement", (req, res) => {
+app.get("/reports/income-statement",authenticateUser, (req, res) => {
   const { date } = req.query; // Get date from query parameter
 
   if (!date) {
@@ -6177,7 +6177,7 @@ app.get("/reports/income-statement", (req, res) => {
   }
 });
 
-app.get("/reports/balance-sheet", async (req, res) => {
+app.get("/reports/balance-sheet",authenticateUser, async(req, res) => {
   const { date } = req.query; // Extract the date from the query parameters
 
   // Validate the date
@@ -6337,7 +6337,7 @@ app.get("/reports/balance-sheet", async (req, res) => {
   }
 });
 
-app.get("/reports/trial-balance", (req, res) => {
+app.get("/reports/trial-balance",authenticateUser, (req, res) => {
   try {
     const query = `
     SELECT
@@ -6373,7 +6373,7 @@ app.get("/reports/trial-balance", (req, res) => {
 });
 // API endpoint to fetch ledger with balances
 
-app.get("/ledger", (req, res) => {
+app.get("/ledger",authenticateUser, (req, res) => {
   const { accountId, startDate, endDate } = req.query;
 
   if (!accountId || !startDate || !endDate) {
@@ -6433,7 +6433,7 @@ app.get("/ledger", (req, res) => {
 });
 
 // API endpoint to fetch chart of accounts with balances
-app.get("/chart-of-accounts", (req, res) => {
+app.get("/chart-of-accounts",authenticateUser, (req, res) => {
   try {
     const query = `
       WITH RECURSIVE AccountHierarchy AS (

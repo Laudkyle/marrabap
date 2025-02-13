@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify";
 
 const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
@@ -20,7 +20,7 @@ const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
     const fetchInvoices = async () => {
       if (customerId) {
         try {
-          const response = await axios.get(
+          const response = await API.get(
             `http://localhost:5000/invoices?customerId=${customerId}`
           );
           const filteredInvoices = response.data.filter(
@@ -96,7 +96,7 @@ const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
     };
 
     try {
-      await axios.post("http://localhost:5000/payments", paymentPayload);
+      await API.post("http://localhost:5000/payments", paymentPayload);
       toast.success("Payment processed successfully.");
       onClose();
     } catch (error) {

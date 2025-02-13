@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -18,7 +18,7 @@ const EditProduct = ({ onProductUpdated }) => {
     // Fetch all products
     const fetchProducts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/products");
+        const response = await API.get("http://localhost:5000/products");
         setProducts(response.data);
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -69,7 +69,7 @@ const EditProduct = ({ onProductUpdated }) => {
     setIsSubmitting(true);
   
     try {
-      await axios.put(`http://localhost:5000/products/${selectedProduct.id}`, {
+      await API.put(`http://localhost:5000/products/${selectedProduct.id}`, {
         name,
         cp: parseFloat(cp),
         sp: parseFloat(sp),

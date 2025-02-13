@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import ProductCard from "./ProductCard";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -24,7 +24,7 @@ const EditPurchaseOrder = ({
   useEffect(() => {
     const fetchPurchaseOrderDetails = async () => {
       try {
-        const purchaseOrderResponse = await axios.get(
+        const purchaseOrderResponse = await API.get(
           `http://localhost:5000/purchase_orders/${purchaseOrderId}`
         );
         const purchaseOrder = purchaseOrderResponse.data;
@@ -32,7 +32,7 @@ const EditPurchaseOrder = ({
         setReferenceNumber(purchaseOrder.reference_number);
         setSupplierId(purchaseOrder.supplier_id);
 
-        const itemsResponse = await axios.get(
+        const itemsResponse = await API.get(
           `http://localhost:5000/purchase_orders/${purchaseOrderId}/details`
         );
         setSelectedProducts(
@@ -42,7 +42,7 @@ const EditPurchaseOrder = ({
           }))
         );
 
-        const productsResponse = await axios.get(
+        const productsResponse = await API.get(
           "http://localhost:5000/products"
         );
         setProducts(productsResponse.data);
@@ -113,7 +113,7 @@ const EditPurchaseOrder = ({
       }, 0);
   
       // Fetch original purchase order details
-      const originalResponse = await axios.get(
+      const originalResponse = await API.get(
         `http://localhost:5000/purchase_orders/${purchaseOrderId}/details`
       );
       const originalProducts = originalResponse.data;
@@ -128,13 +128,13 @@ const EditPurchaseOrder = ({
   
       // Perform delete operations for removed items
       for (const item of removedItems) {
-        await axios.delete(
+        await API.delete(
           `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details/${item.product_id}`
         );
       }
   
       // Update the purchase order
-      await axios.put(`http://localhost:5000/purchase_orders/${purchaseOrderId}`, {
+      await API.put(`http://localhost:5000/purchase_orders/${purchaseOrderId}`, {
         reference_number: referenceNumber,
         supplier_id: supplierId,
         total_amount: totalAmount,
@@ -151,7 +151,7 @@ const EditPurchaseOrder = ({
   
       // Update existing products
       for (const product of updatedProducts) {
-        await axios.put(
+        await API.put(
           `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details/${product.product_id}`,
           {
             quantity: product.quantity,
@@ -162,7 +162,7 @@ const EditPurchaseOrder = ({
   
       // Add new products
       for (const product of newProducts) {
-        await axios.post(
+        await API.post(
           `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details`,
           {
             product_id: product.id,
@@ -176,7 +176,7 @@ const EditPurchaseOrder = ({
       const updateSupplierDue = async () => {
         try {
           // Fetch all purchase orders for this supplier
-          const response = await axios.get(
+          const response = await API.get(
             `http://localhost:5000/suppliers/purchase_orders/${supplierId}`
           );
   
@@ -190,7 +190,7 @@ const EditPurchaseOrder = ({
           );
   
           // Update the supplier's total due in the database
-          await axios.put(`http://localhost:5000/suppliers/${supplierId}`, {
+          await API.put(`http://localhost:5000/suppliers/${supplierId}`, {
             total_purchase_due: totalDue,
           });
   

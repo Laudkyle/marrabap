@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify"; // Ensure react-toastify is installed
 
 const SupplierPayment = () => {
@@ -23,7 +23,7 @@ const SupplierPayment = () => {
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/suppliers");
+        const response = await API.get("http://localhost:5000/suppliers");
         setSuppliers(response.data);
       } catch (error) {
         console.error("Error fetching suppliers:", error);
@@ -37,7 +37,7 @@ const SupplierPayment = () => {
   useEffect(() => {
     const fetchPaymentMethods = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/payment-methods");
+        const response = await API.get("http://localhost:5000/payment-methods");
         setPaymentMethods(response.data);
       } catch (error) {
         console.error("Error fetching payment methods:", error);
@@ -71,7 +71,7 @@ const SupplierPayment = () => {
 
     if (supplierId) {
       try {
-        const response = await axios.get(
+        const response = await API.get(
           `http://localhost:5000/suppliers/purchase_orders/${supplierId}`
         );
         setPurchaseOrders(
@@ -140,7 +140,7 @@ const SupplierPayment = () => {
   
     try {
       // Send payment data to the backend
-      const paymentResponse = await axios.post(
+      const paymentResponse = await API.post(
         "http://localhost:5000/supplier_payments",
         paymentPayload
       );
@@ -155,7 +155,7 @@ const SupplierPayment = () => {
           formData.append("files", file);
         });
   
-        await axios.post("http://localhost:5000/documents", formData, {
+        await API.post("http://localhost:5000/documents", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },

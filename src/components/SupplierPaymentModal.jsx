@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify";
 
 const SupplierPaymentModal = ({ isOpen, onClose, supplierId }) => {
@@ -16,7 +16,7 @@ const SupplierPaymentModal = ({ isOpen, onClose, supplierId }) => {
 
   useEffect(() => {
     if (supplierId) {
-      axios.get(`http://localhost:5000/suppliers/purchase_orders/${supplierId}`)
+      API.get(`http://localhost:5000/suppliers/purchase_orders/${supplierId}`)
         .then(response => {
           setPurchaseOrders(response.data.filter(order => order.payment_status === "unpaid" || order.payment_status === "partial"));
         })
@@ -25,7 +25,7 @@ const SupplierPaymentModal = ({ isOpen, onClose, supplierId }) => {
   }, [supplierId]);
 
   useEffect(() => {
-    axios.get("http://localhost:5000/payment-methods")
+    API.get("http://localhost:5000/payment-methods")
       .then(response => setPaymentMethods(response.data))
       .catch(error => toast.error("Error fetching payment methods."));
   }, []);
@@ -57,7 +57,7 @@ const SupplierPaymentModal = ({ isOpen, onClose, supplierId }) => {
     };
 
     try {
-      await axios.post("http://localhost:5000/supplier_payments", paymentPayload);
+      await API.post("http://localhost:5000/supplier_payments", paymentPayload);
       toast.success("Supplier payment processed successfully.");
       onClose();
     } catch (error) {

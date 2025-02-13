@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Bar, Line, Pie } from "react-chartjs-2";
+import API from "../api";
+
 import {
   FiDollarSign,
   FiShoppingCart,
@@ -33,7 +35,6 @@ ChartJS.register(
   LineElement,
   ArcElement
 );
-
 const Dashboard = ({companyName}) => {
   // Filter out-of-stock products
   const [salesData, setSalesData] = useState([]);
@@ -44,38 +45,33 @@ const Dashboard = ({companyName}) => {
   const [salesReturns, setSalesReturns] = useState([]);
   const [purchaseReturns, setPurchaseReturns] = useState([]);
   const [expenses, setExpenses] = useState(0); // Add expenses if available
-
+  const [error, setError] = useState(null);
   useEffect(() => {
-    fetch("http://localhost:5000/sales")
-      .then((response) => response.json())
-      .then((data) => setSalesData(data))
-      .catch((err) => console.error("Error fetching sales data:", err));
-       // Fetch purchase orders data
-    fetch("http://localhost:5000/purchase_orders")
-      .then((response) => response.json())
-      .then((data) => setPurchaseOrders(data))
-      .catch((err) => console.error("Error fetching purchase orders:", err));
+    const fetchData = async () => {
+      try {
+        // Fetch all required data in parallel for efficiency
+        const [salesRes, purchaseOrdersRes, salesReturnsRes, purchaseReturnsRes, expensesRes] =
+          await Promise.all([
+            API.get("/sales"),
+            API.get("/purchase_orders"),
+            API.get("/sales/returns"),
+            API.get("/purchase/returns"), // Corrected endpoint for purchase returns
+            API.get("/expenses"),
+          ]);
 
-    // Fetch sales returns data
-    fetch("http://localhost:5000/sales/returns")
-      .then((response) => response.json())
-      .then((data) => setSalesReturns(data))
-      .catch((err) => console.error("Error fetching sales returns:", err));
+        setSalesData(salesRes.data);
+        setPurchaseOrders(purchaseOrdersRes.data);
+        setSalesReturns(salesReturnsRes.data);
+        setPurchaseReturns(purchaseReturnsRes.data);
+        setExpenses(expensesRes.data);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("Failed to fetch data.");
+      }
+    };
 
-    // Fetch purchase returns data
-    fetch("http://localhost:5000/sales/returns")
-      .then((response) => response.json())
-      .then((data) => setPurchaseReturns(data))
-      .catch((err) => console.error("Error fetching purchase returns:", err));
-
-    // Fetch expenses data (this depends on your implementation)
-    fetch("http://localhost:5000/expenses")
-      .then((response) => response.data)
-      .then((data) => setExpenses(data))
-      .catch((err) => console.error("Error fetching expenses:", err));
-
+    fetchData();
   }, []);
-
 
   // Prepare data for the bar chart (total sales by product)
   const totalSalesByProduct = salesData.reduce((acc, sale) => {
@@ -114,17 +110,20 @@ const Dashboard = ({companyName}) => {
   const totalPurchaseReturns = purchaseReturns.reduce((acc, returnItem) => acc + returnItem.return_quantity * returnItem.price, 0);
 
   // Calculate Net Profit (example formula)
+  const date = "2025-01-25"; // Set the date to fetch the income statement
+
   useEffect(() => {
-    const date = '2025-01-25'; // Set the date to fetch the income statement for
-    fetch(`http://localhost:5000/reports/income-statement?date=${date}`)
-      .then((response) => response.json())
-      .then((data) => {
-        // You can access data.netIncome here and set it in your state
-        setNetProfit(data.netIncome);
-      })
-      .catch((err) => console.error("Error fetching income statement:", err));
-  }, []);
-  
+    const fetchIncomeStatement = async () => {
+      try {
+        const response = await API.get(`/reports/income-statement?date=${date}`);
+        setNetProfit(response.data.netIncome);
+      } catch (err) {
+        console.error("Error fetching income statement:", err);
+      }
+    };
+
+    fetchIncomeStatement();
+  }, [date]); 
 
   // Prepare data for the line chart (sales over time)
   const salesByDate = salesData.reduce((acc, sale) => {
@@ -156,13 +155,19 @@ const Dashboard = ({companyName}) => {
     ],
   };
 
-  // Fetch the product data
-  useEffect(() => {
-    fetch("http://localhost:5000/products")
-      .then((response) => response.json())
-      .then((data) => setProductData(data))
-      .catch((err) => console.error("Error fetching product data:", err));
-  }, []);
+   useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await API.get("/products");
+        setProductData(response.data);
+      } catch (err) {
+        console.error("Error fetching product data:", err);
+        setError("Failed to fetch product data. Please try again.");
+      }
+    };
+
+    fetchProducts();
+  }, []); // Runs once on mount
 
   const outOfStockProducts = productData.filter(
     (product) => product.stock === 0

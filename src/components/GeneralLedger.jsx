@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import DataTable from "react-data-table-component";
-
+import API from "../api";
 const GeneralLedgerComponent = () => {
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -26,8 +26,8 @@ const GeneralLedgerComponent = () => {
 
   const fetchAccounts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/accounts");
-      const data = await res.json();
+      const res = await API.get("http://localhost:5000/accounts");
+      const data = await res.data;
       setAccounts(data);
     } catch (error) {
       console.error("Error fetching accounts:", error);
@@ -43,8 +43,8 @@ const GeneralLedgerComponent = () => {
         endDate: filters.endDate,
       }).toString();
 
-      const res = await fetch(`http://localhost:5000/ledger?${queryParams}`);
-      const data = await res.json();
+      const res = await API.get(`/ledger?${queryParams}`);
+      const data = await res.data;
       setTransactions(data);
     } catch (error) {
       toast.error("Error fetching transactions.");

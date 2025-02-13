@@ -3,7 +3,7 @@ import ProductCard from "./ProductCard";
 import { FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaTrash } from "react-icons/fa";
 import { useCart } from "../CartContext";
-import axios from "axios";
+import API from "../api";
 import { toast } from "react-toastify";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -42,7 +42,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/products", {
+      const response = await API.get("http://localhost:5000/products", {
         timeout: 5000,
       });
       setProducts(response.data);
@@ -74,14 +74,19 @@ function Shop({ companyName, companyAddress, email, phone }) {
   }, [saleComplete]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/taxes")
-      .then((response) => response.json())
-      .then((data) => {
-        setTaxes(data);
-        setTaxRates(data);
-      })
-      .catch((error) => console.error("Error fetching taxes:", error));
-  }, []);
+    const fetchTaxes = async () => {
+      try {
+        const response = await API.get("/taxes");
+        setTaxes(response.data);
+        setTaxRates(response.data);
+      } catch (err) {
+        console.error("Error fetching taxes:", err);
+        setError("Failed to fetch tax data. Please try again.");
+      }
+    };
+
+    fetchTaxes();
+  }, []); // Runs only once when the component mounts
 
   const filteredProducts = products.filter(
     (product) =>
@@ -340,13 +345,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
     };
 
     try {
-      const response = await fetch("http://localhost:5000/drafts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(draft),
-      });
+      const response = await API.post("/drafts", draft); // Using Axios
 
       if (response.status === 201) {
         // Successfully saved draft

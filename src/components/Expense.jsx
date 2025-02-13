@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { FaEdit, FaTrash, FaMoneyCheckAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -30,7 +30,7 @@ const ExpenseComponent = () => {
 
   const fetchExpenses = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/expenses");
+      const response = await API.get("http://localhost:5000/expenses");
       setExpenses(response.data);
     } catch (error) {
       console.error("Error fetching expenses:", error);
@@ -39,7 +39,7 @@ const ExpenseComponent = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/accounts");
+      const response = await API.get("http://localhost:5000/accounts");
       setAccounts(response.data);
     } catch (error) {
       console.error("Error fetching accounts:", error);
@@ -48,7 +48,7 @@ const ExpenseComponent = () => {
 
   const fetchPaymentMethods = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/payment-methods");
+      const response = await API.get("http://localhost:5000/payment-methods");
       setPaymentMethods(response.data);
     } catch (error) {
       console.error("Error fetching payment methods:", error);
@@ -75,12 +75,12 @@ const ExpenseComponent = () => {
       }
 
       if (selectedExpense) {
-        await axios.put(
+        await API.put(
           `http://localhost:5000/expenses/${selectedExpense.id}`,
           dataToSend
         );
       } else {
-        await axios.post("http://localhost:5000/expenses", dataToSend);
+        await API.post("http://localhost:5000/expenses", dataToSend);
       }
 
       setShowAddModal(false);
@@ -105,7 +105,7 @@ const ExpenseComponent = () => {
     setLoading(true); // Start loading
 
     try {
-      const response = await axios.put(
+      const response = await API.put(
         `http://localhost:5000/expenses/pay/${expenseId}`,
         { payment_method_id: selectedMethod,
           payAmount:amount
@@ -150,7 +150,7 @@ const ExpenseComponent = () => {
 
   const handleDeleteExpense = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/expenses/${id}`);
+      await API.delete(`http://localhost:5000/expenses/${id}`);
       fetchExpenses();
     } catch (error) {
       console.error("Error deleting expense:", error);

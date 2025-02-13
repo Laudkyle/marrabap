@@ -3,7 +3,7 @@ import { FaEdit, FaCheck, FaTimes, FaTrash } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import DataTable from "react-data-table-component";
-
+import API from "../api";
 const ConfirmModal = ({ isVisible, onClose, onConfirm, message }) => {
   if (!isVisible) return null;
 
@@ -47,13 +47,13 @@ const CustomerGroup = () => {
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [filterText, setFilterText] = useState("");
 
-  const API_URL = "http://localhost:5000/customer_groups"; // Correct URL
+  const API_URL = "/customer_groups"; // Correct URL
 
   // Fetch customer groups from the backend
   useEffect(() => {
     const fetchCustomerGroups = async () => {
       try {
-        const response = await fetch(API_URL); // Use API_URL here
+        const response = await API.get(API_URL); // Use API_URL here
         const data = await response.json();
         setCustomerGroups(data);
       } catch (error) {

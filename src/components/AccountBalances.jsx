@@ -3,7 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import DataTable from "react-data-table-component";
 import "react-toastify/dist/ReactToastify.css";
-
+import API from "../api";
 const AccountBalances = () => {
   const [accounts, setAccounts] = useState([]);
   const [filteredAccounts, setFilteredAccounts] = useState([]);
@@ -13,7 +13,7 @@ const AccountBalances = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/chart-of-accounts");
+        const response = await API.get("http://localhost:5000/chart-of-accounts");
         const data = response.data.map((account) => ({
           ...account,
           balance: account.balance || 0, // Ensure balance has a default value

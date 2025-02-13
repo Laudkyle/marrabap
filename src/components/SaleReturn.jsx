@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { toast, ToastContainer } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
@@ -21,7 +21,7 @@ const SaleReturn = () => {
 
   const fetchSales = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/sales");
+      const response = await API.get("http://localhost:5000/sales");
 
       const filtered = response.data.filter(
         (sale) =>
@@ -78,7 +78,7 @@ const SaleReturn = () => {
       reason: "please", // Allow user to enter a reason later
     };
     try {
-      const response = await axios.post(
+      const response = await API.post(
         "http://localhost:5000/sales-return",
         returnData
       );

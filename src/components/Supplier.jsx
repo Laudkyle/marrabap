@@ -1,5 +1,5 @@
 import React, { useState, useEffect,useMemo } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -60,7 +60,7 @@ const filteredSuppliersd = useMemo(() => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get(API_URL);
+      const response = await API.get(API_URL);
       setSuppliers(response.data);
     } catch (error) {
       toast.error("Error fetching Suppliers.");
@@ -135,11 +135,11 @@ const filteredSuppliersd = useMemo(() => {
       const newStatus = supplier.active_status ? 0 : 1; // SQL typically uses 0 and 1 for boolean values.
 
       if (supplier.active_status) {
-        await axios.patch(`${API_URL}/${supplier.contact_id}`, {
+        await API.patch(`${API_URL}/${supplier.contact_id}`, {
           active_status: 0, // Setting to inactive.
         });
       } else {
-        await axios.patch(`${API_URL}/${supplier.contact_id}`, {
+        await API.patch(`${API_URL}/${supplier.contact_id}`, {
           active_status: 1, // Setting to active.
         });
       }
@@ -170,7 +170,7 @@ const filteredSuppliersd = useMemo(() => {
 
       if (!validateForm()) return;
 
-      const response = await axios.post(API_URL, supplierData);
+      const response = await API.post(API_URL, supplierData);
 
       if (response.data) {
         setSuppliers([...Suppliers, response.data]);
@@ -213,7 +213,7 @@ const filteredSuppliersd = useMemo(() => {
       };
 
       // Make a PUT request to update the supplier
-      const response = await axios.put(
+      const response = await API.put(
         `${API_URL}/${formData.contact_id}`,
         supplierData
       );
@@ -256,7 +256,7 @@ const filteredSuppliersd = useMemo(() => {
 
   const handleDeletesupplier = async (contact_id) => {
     try {
-      await axios.delete(`${API_URL}/${contact_id}`);
+      await API.delete(`${API_URL}/${contact_id}`);
       setSuppliers(
         Suppliers.filter((supplier) => supplier.contact_id !== contact_id)
       );

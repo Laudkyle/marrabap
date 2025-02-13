@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../api";
 import { formatCurrency } from "../utils/helpers"; // Utility to format currency
 
 const IncomeStatement = () => {
@@ -28,7 +28,7 @@ const IncomeStatement = () => {
       try {
         setLoading(true);
         console.log("Fetching income statement for date:", date); // Log the date being fetched
-        const response = await axios.get("http://localhost:5000/reports/income-statement", {
+        const response = await API.get("http://localhost:5000/reports/income-statement", {
           params: { date },
         });
         console.log("Received response:", response.data); // Log the response data

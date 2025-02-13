@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify"; // Ensure react-toastify is installed
 
 const CustomerPayment = () => {
@@ -22,7 +22,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
     // Fetch customers for dropdown
     const fetchCustomers = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/customers");
+        const response = await API.get("http://localhost:5000/customers");
         setCustomers(response.data);
       } catch (error) {
         console.error("Error fetching customers:", error);
@@ -36,7 +36,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
     const fetchInvoices = async (customerId) => {
       if (customerId) {
         try {
-          const response = await axios.get(
+          const response = await API.get(
             `http://localhost:5000/invoices?customerId=${customerId}`
           );
 
@@ -173,7 +173,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
 
     try {
       // Post payment data to the server
-      await axios.post("http://localhost:5000/payments", paymentPayload);
+      await API.post("http://localhost:5000/payments", paymentPayload);
 
       // If documents are attached, upload them
       if (paymentData.documents.length > 0) {
@@ -182,7 +182,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
         formData.append("reference_number", selectedInvoice.reference_number);
         paymentData.documents.forEach((file) => formData.append("files", file));
 
-        await axios.post("http://localhost:5000/documents", formData, {
+        await API.post("http://localhost:5000/documents", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
@@ -196,7 +196,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
         due_date: selectedInvoice.due_date,
         status: updatedStatus,
       };
-      await axios.put(
+      await API.put(
         `http://localhost:5000/invoices/${selectedInvoice.reference_number}`,
         invoiceUpdatePayload
       );

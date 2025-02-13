@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast } from "react-toastify";
 import DataTable from "react-data-table-component";
 import { FaEdit } from "react-icons/fa";
@@ -21,7 +21,7 @@ const OpeningBalances = () => {
   const accountTypes = ["asset", "liability", "equity", "revenue", "expense"];
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/chart-of-accounts");
+      const response = await API.get("http://localhost:5000/chart-of-accounts");
       setAccounts(response.data);
       setFilteredAccounts(response.data); // Initialize filtered accounts
     } catch (error) {
@@ -80,7 +80,7 @@ const OpeningBalances = () => {
     }
 
     try {
-      await axios.put(`http://localhost:5000/accounts/${editAccount.id}`, {
+      await API.put(`http://localhost:5000/accounts/${editAccount.id}`, {
         balance: parseFloat(editAccount.balance),
         parent_account_id: editAccount.parent_account_id || null,
       });
@@ -114,7 +114,7 @@ const OpeningBalances = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:5000/accounts", {
+      const response = await API.post("http://localhost:5000/accounts", {
         account_name,
         account_type,
         balance: parseFloat(balance),

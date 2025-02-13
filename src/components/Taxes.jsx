@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import DataTable from "react-data-table-component"; // Install with `npm install react-data-table-component`
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify"; // Toast imports
 import "react-toastify/dist/ReactToastify.css"; // Toast styles
 
@@ -20,7 +20,7 @@ const Taxes = () => {
   // Fetch Taxes
   const fetchTaxes = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/taxes");
+      const response = await API.get("http://localhost:5000/taxes");
       setTaxes(response.data);
     } catch (err) {
       toast.error("Error fetching taxes.");
@@ -30,7 +30,7 @@ const Taxes = () => {
   // Fetch Accounts
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/accounts"); // Adjust endpoint if necessary
+      const response = await API.get("http://localhost:5000/accounts"); // Adjust endpoint if necessary
       setAccounts(response.data);
     } catch (err) {
       toast.error("Error fetching accounts.");
@@ -55,7 +55,7 @@ const Taxes = () => {
     }
 
     try {
-      await axios.post("http://localhost:5000/taxes", {
+      await API.post("http://localhost:5000/taxes", {
         tax_name: taxName,
         tax_rate: parseFloat(taxRate),
         tax_type: taxType,

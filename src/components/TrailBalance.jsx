@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../api";
 import { formatCurrency } from "../utils/helpers"; // Utility to format currency
 
 const TrialBalance = () => {
@@ -13,7 +13,7 @@ const TrialBalance = () => {
     const fetchTrialBalance = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(
+        const response = await API.get(
           "http://localhost:5000/reports/trial-balance"
         );
         setTrialBalanceData(response.data);

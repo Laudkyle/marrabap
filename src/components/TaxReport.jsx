@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { FiDownload, FiSearch, FiFilter, FiRefreshCw, FiAlertCircle } from 'react-icons/fi';
 import DataTable from 'react-data-table-component';
-import axios from 'axios';
+import API from "../api";
 
 const TaxReport = () => {
   // State Management
@@ -52,7 +52,7 @@ const TaxReport = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get('http://localhost:5000/taxes');
+      const response = await API.get('http://localhost:5000/taxes');
       setTaxes(response.data);
       setFilteredTaxes(response.data);
     } catch (error) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import DataTable from "react-data-table-component";
-import axios from "axios";
+import API from "../api";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaEdit, FaTrashAlt } from "react-icons/fa";
@@ -23,13 +23,13 @@ const PurchaseOrdersTable = () => {
       setLoading(true);
       try {
         // Fetch suppliers
-        const suppliersResponse = await axios.get(
+        const suppliersResponse = await API.get(
           "http://localhost:5000/suppliers"
         );
         const suppliersData = suppliersResponse.data;
 
         // Fetch purchase orders
-        const purchaseOrdersResponse = await axios.get(
+        const purchaseOrdersResponse = await API.get(
           "http://localhost:5000/purchase_orders"
         );
         const purchaseOrdersData = purchaseOrdersResponse.data;
@@ -64,7 +64,7 @@ const PurchaseOrdersTable = () => {
       return;
 
     try {
-      await axios.delete(`http://localhost:5000/purchase_orders/${id}`);
+      await API.delete(`http://localhost:5000/purchase_orders/${id}`);
       setPurchaseOrders((prevOrders) =>
         prevOrders.filter((order) => order.id !== id)
       );
@@ -89,7 +89,7 @@ const PurchaseOrdersTable = () => {
 
     // Refetch purchase orders and suppliers
     setLoading(true);
-    axios
+    API
       .get("http://localhost:5000/purchase_orders")
       .then((response) => {
         const purchaseOrdersData = response.data;
@@ -201,7 +201,7 @@ const PurchaseOrdersTable = () => {
   const handleStatusChange = async (id, newStatus,reference_number) => {
 setLoading(true)
     try {
-      await axios.patch(
+      await API.patch(
         `http://localhost:5000/purchase_orders/${id}/order_status`,
         {
           order_status: newStatus,

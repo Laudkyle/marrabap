@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { FaTrash, FaEye } from "react-icons/fa";
 import ReactModal from "react-modal";
@@ -17,8 +17,8 @@ const PaymentList = () => {
   const fetchPayments = async () => {
     try {
       const [customerPayments, supplierPayments] = await Promise.all([
-        axios.get("http://localhost:5000/payments"),
-        axios.get("http://localhost:5000/supplier_payments"),
+        API.get("http://localhost:5000/payments"),
+        API.get("http://localhost:5000/supplier_payments"),
       ]);
 
       const combinedPayments = [
@@ -42,7 +42,7 @@ const PaymentList = () => {
   // Fetch documents related to a payment
   const fetchDocuments = async (referenceNumber) => {
     try {
-      const response = await axios.get(`http://localhost:5000/documents/by-reference/${referenceNumber}`);
+      const response = await API.get(`http://localhost:5000/documents/by-reference/${referenceNumber}`);
       setDocuments(response.data);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -63,7 +63,7 @@ const PaymentList = () => {
           ? `http://localhost:5000/supplier_payments/${paymentToDelete.id}`
           : `http://localhost:5000/payments/${paymentToDelete.id}`;
 
-      await axios.delete(endpoint);
+      await API.delete(endpoint);
       toast.success("Payment deleted successfully.");
       setShowDeleteConfirmation(false);
       fetchPayments(); // Refresh payments list

@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { toast } from "react-toastify";
 import DataTable from "react-data-table-component";
 import { Undo2 } from "lucide-react";
+import API from "../api";
 const FundsTransferComponent = () => {
   const [transfers, setTransfers] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -24,8 +25,8 @@ const FundsTransferComponent = () => {
   const fetchTransfers = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/funds-transfer");
-      const data = await res.json();
+      const res = await API.get("/funds-transfer");
+      const data = await res.data;
       setTransfers(data);
     } catch (error) {
       console.error("Error fetching transfers:", error);
@@ -36,8 +37,8 @@ const FundsTransferComponent = () => {
 
   const fetchAccounts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/accounts");
-      const data = await res.json();
+      const res = await API.get("/accounts");
+      const data = await res.data;
       setAccounts(data);
     } catch (error) {
       console.error("Error fetching accounts:", error);
@@ -47,12 +48,8 @@ const FundsTransferComponent = () => {
   const handleTransfer = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/funds-transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
+      const res = await API.post("/funds-transfer",formData);
+      const data = await res.data;
       if (res.ok) {
         toast.success("Funds transferred successfully!");
         fetchTransfers();
@@ -86,7 +83,7 @@ const FundsTransferComponent = () => {
         }
       );
 
-      const data = await res.json();
+      const data = await res.data;
 
       if (res.ok) {
         toast.success("Transfer reversed successfully!");

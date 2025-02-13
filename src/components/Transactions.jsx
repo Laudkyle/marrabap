@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { FaEdit, FaTrash, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -25,7 +25,7 @@ const Transactions = () => {
   // Fetch Transactions
   const fetchTransactions = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/transactions");
+      const response = await API.get("http://localhost:5000/transactions");
       setTransactions(response.data);
     } catch (error) {
       toast.error("Error fetching transactions");
@@ -35,7 +35,7 @@ const Transactions = () => {
   // Fetch Accounts (Chart of Accounts)
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/accounts");
+      const response = await API.get("http://localhost:5000/accounts");
       setAccounts(response.data);
     } catch (error) {
       toast.error("Error fetching accounts");
@@ -52,10 +52,10 @@ const Transactions = () => {
     e.preventDefault();
     try {
       if (editId) {
-        await axios.put(`http://localhost:5000/transactions/${editId}`, formData);
+        await API.put(`http://localhost:5000/transactions/${editId}`, formData);
         toast.success("Transaction updated successfully");
       } else {
-        await axios.post("http://localhost:5000/transactions", formData);
+        await API.post("http://localhost:5000/transactions", formData);
         toast.success("Transaction added successfully");
       }
       setIsModalOpen(false);
@@ -84,7 +84,7 @@ const Transactions = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this transaction?")) {
       try {
-        await axios.delete(`http://localhost:5000/transactions/${id}`);
+        await API.delete(`http://localhost:5000/transactions/${id}`);
         toast.success("Transaction deleted");
         fetchTransactions();
       } catch (error) {

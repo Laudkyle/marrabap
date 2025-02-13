@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../api";
 import { formatCurrency } from "../utils/helpers"; // Utility to format currency
 
 const CashFlowStatement = () => {
@@ -16,7 +16,7 @@ const CashFlowStatement = () => {
     const fetchCashFlowStatement = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("http://localhost:5000/reports/cash-flow");
+        const response = await API.get("http://localhost:5000/reports/cash-flow");
         setCashFlowData(response.data);
       } catch (err) {
         setError("Failed to load cash flow data.");

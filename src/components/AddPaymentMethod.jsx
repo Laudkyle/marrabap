@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify"; // Ensure react-toastify is installed
 
 const AddPaymentMethod = () => {
@@ -16,7 +16,7 @@ const AddPaymentMethod = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/accounts");
+        const response = await API.get("http://localhost:5000/accounts");
         setAccounts(response.data);
       } catch (error) {
         console.error("Error fetching accounts:", error);
@@ -53,7 +53,7 @@ const AddPaymentMethod = () => {
         description: paymentMethodData.description || null,
       };
 console.log("payload : ",paymentMethodPayload)
-      const response = await axios.post("http://localhost:5000/payment-methods", paymentMethodPayload);
+      const response = await API.post("http://localhost:5000/payment-methods", paymentMethodPayload);
 
       if (response.status === 201) {
         toast.success("Payment method added successfully.");

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { useCart } from "../CartContext";
 import { FaEye, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -28,7 +28,7 @@ function ProcessSaleModal({
   // Fetch customers from the database
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/customers", {
+      const response = await API.get("http://localhost:5000/customers", {
         timeout: 5000,
       });
       setCustomers(response.data);
@@ -44,7 +44,7 @@ function ProcessSaleModal({
   // Fetch taxes
   const fetchTaxes = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/taxes", {
+      const response = await API.get("http://localhost:5000/taxes", {
         timeout: 5000,
       });
       setTaxRates(response.data); // Assume response.data is an array of taxes
@@ -60,7 +60,7 @@ function ProcessSaleModal({
   }, []);
   const fetchProducts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/products", {
+      const response = await API.get("http://localhost:5000/products", {
         timeout: 5000,
       });
       const fetchedProducts = response.data;
@@ -183,7 +183,7 @@ function ProcessSaleModal({
     // If the document has an ID, attempt to remove it from the database
     if (documentId) {
       try {
-        const response = await axios.delete(
+        const response = await API.delete(
           `http://localhost:5000/documents/${documentId}`
         );
         toast.success(response.data.message);

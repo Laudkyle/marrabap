@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -15,7 +15,7 @@ const AddProducts = ({ onProductsAdded }) => {
     // Fetch suppliers from the API
     const fetchSuppliers = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/suppliers");
+        const response = await API.get("http://localhost:5000/suppliers");
         setSuppliers(response.data);
       } catch (error) {
         console.error("Error fetching suppliers:", error);
@@ -84,7 +84,7 @@ const AddProducts = ({ onProductsAdded }) => {
       };
   
       // Send JSON payload
-      const response = await axios.post(
+      const response = await API.post(
         "http://localhost:5000/products/bulk",
         payload,
         {

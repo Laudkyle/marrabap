@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronRight, ChevronDown, Printer, Download, RefreshCw, Menu } from "lucide-react";
 import { formatCurrency } from "../utils/helpers";
-
+import API from "../api";
 const BalanceSheet = () => {
   const [balanceSheetData, setBalanceSheetData] = useState({
     currentAssets: [],
@@ -24,8 +24,8 @@ const BalanceSheet = () => {
   useEffect(() => {
     const fetchBalanceSheetData = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/reports/balance-sheet?date=${selectedDate}`);
-        const data = await response.json();
+        const response = await API.get(`/reports/balance-sheet?date=${selectedDate}`);
+        const data = await response.data;
         setBalanceSheetData({
           currentAssets: Array.isArray(data.currentAssets) ? data.currentAssets : [],
           nonCurrentAssets: Array.isArray(data.nonCurrentAssets) ? data.nonCurrentAssets : [],

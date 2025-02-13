@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -15,7 +15,7 @@ const SaleReturnList = () => {
 
   const fetchReturns = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/sales/returns");
+      const response = await API.get("http://localhost:5000/sales/returns");
       setReturns(response.data);
       setFilteredReturns(response.data);
     } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import API from "../api";
 import DataTable from "react-data-table-component";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -53,7 +53,7 @@ const Customer = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(API_URL);
+      const response = await API.get(API_URL);
       setCustomers(response.data);
     } catch (error) {
       toast.error("Error fetching customers.");
@@ -208,7 +208,7 @@ const Customer = () => {
 
   const toggleActiveStatus = async (customer) => {
     try {
-      await axios.patch(`${API_URL}/${customer.contact_id}`, {
+      await API.patch(`${API_URL}/${customer.contact_id}`, {
         active_status: !customer.active_status,
       });
       setCustomers(
@@ -237,7 +237,7 @@ const Customer = () => {
 
       if (!validateForm()) return;
 
-      const response = await axios.post(API_URL, customerData);
+      const response = await API.post(API_URL, customerData);
 
       if (response.data) {
         setCustomers([...customers, response.data]);
@@ -284,7 +284,7 @@ const Customer = () => {
       };
 
       // Make a PUT request to update the customer
-      const response = await axios.put(
+      const response = await API.put(
         `${API_URL}/${formData.contact_id}`,
         customerData
       );
@@ -333,7 +333,7 @@ const Customer = () => {
   useEffect(() => {
     const fetchCustomerGroups = async () => {
       try {
-        const response = await fetch("http://localhost:5000/customer_groups");
+        const response = await API.get("/customer_groups");
         const data = await response.json();
         setCustomerGroups(data); // Assuming the response is an array of customer groups
       } catch (error) {
@@ -345,7 +345,7 @@ const Customer = () => {
 
   const handleDeleteCustomer = async (contact_id) => {
     try {
-      await axios.delete(`${API_URL}/${contact_id}`);
+      await API.delete(`${API_URL}/${contact_id}`);
       setCustomers(
         customers.filter((customer) => customer.contact_id !== contact_id)
       );
