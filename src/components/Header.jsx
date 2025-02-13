@@ -1,36 +1,47 @@
-import React,{useState, useEffect} from 'react'
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { logout } from "./auth"; 
 
-function Header({isExpanded,setIsExpanded}) {
-    const [isMobile, setIsMobile] = useState(false); // State to track mobile screen size
-  
-     // Update isMobile state based on screen width
+function Header({ isExpanded, setIsExpanded }) {
+  const [isMobile, setIsMobile] = useState(false);
+  const navigate = useNavigate();
+
+  // Check authentication
+  const isAuthenticated = !!localStorage.getItem("accessToken");
+
+  // Update isMobile state based on screen width
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsMobile(true);
-        setIsExpanded(false); // Collapse sidebar on mobile by default
+        setIsExpanded(false);
       } else {
         setIsMobile(false);
-        setIsExpanded(true); // Expand sidebar on desktop by default
+        setIsExpanded(true);
       }
     };
 
     handleResize(); // Initial check
-    window.addEventListener('resize', handleResize); // Listen for window resize
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener('resize', handleResize); // Clean up listener
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
+  // Logout Handler
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login"); 
+  };
 
   return (
-    <div className='p-4 border-b  border-gray-600 bg-gray-800 h-20'>
-        {/* Toggle Button */}
+    <div className="p-4 border-b border-gray-600 bg-gray-800 h-20 flex justify-between items-center">
+      {/* Sidebar Toggle Button */}
       {!isMobile && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-4  hover:bg-gray-700"
+          className="p-4 hover:bg-gray-700 text-white"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -49,9 +60,31 @@ function Header({isExpanded,setIsExpanded}) {
         </button>
       )}
 
+      {/* Logout Icon (Only show if authenticated) */}
+      {isAuthenticated && (
+        <button
+          onClick={handleLogout}
+          className="p-4 hover:bg-red-700 text-white flex items-center"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 11-6 0v-1"
+            />
+          </svg>
+          <span className="ml-2 hidden md:inline">Logout</span>
+        </button>
+      )}
     </div>
-
-  )
+  );
 }
 
-export default Header
+export default Header;
