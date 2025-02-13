@@ -164,6 +164,30 @@ app.post("/logout", (req, res) => {
   res.clearCookie("refreshToken");
   res.json({ message: "Logged out successfully" });
 });
+
+const logAuditTrail = (req, db, tableName, recordId, action, changes) => {
+  if (!req.user || !req.user.id) {
+    console.error("Error: User ID not found in request.");
+    return;
+  }
+
+  const userId = req.user.id; // Get user ID from authenticated request
+  const query = `
+    INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+
+  const changesJson = JSON.stringify(changes || {});
+
+  db.run(query, [userId, tableName, recordId, action, changesJson], (err) => {
+    if (err) {
+      console.error("Error logging audit trail:", err.message);
+    } else {
+      console.log(`Audit trail logged for ${action} on ${tableName} (Record ID: ${recordId}) by User ID: ${userId}`);
+    }
+  });
+};
+
 // ===================== Products Endpoints =====================
 
 // Get all products
@@ -222,8 +246,7 @@ app.get("/products/:id", authenticateUser,(req, res) => {
     }
   });
 });
-
-app.post("/products/bulk",authenticateUser,(req, res) => {
+app.post("/products/bulk", authenticateUser, (req, res) => {
   const { suppliers_id, products } = req.body;
 
   // Validate input
@@ -232,9 +255,7 @@ app.post("/products/bulk",authenticateUser,(req, res) => {
   }
 
   if (!Array.isArray(products) || products.length === 0) {
-    return res
-      .status(400)
-      .send("Products array is required and cannot be empty.");
+    return res.status(400).send("Products array is required and cannot be empty.");
   }
 
   const invalidProduct = products.find(
@@ -247,59 +268,54 @@ app.post("/products/bulk",authenticateUser,(req, res) => {
   );
 
   if (invalidProduct) {
-    return res
-      .status(400)
-      .send(
-        "Each product must have a name, cp, and sp with non-negative values."
-      );
+    return res.status(400).send("Each product must have a name, cp, and sp with non-negative values.");
   }
 
   db.serialize(() => {
     db.run("BEGIN TRANSACTION");
 
     let errorOccurred = false;
-
     const inventoryInserts = [];
+    const auditLogs = [];
 
     products.forEach((product) => {
       const stmt = db.prepare(
         "INSERT INTO products (name, cp, sp, suppliers_id) VALUES (?, ?, ?, ?)"
       );
 
-      stmt.run(
-        product.name,
-        product.cp,
-        product.sp,
-        suppliers_id,
-        function (err) {
-          if (err) {
-            console.error("Error inserting product:", err.message);
-            errorOccurred = true;
-          } else {
-            const productId = this.lastID;
+      stmt.run(product.name, product.cp, product.sp, suppliers_id, function (err) {
+        if (err) {
+          console.error("Error inserting product:", err.message);
+          errorOccurred = true;
+        } else {
+          const productId = this.lastID;
 
-            // Prepare inventory entry for the newly added product
-            inventoryInserts.push(
-              new Promise((resolve, reject) => {
-                db.run(
-                  "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
-                  [productId, 0, product.cp],
-                  (err) => {
-                    if (err) {
-                      console.error(
-                        "Error inserting into inventory:",
-                        err.message
-                      );
-                      return reject(err);
-                    }
-                    resolve();
+          // Collect audit log data
+          auditLogs.push({
+            table: "products",
+            recordId: productId,
+            action: "insert",
+            changes: product,
+          });
+
+          // Prepare inventory entry for the newly added product
+          inventoryInserts.push(
+            new Promise((resolve, reject) => {
+              db.run(
+                "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
+                [productId, 0, product.cp],
+                (err) => {
+                  if (err) {
+                    console.error("Error inserting into inventory:", err.message);
+                    return reject(err);
                   }
-                );
-              })
-            );
-          }
+                  resolve();
+                }
+              );
+            })
+          );
         }
-      );
+      });
 
       stmt.finalize();
     });
@@ -309,25 +325,26 @@ app.post("/products/bulk",authenticateUser,(req, res) => {
       .then(() => {
         if (errorOccurred) {
           db.run("ROLLBACK");
-          return res
-            .status(500)
-            .send("Failed to add products. Transaction rolled back.");
+          return res.status(500).send("Failed to add products. Transaction rolled back.");
         }
 
-        db.run("COMMIT");
-        res
-          .status(201)
-          .send("Products and inventory entries added successfully.");
+        // Log all audit trails after successful commit
+        db.run("COMMIT", () => {
+          auditLogs.forEach(({ table, recordId, action, changes }) => {
+            logAuditTrail(req, db, table, recordId, action, changes);
+          });
+
+          res.status(201).send("Products and inventory entries added successfully.");
+        });
       })
       .catch((err) => {
         console.error("Error during inventory insertion:", err.message);
         db.run("ROLLBACK");
-        res
-          .status(500)
-          .send("Failed to add inventory entries. Transaction rolled back.");
+        res.status(500).send("Failed to add inventory entries. Transaction rolled back.");
       });
   });
 });
+
 
 // Add a new product
 app.post("/products", upload.single("image"),authenticateUser, (req, res) => {
@@ -435,8 +452,8 @@ app.delete("/products/:id",authenticateUser, (req, res) => {
 });
 
 // ===================== Inventoty Endpoints =====================
-/// Create Inventory
-app.post("/inventory",authenticateUser, (req, res) => {
+// Create Inventory
+app.post("/inventory", authenticateUser, (req, res) => {
   const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
   if (!product_id || !quantity_in_stock || !cost_per_unit) {
@@ -452,9 +469,22 @@ app.post("/inventory",authenticateUser, (req, res) => {
     if (err) {
       return res.status(500).send("Failed to add inventory.");
     }
-    res
-      .status(201)
-      .json({ id: this.lastID, product_id, quantity_in_stock, cost_per_unit });
+
+    const inventoryId = this.lastID;
+
+    // Log audit trail
+    logAuditTrail(req, db, "inventory", inventoryId, "insert", {
+      product_id,
+      quantity_in_stock,
+      cost_per_unit,
+    });
+
+    res.status(201).json({
+      id: inventoryId,
+      product_id,
+      quantity_in_stock,
+      cost_per_unit,
+    });
   });
 });
 
@@ -482,9 +512,43 @@ app.get("/inventory/:id",authenticateUser, (req, res) => {
     res.status(200).json(row);
   });
 });
+// Create Inventory
+app.post("/inventory", authenticateUser, (req, res) => {
+  const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
+  if (!product_id || !quantity_in_stock || !cost_per_unit) {
+    return res.status(400).send("Missing required fields.");
+  }
+
+  const stmt = db.prepare(
+    `INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) 
+     VALUES (?, ?, ?)`
+  );
+
+  stmt.run(product_id, quantity_in_stock, cost_per_unit, function (err) {
+    if (err) {
+      return res.status(500).send("Failed to add inventory.");
+    }
+
+    const inventoryId = this.lastID;
+
+    // Log audit trail
+    logAuditTrail(req, db, "inventory", inventoryId, "insert", {
+      product_id,
+      quantity_in_stock,
+      cost_per_unit,
+    });
+
+    res.status(201).json({
+      id: inventoryId,
+      product_id,
+      quantity_in_stock,
+      cost_per_unit,
+    });
+  });
+});
 // Update Inventory
-app.put("/inventory/:id",authenticateUser, (req, res) => {
+app.put("/inventory/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { product_id, quantity_in_stock, cost_per_unit } = req.body;
 
@@ -505,12 +569,20 @@ app.put("/inventory/:id",authenticateUser, (req, res) => {
     if (this.changes === 0) {
       return res.status(404).send("Inventory item not found.");
     }
+
+    // Log audit trail
+    logAuditTrail(req, db, "inventory", id, "update", {
+      product_id,
+      quantity_in_stock,
+      cost_per_unit,
+    });
+
     res.status(200).send("Inventory item updated successfully.");
   });
 });
 
 // Delete Inventory Item
-app.delete("/inventory/:id",authenticateUser, (req, res) => {
+app.delete("/inventory/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   const stmt = db.prepare("DELETE FROM inventory WHERE id = ?");
@@ -522,73 +594,11 @@ app.delete("/inventory/:id",authenticateUser, (req, res) => {
     if (this.changes === 0) {
       return res.status(404).send("Inventory item not found.");
     }
+
+    // Log audit trail
+    logAuditTrail(req, db, "inventory", id, "delete", {});
+
     res.status(200).send("Inventory item deleted successfully.");
-  });
-});
-
-// ===================== Purchase order Endpoints =====================
-app.post("/purchase_orders",authenticateUser, (req, res) => {
-  const { reference_number, supplier_id, total_amount, status, items } =
-    req.body;
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).send("Product details are required");
-  }
-
-  // Prepare the temporary table with product details
-  db.serialize(() => {
-    // Begin a transaction
-    db.run("BEGIN TRANSACTION");
-
-    // Insert items into the temporary table
-    const stmt = db.prepare(
-      "INSERT INTO temp_purchase_order_items (product_id, quantity, unit_price) VALUES (?, ?, ?)"
-    );
-
-    items.forEach((item) => {
-      const { product_id, quantity, unit_price } = item;
-
-      stmt.run(product_id, quantity, unit_price, (err) => {
-        if (err) {
-          console.error("Error inserting item into temp table:", err.message);
-        }
-      });
-    });
-
-    stmt.finalize();
-
-    // Insert the purchase order itself
-    const purchaseOrderStmt = db.prepare(
-      "INSERT INTO purchase_orders (reference_number, supplier_id, total_amount, order_status,payment_status) VALUES (?, ?, ?, ?,?)"
-    );
-
-    purchaseOrderStmt.run(
-      reference_number,
-      supplier_id,
-      total_amount,
-      status || "pending",
-      "unpaid",
-      function (err) {
-        if (err) {
-          console.error(err.message);
-          db.run("ROLLBACK");
-          res.status(500).send("Error creating purchase order");
-        } else {
-          // After inserting the purchase order, the trigger will populate the purchase_order_details table
-          const purchase_order_id = this.lastID;
-
-          // Commit the transaction
-          db.run("COMMIT");
-          res.status(201).json({
-            id: purchase_order_id,
-            reference_number,
-            supplier_id,
-            total_amount,
-            order_status: status || "pending",
-            payment_status: "unpaid",
-          });
-        }
-      }
-    );
   });
 });
 
@@ -619,318 +629,244 @@ app.get("/purchase_orders/:id",authenticateUser, (req, res) => {
     }
   });
 });
-
-app.patch("/purchase_orders/:id/order_status",authenticateUser, async(req, res) => {
+app.patch("/purchase_orders/:id/order_status", authenticateUser, async (req, res) => {
   const { id } = req.params;
   const { order_status, reference_number } = req.body;
-  const user_id = 1; // Replace with actual logged-in user ID
+  const user_id = req.user.id; // Get the logged-in user ID
 
   if (!["pending", "received", "cancelled"].includes(order_status)) {
     return res.status(400).send("Invalid status.");
   }
 
   try {
-    // Use promises for the initial status check
-    const getPurchaseOrder = () => {
-      return new Promise((resolve, reject) => {
-        db.get(
-          `SELECT order_status FROM purchase_orders WHERE id = ?`,
-          [id],
-          (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-          }
-        );
+    const row = await new Promise((resolve, reject) => {
+      db.get(`SELECT order_status FROM purchase_orders WHERE id = ?`, [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
       });
-    };
+    });
 
-    const row = await getPurchaseOrder();
-
-    if (!row) {
-      return res.status(404).send("Purchase order not found.");
-    }
-
+    if (!row) return res.status(404).send("Purchase order not found.");
+    
     const oldStatus = row.order_status;
+    if (oldStatus === order_status) return res.status(400).send("Status is already updated.");
 
-    if (oldStatus === order_status) {
-      return res.status(400).send("Status is already updated.");
-    }
-
-    // If status is being set to "received"
+    // Process status change
     if (order_status === "received") {
-      // Wrap db.all in a promise
-      const getOrderDetails = () => {
-        return new Promise((resolve, reject) => {
-          db.all(
-            `SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`,
-            [id],
-            (err, items) => {
-              if (err) reject(err);
-              else resolve(items);
-            }
-          );
+      const items = await new Promise((resolve, reject) => {
+        db.all(`SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`, 
+          [id], (err, items) => {
+          if (err) reject(err);
+          else resolve(items);
         });
-      };
-
-      const items = await getOrderDetails();
-
-      if (items.length === 0) {
-        return res.status(404).send("No items found for this purchase order.");
-      }
-
-      // Process items and calculate totals
-      const inventoryUpdates = [];
-      const movementInserts = [];
-      let totalValue = 0;
-
-      // Process purchase order items
-      items.forEach(({ product_id, quantity, unit_price }) => {
-        const lineValue = quantity * unit_price;
-        totalValue += lineValue;
-
-        inventoryUpdates.push(
-          new Promise((resolve, reject) => {
-            db.run(
-              `UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ?
-               WHERE product_id = ?`,
-              [quantity, unit_price, product_id],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          })
-        );
-
-        movementInserts.push(
-          new Promise((resolve, reject) => {
-            db.run(
-              `INSERT INTO inventory_movements (product_id, movement_type, quantity, cost, reference_number)
-               VALUES (?, 'purchase', ?, ?, ?)`,
-              [product_id, quantity, unit_price, reference_number],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          })
-        );
       });
 
-      // Wait for all inventory updates and movements to complete
-      await Promise.all([...inventoryUpdates, ...movementInserts]);
+      if (items.length === 0) return res.status(404).send("No items found for this purchase order.");
 
-      // Create journal entry with proper error handling
-      const createJournalEntry = () => {
+      let totalValue = 0;
+      const inventoryUpdates = items.map(({ product_id, quantity, unit_price }) => {
+        totalValue += quantity * unit_price;
         return new Promise((resolve, reject) => {
-          db.run(
-            `INSERT INTO journal_entries (reference_number, date, description, status)
-             VALUES (?, date('now'), ?, 'posted')`,
-            [reference_number, `Purchase order #${id} received`],
-            function (err) {
-              if (err) reject(err);
-              else resolve(this.lastID);
-            }
-          );
+          db.run(`UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ? WHERE product_id = ?`, 
+            [quantity, unit_price, product_id], (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
         });
-      };
+      });
 
-      const journalEntryId = await createJournalEntry();
+      await Promise.all(inventoryUpdates);
 
-      // Prepare journal lines
+      const journalEntryId = await new Promise((resolve, reject) => {
+        db.run(`INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, date('now'), ?, 'posted')`, 
+          [reference_number, `Purchase order #${id} received`], function (err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        });
+      });
+
       const journalLines = [
-        // Inventory debit (Asset account: debit increases)
-        {
-          journal_entry_id: journalEntryId,
-          account_id: 3,
-          debit: totalValue,
-          credit: 0,
-          isLiability: false, // Asset account
-        },
-        // Accounts Payable credit (Liability account: credit increases)
-        {
-          journal_entry_id: journalEntryId,
-          account_id: 5,
-          debit: 0,
-          credit: totalValue,
-          isLiability: true, // Liability account
-        },
+        { journal_entry_id: journalEntryId, account_id: 3, debit: totalValue, credit: 0, isLiability: false },
+        { journal_entry_id: journalEntryId, account_id: 5, debit: 0, credit: totalValue, isLiability: true },
       ];
 
-      // Insert journal entry lines and update chart of accounts
-      const processJournalLines = async () => {
-        const linePromises = journalLines.map((line) => {
-          return new Promise((resolve, reject) => {
-            db.run(
-              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
-               VALUES (?, ?, ?, ?)`,
-              [line.journal_entry_id, line.account_id, line.debit, line.credit],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
+      await Promise.all(journalLines.map(line => new Promise((resolve, reject) => {
+        db.run(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`, 
+          [line.journal_entry_id, line.account_id, line.debit, line.credit], (err) => {
+          if (err) reject(err);
+          else resolve();
         });
-
-        // Add ledger updates for chart of accounts with correct sign conventions
-        const ledgerUpdates = journalLines.map((line) => {
-          // For liability accounts, credits increase the balance and debits decrease it
-          // For asset accounts, debits increase the balance and credits decrease it
-          const netAmount = line.isLiability
-            ? line.credit - line.debit // Liability accounts: credit increases, debit decreases
-            : line.debit - line.credit; // Asset accounts: debit increases, credit decreases
-
-          return new Promise((resolve, reject) => {
-            db.run(
-              `UPDATE chart_of_accounts
-               SET balance = balance + ?
-               WHERE id = ?`,
-              [netAmount, line.account_id],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-        });
-
-        // Execute all journal line inserts and ledger updates
-        await Promise.all([...linePromises, ...ledgerUpdates]);
-      };
-
-      await processJournalLines();
-
-      // Update purchase order status
-      await new Promise((resolve, reject) => {
-        db.run(
-          `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
-          [order_status, id],
-          (err) => {
-            if (err) reject(err);
-            else resolve();
-          }
-        );
-      });
-
-      // Log to audit trail
-      const changes = JSON.stringify({
-        old_status: oldStatus,
-        new_status: order_status,
-      });
+      })));
 
       await new Promise((resolve, reject) => {
-        db.run(
-          `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
-           VALUES (?, ?, ?, ?, ?)`,
-          [user_id, "purchase_orders", id, "update", changes],
-          (err) => {
-            if (err) reject(err);
-            else resolve();
-          }
-        );
+        db.run(`UPDATE purchase_orders SET order_status = ? WHERE id = ?`, [order_status, id], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      const changes = JSON.stringify({ old_status: oldStatus, new_status: order_status });
+      await new Promise((resolve, reject) => {
+        db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
+          [user_id, "purchase_orders", id, "update", changes], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
 
       res.send("Status updated and records updated successfully.");
     } else {
-      // For non-received statuses, just update the status
       await new Promise((resolve, reject) => {
-        db.run(
-          `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
-          [order_status, id],
-          (err) => {
-            if (err) reject(err);
-            else resolve();
-          }
-        );
+        db.run(`UPDATE purchase_orders SET order_status = ? WHERE id = ?`, [order_status, id], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      const changes = JSON.stringify({ old_status: oldStatus, new_status: order_status });
+      await new Promise((resolve, reject) => {
+        db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
+          [user_id, "purchase_orders", id, "update", changes], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
 
       res.send("Status updated successfully.");
     }
   } catch (error) {
     console.error("Error processing purchase order:", error);
-    res
-      .status(500)
-      .send("An error occurred while processing the purchase order.");
+    res.status(500).send("An error occurred while processing the purchase order.");
   }
 });
-// Update a purchase order
-app.put("/purchase_orders/:id",authenticateUser, (req, res) => {
+app.put("/purchase_orders/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { reference_number, supplier_id, total_amount } = req.body;
-  const query =
-    "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ? WHERE id = ?";
-  db.run(
-    query,
-    [reference_number, supplier_id, total_amount, id],
-    function (err) {
-      if (err) {
-        console.error(err.message);
-        res.status(500).send("Error updating purchase order");
-      } else if (this.changes === 0) {
-        res.status(404).send("Purchase order not found");
-      } else {
-        res.json({
-          id,
-          reference_number,
-          supplier_id,
-          total_amount,
-        });
-      }
+  const user_id = req.user.id; // Get the logged-in user ID
+
+  const query = "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ? WHERE id = ?";
+  db.run(query, [reference_number, supplier_id, total_amount, id], function (err) {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Error updating purchase order");
+    } else if (this.changes === 0) {
+      res.status(404).send("Purchase order not found");
+    } else {
+      const changes = JSON.stringify({ reference_number, supplier_id, total_amount });
+
+      db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
+        [user_id, "purchase_orders", id, "update", changes], (err) => {
+        if (err) console.error(err);
+      });
+
+      res.json({ id, reference_number, supplier_id, total_amount });
     }
-  );
+  });
 });
-
-// Delete a purchase order
-app.delete("/purchase_orders/:id",authenticateUser, async(req, res) => {
+app.delete("/purchase_orders/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
+  const user_id = req.user.id; // Get the logged-in user ID
 
-  // Get the purchase order details before deleting
-  db.get(
-    `SELECT supplier_id, total_amount FROM purchase_orders WHERE id = ?`,
-    [id],
-    (err, purchaseOrder) => {
+  db.get(`SELECT supplier_id, total_amount FROM purchase_orders WHERE id = ?`, [id], (err, purchaseOrder) => {
+    if (err) {
+      console.error("Error fetching purchase order:", err);
+      return res.status(500).send("Error deleting purchase order.");
+    }
+
+    if (!purchaseOrder) return res.status(404).send("Purchase order not found.");
+
+    db.run(`DELETE FROM purchase_orders WHERE id = ?`, [id], (err) => {
       if (err) {
-        console.error("Error fetching purchase order:", err);
+        console.error("Error deleting purchase order:", err);
         return res.status(500).send("Error deleting purchase order.");
       }
 
-      if (!purchaseOrder) {
-        return res.status(404).send("Purchase order not found.");
-      }
-
-      const { supplier_id, total_amount } = purchaseOrder;
-
-      // Delete the purchase order
-      db.run(`DELETE FROM purchase_orders WHERE id = ?`, [id], (err) => {
+      db.run(`UPDATE suppliers SET total_purchase_due = total_purchase_due - ? WHERE id = ?`, 
+        [purchaseOrder.total_amount, purchaseOrder.supplier_id], (err) => {
         if (err) {
-          console.error("Error deleting purchase order:", err);
-          return res.status(500).send("Error deleting purchase order.");
+          console.error("Error updating supplier's total_purchase_due:", err);
+          return res.status(500).send("Error updating supplier's total_purchase_due.");
         }
 
-        // Update the supplier's total_purchase_due
-        db.run(
-          `UPDATE suppliers SET total_purchase_due = total_purchase_due - ? WHERE id = ?`,
-          [total_amount, supplier_id],
-          (err) => {
-            if (err) {
-              console.error(
-                "Error updating supplier's total_purchase_due:",
-                err
-              );
-              return res
-                .status(500)
-                .send("Error updating supplier's total_purchase_due.");
-            }
+        const changes = JSON.stringify({ supplier_id: purchaseOrder.supplier_id, total_amount: purchaseOrder.total_amount });
+        db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
+          [user_id, "purchase_orders", id, "delete", changes], (err) => {
+          if (err) console.error(err);
+        });
 
-            res.send(
-              "Purchase order deleted and supplier's total_purchase_due updated."
-            );
-          }
-        );
+        res.send("Purchase order deleted and supplier's total_purchase_due updated.");
       });
-    }
-  );
+    });
+  });
+});
+// Create Purchase Order
+app.post("/purchase_orders", authenticateUser, (req, res) => {
+  const { reference_number, supplier_id, total_amount, status, items } = req.body;
+  
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).send("Product details are required");
+  }
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    // Insert items into the temporary table
+    const stmt = db.prepare(
+      "INSERT INTO temp_purchase_order_items (product_id, quantity, unit_price) VALUES (?, ?, ?)"
+    );
+
+    items.forEach((item) => {
+      const { product_id, quantity, unit_price } = item;
+      stmt.run(product_id, quantity, unit_price, (err) => {
+        if (err) {
+          console.error("Error inserting item into temp table:", err.message);
+        }
+      });
+    });
+
+    stmt.finalize();
+
+    // Insert the purchase order
+    const purchaseOrderStmt = db.prepare(
+      "INSERT INTO purchase_orders (reference_number, supplier_id, total_amount, order_status, payment_status) VALUES (?, ?, ?, ?, ?)"
+    );
+
+    purchaseOrderStmt.run(
+      reference_number,
+      supplier_id,
+      total_amount,
+      status || "pending",
+      "unpaid",
+      function (err) {
+        if (err) {
+          console.error(err.message);
+          db.run("ROLLBACK");
+          return res.status(500).send("Error creating purchase order");
+        }
+
+        const purchase_order_id = this.lastID;
+        db.run("COMMIT");
+
+        // Log audit trail
+        logAuditTrail(req, db, "purchase_orders", purchase_order_id, "insert", {
+          reference_number,
+          supplier_id,
+          total_amount,
+          order_status: status || "pending",
+          payment_status: "unpaid",
+        });
+
+        res.status(201).json({
+          id: purchase_order_id,
+          reference_number,
+          supplier_id,
+          total_amount,
+          order_status: status || "pending",
+          payment_status: "unpaid",
+        });
+      }
+    );
+  });
 });
 
 // Get purchase order details by purchase order ID
@@ -957,11 +893,13 @@ app.get("/purchase_orders/:id/details",authenticateUser, (req, res) => {
 // Delete purchase order detail
 app.delete(
   "/purchase_orders_with_details/:purchase_order_id/details/:detail_id",
+  authenticateUser,
   (req, res) => {
     const { purchase_order_id, detail_id } = req.params;
+    const userId = req.user.id; // Get user ID from authenticateUser middleware
 
     const query = `DELETE FROM purchase_order_details
-                 WHERE product_id = ? AND purchase_order_id = ?`;
+                   WHERE product_id = ? AND purchase_order_id = ?`;
 
     db.run(query, [detail_id, purchase_order_id], function (err) {
       if (err) {
@@ -970,18 +908,27 @@ app.delete(
       } else if (this.changes === 0) {
         res.status(404).send("Purchase order detail not found");
       } else {
+        // Log audit trail
+        logAuditTrail(req, db, "purchase_order_details", detail_id, "delete", {
+          purchase_order_id,
+          product_id: detail_id,
+        });
+
         res.status(200).send("Purchase order detail deleted successfully");
       }
     });
   }
 );
 
+// Update a purchase order detail
 app.put(
   "/purchase_orders_with_details/:purchase_order_id/details/:detail_id",
+  authenticateUser,
   (req, res) => {
     const { purchase_order_id, detail_id } = req.params;
-    const { quantity, unit_price } = req.body; // Assuming user_id is provided in the request
-    user_id = 1;
+    const { quantity, unit_price } = req.body;
+    const userId = req.user.id; // Get user ID from authenticateUser middleware
+
     const query = `UPDATE purchase_order_details
                    SET quantity = ?, unit_price = ?
                    WHERE product_id = ? AND purchase_order_id = ?`;
@@ -996,45 +943,19 @@ app.put(
         } else if (this.changes === 0) {
           res.status(404).send("Purchase order detail not found");
         } else {
-          // Log the audit trail after successful update
-          const auditTrailQuery = `INSERT INTO audit_trails (
-            user_id,
-            table_name,
-            record_id,
-            action,
-            changes
-          ) VALUES (?, ?, ?, ?, ?)`;
-
-          const changes = JSON.stringify({
-            updated_fields: {
-              quantity,
-              unit_price,
-            },
+          // Log audit trail after successful update
+          logAuditTrail(req, db, "purchase_order_details", detail_id, "update", {
+            purchase_order_id,
+            quantity,
+            unit_price,
           });
 
-          db.run(
-            auditTrailQuery,
-            [
-              user_id, // ID of the user making the change
-              "purchase_order_details", // Affected table
-              detail_id, // Record ID (product_id in this case)
-              "update", // Action type
-              changes, // Change details in JSON
-            ],
-            (auditErr) => {
-              if (auditErr) {
-                console.error("Error logging audit trail:", auditErr.message);
-                res.status(500).send("Error logging audit trail");
-              } else {
-                res.json({
-                  purchase_order_id,
-                  detail_id,
-                  quantity,
-                  unit_price,
-                });
-              }
-            }
-          );
+          res.json({
+            purchase_order_id,
+            detail_id,
+            quantity,
+            unit_price,
+          });
         }
       }
     );
@@ -1044,9 +965,11 @@ app.put(
 // Add a new purchase order detail
 app.post(
   "/purchase_orders_with_details/:purchase_order_id/details",
+  authenticateUser,
   (req, res) => {
     const { purchase_order_id } = req.params;
     const { product_id, quantity, unit_price } = req.body;
+    const userId = req.user.id; // Get user ID from authenticateUser middleware
 
     // Ensure all required fields are provided
     if (!product_id || !quantity || !unit_price) {
@@ -1056,7 +979,7 @@ app.post(
     }
 
     const query = `INSERT INTO purchase_order_details (purchase_order_id, product_id, quantity, unit_price)
-                 VALUES (?, ?, ?, ?)`;
+                   VALUES (?, ?, ?, ?)`;
 
     db.run(
       query,
@@ -1066,12 +989,22 @@ app.post(
           console.error(err.message);
           res.status(500).send("Error adding purchase order detail");
         } else {
+          const detailId = this.lastID;
+
+          // Log audit trail after successful insertion
+          logAuditTrail(req, db, "purchase_order_details", detailId, "insert", {
+            purchase_order_id,
+            product_id,
+            quantity,
+            unit_price,
+          });
+
           res.status(201).json({
             purchase_order_id,
             product_id,
             quantity,
             unit_price,
-            id: this.lastID, // Return the ID of the inserted row if applicable
+            id: detailId,
           });
         }
       }
@@ -1090,8 +1023,11 @@ app.get("/accounts",authenticateUser, (req, res) => {
     }
   });
 });
-app.post("/accounts",authenticateUser, (req, res) => {
+
+
+app.post("/accounts", authenticateUser, (req, res) => {
   const { account_name, account_type, balance, parent_account_id } = req.body;
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
   if (!account_name || !account_type) {
     return res
@@ -1133,6 +1069,15 @@ app.post("/accounts",authenticateUser, (req, res) => {
         }
 
         const newAccountId = this.lastID;
+
+        // Log audit trail for account creation
+        logAuditTrail(req, db, "chart_of_accounts", newAccountId, "insert", {
+          account_code: nextCode.toString(),
+          account_name,
+          account_type,
+          balance: balance || 0,
+          parent_account_id: parent_account_id || null,
+        });
 
         if (balance !== 0) {
           const referenceNumber = `OB-${Date.now()}`;
@@ -1200,6 +1145,21 @@ app.post("/accounts",authenticateUser, (req, res) => {
                         });
                       }
 
+                      // Log audit trail for journal entry
+                      logAuditTrail(req, db, "journal_entries", journalEntryId, "insert", {
+                        reference_number: referenceNumber,
+                        date,
+                        description,
+                        status: "posted",
+                      });
+
+                      // Log audit trail for journal entry line
+                      logAuditTrail(req, db, "journal_entry_lines", journalEntryId, "insert", {
+                        account_id: newAccountId,
+                        debit,
+                        credit,
+                      });
+
                       res.status(201).json({
                         id: newAccountId,
                         account_code: nextCode.toString(),
@@ -1230,18 +1190,50 @@ app.post("/accounts",authenticateUser, (req, res) => {
   });
 });
 
-// Delete an account
-app.delete("/accounts/:id",authenticateUser, (req, res) => {
-  const { id } = req.params;
 
-  db.run("DELETE FROM chart_of_accounts WHERE id = ?", id, function (err) {
+app.delete("/accounts/:id", authenticateUser, (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
+
+  // Retrieve account details before deletion for audit logging
+  const selectQuery = "SELECT * FROM chart_of_accounts WHERE id = ?";
+
+  db.get(selectQuery, [id], (err, account) => {
     if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.status(204).end();
+      console.error(err);
+      return res.status(500).json({ error: "Failed to retrieve account details." });
     }
+
+    if (!account) {
+      return res.status(404).json({ error: "Account not found." });
+    }
+
+    // Proceed to delete the account
+    db.run("DELETE FROM chart_of_accounts WHERE id = ?", [id], function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to delete account." });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: "Account not found." });
+      }
+
+      // Log audit trail for account deletion
+      logAuditTrail(req, db, "chart_of_accounts", id, "delete", {
+        account_code: account.account_code,
+        account_name: account.account_name,
+        account_type: account.account_type,
+        balance: account.balance,
+        parent_account_id: account.parent_account_id,
+      });
+
+      res.status(204).end();
+    });
   });
 });
+
+
 app.put("/accounts/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
   const { account_name, account_type, balance, parent_account_id } = req.body;
@@ -1278,6 +1270,7 @@ app.put("/accounts/:id",authenticateUser, (req, res) => {
     ", "
   )} WHERE id = ?`;
   params.push(id);
+  
 
   // Fetch the original account data before the update
   db.get(
@@ -1484,10 +1477,31 @@ app.put("/accounts/:id",authenticateUser, (req, res) => {
           }
         }
       });
-    }
-  );
+ 
+  // Construct changes object for logging
+  const changes = {};
+  if (account_name !== undefined && account_name !== account.account_name) {
+    changes.account_name = { old: account.account_name, new: account_name };
+  }
+  if (account_type !== undefined && account_type !== account.account_type) {
+    changes.account_type = { old: account.account_type, new: account_type };
+  }
+  if (balance !== undefined && balance !== originalBalance) {
+    changes.balance = { old: originalBalance, new: balance };
+  }
+  if (parent_account_id !== undefined && parent_account_id !== account.parent_account_id) {
+    changes.parent_account_id = { old: account.parent_account_id, new: parent_account_id };
+  }
+
+  // Log audit trail if there are changes
+  if (Object.keys(changes).length > 0) {
+    logAuditTrail(req, db, "chart_of_accounts", id, "update", changes);
+  }
+
 });
 
+}
+);
 // Recursive function to update parent account balances
 const updateParentBalance = (parentId, callback) => {
   if (!parentId) return callback(null); // If no parent, stop here
