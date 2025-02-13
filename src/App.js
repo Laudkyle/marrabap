@@ -37,6 +37,7 @@ import TaxReport from "./components/TaxReport";
 import ExpenseComponent from "./components/Expense";
 import { toastOptions } from "./toastConfig"; // Import the config
 import GeneralLedgerComponent from "./components/GeneralLedger";
+import FundsTransferComponent from "./components/FundTransfer";
  const App = () => {
   const [isExpanded, setIsExpanded] = useState(true); // State for sidebar expansion
   const companyName = "Essential Anchor Limited";
@@ -123,6 +124,7 @@ import GeneralLedgerComponent from "./components/GeneralLedger";
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/income-statement" element={<IncomeStatement />} />
             <Route path="/general-ledger" element={<GeneralLedgerComponent />} />
+            <Route path="/funds-transfer" element={<FundsTransferComponent />} />
             <Route path="/balance-sheet" element={<BalanceSheet />} />
             <Route path="/trial-balance" element={<TrailBalance />} />
           </Routes>

@@ -32,9 +32,10 @@ import {
   BookCheck,
   CogIcon,
   BookOpenCheck,
+  ArrowLeftRight,
 
 } from "lucide-react";
-import { FaMoneyBill1,FaMoneyBill } from "react-icons/fa6";
+import { FaMoneyBill1,FaMoneyBill, FaArrowUpFromBracket } from "react-icons/fa6";
 
 const Sidebar = ({ isExpanded, companyName }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -176,6 +177,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/transactions",
           label: "Transactions",
           icon: <Calculator className="w-4 h-4" />,
+        },
+        {
+          path: "/funds-transfer",
+          label: "Transfer Funds",
+          icon: <ArrowLeftRight className="w-4 h-4" />,
         },
       ],
     },

@@ -592,7 +592,18 @@ db.run(`CREATE TABLE IF NOT EXISTS journal_entry_lines (
   FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE
 )`);
 
-
+db.run(`CREATE TABLE IF NOT EXISTS funds_transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reference_number TEXT UNIQUE NOT NULL, -- Unique transfer reference
+  from_account INTEGER NOT NULL, -- Origin account
+  to_account INTEGER NOT NULL, -- Destination account
+  amount REAL NOT NULL CHECK(amount > 0), -- Transfer amount
+  date TEXT NOT NULL, -- Transaction date
+  description TEXT, -- Optional description
+  status TEXT DEFAULT 'POSTED' CHECK(status IN ('POSTED', 'REVERSED')), -- Status of transfer
+  created_on TEXT DEFAULT CURRENT_TIMESTAMP -- Timestamp
+);
+`)
   db.run(`CREATE TABLE IF NOT EXISTS audit_trails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL, -- User making the change

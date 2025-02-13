@@ -3883,6 +3883,233 @@ app.delete("/adjustments/:id", (req, res) => {
 });
 
 
+// ===================== Funds Transfer Endpoints =====================
+app.post("/funds-transfer", (req, res) => {
+  const { fromAccount, toAccount, amount, description, date } = req.body;
+  const user_id = 1;
+
+  if (!fromAccount || !toAccount || !amount || amount <= 0) {
+    return res.status(400).json({ error: "Invalid input values." });
+  }
+
+  const referenceNumber = `FT-${Date.now()}`;
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    // Insert into funds_transfers (New table for faster tracking)
+    db.run(
+      `INSERT INTO funds_transfers (reference_number, from_account, to_account, amount, date, description)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [referenceNumber, fromAccount, toAccount, amount, date, description],
+      function (err) {
+        if (err) {
+          db.run("ROLLBACK");
+          return res.status(500).json({ error: err.message });
+        }
+
+        const transferId = this.lastID;
+
+        // Insert into journal_entries
+        db.run(
+          `INSERT INTO journal_entries (reference_number, date, description, status, adjustment_type)
+           VALUES (?, ?, ?, 'posted', 'FUNDS TRANSFER')`,
+          [referenceNumber, date, description],
+          function (err) {
+            if (err) {
+              db.run("ROLLBACK");
+              return res.status(500).json({ error: err.message });
+            }
+
+            const journalEntryId = this.lastID;
+
+            // Insert Debit Entry for the To-Account
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
+               VALUES (?, ?, ?, 0, 'FUNDS TRANSFER')`,
+              [journalEntryId, toAccount, amount],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
+              }
+            );
+
+            // Insert Credit Entry for the From-Account
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
+               VALUES (?, ?, 0, ?, 'FUNDS TRANSFER')`,
+              [journalEntryId, fromAccount, amount],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
+              }
+            );
+
+            // Insert into audit_trails
+            db.run(
+              `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+               VALUES (?, 'funds_transfer', ?, 'insert', ?)`,
+              [user_id, transferId, JSON.stringify({ fromAccount, toAccount, amount, date, description })],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
+              }
+            );
+
+            db.run("COMMIT"); // Commit transaction
+            res.json({ message: "Funds transferred successfully", transferId });
+          }
+        );
+      }
+    );
+  });
+});
+
+// GET ALL FUNDS TRANSFERS
+app.get("/funds-transfer", (req, res) => {
+  db.all(
+    `SELECT je.id, je.reference_number, je.date, je.description,
+            jel_from.account_id AS from_account_id, coa_from.account_name AS from_account_name,
+            jel_from.credit AS amount,
+            jel_to.account_id AS to_account_id, coa_to.account_name AS to_account_name
+     FROM journal_entries je
+     JOIN journal_entry_lines jel_from ON je.id = jel_from.journal_entry_id AND jel_from.credit > 0
+     JOIN chart_of_accounts coa_from ON jel_from.account_id = coa_from.id
+     JOIN journal_entry_lines jel_to ON je.id = jel_to.journal_entry_id AND jel_to.debit > 0
+     JOIN chart_of_accounts coa_to ON jel_to.account_id = coa_to.id
+     WHERE je.adjustment_type = 'FUNDS TRANSFER'`,
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows);
+    }
+  );
+});
+
+app.post("/funds-transfer/reverse/:id", (req, res) => {
+  const { id } = req.params;
+  const user_id = 1;
+
+  db.get(`SELECT * FROM funds_transfers WHERE id = ?`, [id], (err, transfer) => {
+    if (err || !transfer) {
+      return res.status(404).json({ error: "Transfer not found" });
+    }
+
+    if (transfer.status === "REVERSED") {
+      return res.status(400).json({ error: "Transfer already reversed" });
+    }
+
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+
+      const reverseReference = `REV-${transfer.reference_number}`;
+
+      // Insert Reversal Entry in journal_entries
+      db.run(
+        `INSERT INTO journal_entries (reference_number, date, description, status, adjustment_type)
+         VALUES (?, ?, ?, 'posted', 'FUNDS TRANSFER REVERSAL')`,
+        [reverseReference, transfer.date, `Reversal: ${transfer.description}`],
+        function (err) {
+          if (err) {
+            db.run("ROLLBACK");
+            return res.status(500).json({ error: err.message });
+          }
+
+          const reversalEntryId = this.lastID;
+
+          // Reverse Debit & Credit for Reversal Entry
+          db.run(
+            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
+             VALUES (?, ?, 0, ?, 'FUNDS TRANSFER REVERSAL')`,
+            [reversalEntryId, transfer.to_account, transfer.amount],
+            function (err) {
+              if (err) {
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: err.message });
+              }
+            }
+          );
+
+          db.run(
+            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
+             VALUES (?, ?, ?, 0, 'FUNDS TRANSFER REVERSAL')`,
+            [reversalEntryId, transfer.from_account, transfer.amount],
+            function (err) {
+              if (err) {
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: err.message });
+              }
+            }
+          );
+
+          // Mark transfer as REVERSED in funds_transfers
+          db.run(
+            `UPDATE funds_transfers SET status = 'REVERSED' WHERE id = ?`,
+            [id],
+            function (err) {
+              if (err) {
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: err.message });
+              }
+            }
+          );
+
+          // Log Reversal in audit_trails
+          db.run(
+            `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+             VALUES (?, 'funds_transfer', ?, 'update', ?)`,
+            [user_id, id, JSON.stringify({ status: "REVERSED" })],
+            function (err) {
+              if (err) {
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: err.message });
+              }
+            }
+          );
+
+          db.run("COMMIT");
+          res.json({ message: "Funds transfer reversed successfully" });
+        }
+      );
+    });
+  });
+});
+
+
+// DELETE FUNDS TRANSFER
+app.delete("/funds-transfer/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.get(`SELECT * FROM journal_entries WHERE id = ? AND adjustment_type = 'FUNDS TRANSFER'`, [id], (err, entry) => {
+    if (err || !entry) return res.status(404).json({ error: "Transfer not found" });
+
+    db.serialize(() => {
+      db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        db.run(`DELETE FROM journal_entries WHERE id = ?`, [id], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+
+          db.run(
+            `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+             VALUES (?, 'funds_transfer', ?, 'delete', ?)`,
+            [1, id, JSON.stringify({ message: "Funds transfer deleted" })],
+            function (err) {
+              if (err) return res.status(500).json({ error: err.message });
+            }
+          );
+
+          res.json({ message: "Funds transfer deleted successfully" });
+        });
+      });
+    });
+  });
+});
 // ===================== Customer Groups Endpoints =====================
 
 // Get all customer groups
