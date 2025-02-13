@@ -106,10 +106,11 @@ const FundsTransferComponent = () => {
       selector: (row) => format(new Date(row.date), "dd MMM yyyy"),
       sortable: true,
     },
-    { name: "From", selector: (row) => row.from_account_name },
-    { name: "To", selector: (row) => row.to_account_name },
+    { name: "From", selector: (row) => row.from_account },
+    { name: "To", selector: (row) => row.to_account },
     { name: "Amount", selector: (row) => row.amount.toFixed(2), right: true },
     { name: "Description", selector: (row) => row.description || "N/A" },
+    { name: "Status", selector: (row) => row.status || "N/A" },
     {
       name: "Actions",
       cell: (row) => (

@@ -70,7 +70,7 @@ const Dashboard = ({companyName}) => {
 
     // Fetch expenses data (this depends on your implementation)
     fetch("http://localhost:5000/expenses")
-      .then((response) => response.json())
+      .then((response) => response.data)
       .then((data) => setExpenses(data))
       .catch((err) => console.error("Error fetching expenses:", err));
 

@@ -581,7 +581,17 @@ db.run(`CREATE TABLE IF NOT EXISTS sale_tax_amounts (
   budget_amount REAL NOT NULL CHECK(budget_amount >= 0), -- Planned budget
   FOREIGN KEY (account_id) REFERENCES chart_of_accounts(id)
 );`);
-
+// Create Users Table
+db.run(
+  `CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE NOT NULL,
+    phone TEXT UNIQUE NOT NULL,
+    role TEXT  NOT NULL DEFAULT 'user',
+    password TEXT NOT NULL
+  )`
+);
 db.run(`CREATE TABLE IF NOT EXISTS journal_entry_lines (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   journal_entry_id INTEGER NOT NULL,

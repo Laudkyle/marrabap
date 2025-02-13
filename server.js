@@ -1,10 +1,12 @@
 const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
 const multer = require("multer");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
-
+const { authenticateUser } = require("./middleware/authMiddleware");
 // Initialize the app
 const app = express();
 const port = 5000;
@@ -33,7 +35,8 @@ const db = new sqlite3.Database("./shopdb.sqlite", (err) => {
 app.use(express.json());
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: true,
+    credentials: true, // Allows cookies and authentication headers
   })
 );
 app.use((req, res, next) => {
@@ -71,6 +74,96 @@ const documentStorage = multer.diskStorage({
 
 const documentUpload = multer({ storage: documentStorage });
 
+
+// Generate Token Functions
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { id: user.id, email: user.email },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: process.env.TOKEN_EXPIRY }
+  );
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user.id, email: user.email },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY }
+  );
+};
+
+// REGISTER
+// REGISTER NEW USER (Only Admins)
+app.post("/register", authenticateUser, async (req, res) => {
+  const { email, username, phone, password } = req.body;
+  
+  // Ensure only admins can register users
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ error: "Forbidden. Only admins can create users." });
+  }
+
+  if (!email || !username || !phone || !password) {
+    return res.status(400).json({ error: "All fields are required." });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  db.run(
+    `INSERT INTO users (email, username, phone, password, role) VALUES (?, ?, ?, ?, ?)`,
+    [email, username, phone, hashedPassword, "user"],
+    (err) => {
+      if (err) return res.status(500).json({ error: "Registration failed." });
+      res.json({ message: "User registered successfully!" });
+    }
+  );
+});
+
+
+// LOGIN
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password are required." });
+
+  db.get(`SELECT * FROM users WHERE email = ?`, [email], async (err, user) => {
+    if (err || !user)
+      return res.status(400).json({ error: "Invalid email or password." });
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch)
+      return res.status(400).json({ error: "Invalid email or password." });
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+    });
+    res.json({ accessToken });
+  });
+});
+
+// REFRESH TOKEN
+app.post("/refresh", (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken)
+    return res.status(403).json({ error: "Refresh token required." });
+
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: "Invalid refresh token." });
+
+    const newAccessToken = generateAccessToken(user);
+    res.json({ accessToken: newAccessToken });
+  });
+});
+
+// LOGOUT
+app.post("/logout", (req, res) => {
+  res.clearCookie("refreshToken");
+  res.json({ message: "Logged out successfully" });
+});
 // ===================== Products Endpoints =====================
 
 // Get all products
@@ -3589,7 +3682,8 @@ const createJournalEntry = (adjustment) => {
           `SELECT id FROM chart_of_accounts WHERE account_code = ?`,
           [contra_account],
           (err, contraAccount) => {
-            if (err || !contraAccount) return reject(err || "Contra account not found");
+            if (err || !contraAccount)
+              return reject(err || "Contra account not found");
             const contra_account_id = contraAccount.id;
 
             // Determine debit and credit accounts
@@ -3634,7 +3728,13 @@ const createJournalEntry = (adjustment) => {
                         credit,
                         entry_type
                       ) VALUES (?, ?, ?, ?, ?)`,
-                      [journal_entry_id, credit_account_id, 0, amount, "credit"],
+                      [
+                        journal_entry_id,
+                        credit_account_id,
+                        0,
+                        amount,
+                        "credit",
+                      ],
                       function (err) {
                         if (err) return reject(err);
 
@@ -3718,7 +3818,7 @@ app.post("/adjustments", (req, res) => {
         reference_number,
         status: "posted",
       };
-console.log(adjustment)
+      console.log(adjustment);
       createJournalEntry(adjustment)
         .then(() =>
           res.json({
@@ -3863,25 +3963,46 @@ app.delete("/adjustments/:id", (req, res) => {
     const journalEntryId = adjustment.journal_entry_id;
 
     db.serialize(() => {
-      db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journalEntryId], (err) => {
-        if (err) return res.status(500).json({ error: "Failed to delete journal entry lines." });
+      db.run(
+        `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
+        [journalEntryId],
+        (err) => {
+          if (err)
+            return res
+              .status(500)
+              .json({ error: "Failed to delete journal entry lines." });
 
-        db.run(`DELETE FROM journal_entries WHERE id = ?`, [journalEntryId], (err) => {
-          if (err) return res.status(500).json({ error: "Failed to delete journal entry." });
+          db.run(
+            `DELETE FROM journal_entries WHERE id = ?`,
+            [journalEntryId],
+            (err) => {
+              if (err)
+                return res
+                  .status(500)
+                  .json({ error: "Failed to delete journal entry." });
 
-          db.run(`DELETE FROM adjustments WHERE id = ?`, [id], function (err) {
-            if (err) return res.status(500).json({ error: "Failed to delete adjustment." });
+              db.run(
+                `DELETE FROM adjustments WHERE id = ?`,
+                [id],
+                function (err) {
+                  if (err)
+                    return res
+                      .status(500)
+                      .json({ error: "Failed to delete adjustment." });
 
-            res.json({
-              message: "Adjustment, related journal entry, and journal entry lines deleted successfully.",
-            });
-          });
-        });
-      });
+                  res.json({
+                    message:
+                      "Adjustment, related journal entry, and journal entry lines deleted successfully.",
+                  });
+                }
+              );
+            }
+          );
+        }
+      );
     });
   });
 });
-
 
 // ===================== Funds Transfer Endpoints =====================
 app.post("/funds-transfer", (req, res) => {
@@ -3953,7 +4074,17 @@ app.post("/funds-transfer", (req, res) => {
             db.run(
               `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
                VALUES (?, 'funds_transfer', ?, 'insert', ?)`,
-              [user_id, transferId, JSON.stringify({ fromAccount, toAccount, amount, date, description })],
+              [
+                user_id,
+                transferId,
+                JSON.stringify({
+                  fromAccount,
+                  toAccount,
+                  amount,
+                  date,
+                  description,
+                }),
+              ],
               function (err) {
                 if (err) {
                   db.run("ROLLBACK");
@@ -3974,16 +4105,12 @@ app.post("/funds-transfer", (req, res) => {
 // GET ALL FUNDS TRANSFERS
 app.get("/funds-transfer", (req, res) => {
   db.all(
-    `SELECT je.id, je.reference_number, je.date, je.description,
-            jel_from.account_id AS from_account_id, coa_from.account_name AS from_account_name,
-            jel_from.credit AS amount,
-            jel_to.account_id AS to_account_id, coa_to.account_name AS to_account_name
-     FROM journal_entries je
-     JOIN journal_entry_lines jel_from ON je.id = jel_from.journal_entry_id AND jel_from.credit > 0
-     JOIN chart_of_accounts coa_from ON jel_from.account_id = coa_from.id
-     JOIN journal_entry_lines jel_to ON je.id = jel_to.journal_entry_id AND jel_to.debit > 0
-     JOIN chart_of_accounts coa_to ON jel_to.account_id = coa_to.id
-     WHERE je.adjustment_type = 'FUNDS TRANSFER'`,
+    `SELECT ft.id, ft.reference_number, ft.date, ft.amount, ft.description, ft.status,
+            ca_from.account_name AS from_account, 
+            ca_to.account_name AS to_account
+     FROM funds_transfers ft
+     JOIN chart_of_accounts ca_from ON ft.from_account = ca_from.id
+     JOIN chart_of_accounts ca_to ON ft.to_account = ca_to.id`,
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(rows);
@@ -3994,121 +4121,136 @@ app.get("/funds-transfer", (req, res) => {
 app.post("/funds-transfer/reverse/:id", (req, res) => {
   const { id } = req.params;
   const user_id = 1;
+  db.get(
+    `SELECT * FROM funds_transfers WHERE id = ?`,
+    [id],
+    (err, transfer) => {
+      if (err || !transfer) {
+        return res.status(404).json({ error: "Transfer not found" });
+      }
 
-  db.get(`SELECT * FROM funds_transfers WHERE id = ?`, [id], (err, transfer) => {
-    if (err || !transfer) {
-      return res.status(404).json({ error: "Transfer not found" });
-    }
+      if (transfer.status === "REVERSED") {
+        return res.status(400).json({ error: "Transfer already reversed" });
+      }
 
-    if (transfer.status === "REVERSED") {
-      return res.status(400).json({ error: "Transfer already reversed" });
-    }
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
 
-    db.serialize(() => {
-      db.run("BEGIN TRANSACTION");
+        const reverseReference = `REV-${transfer.reference_number}`;
 
-      const reverseReference = `REV-${transfer.reference_number}`;
-
-      // Insert Reversal Entry in journal_entries
-      db.run(
-        `INSERT INTO journal_entries (reference_number, date, description, status, adjustment_type)
+        // Insert Reversal Entry in journal_entries
+        db.run(
+          `INSERT INTO journal_entries (reference_number, date, description, status, adjustment_type)
          VALUES (?, ?, ?, 'posted', 'FUNDS TRANSFER REVERSAL')`,
-        [reverseReference, transfer.date, `Reversal: ${transfer.description}`],
-        function (err) {
-          if (err) {
-            db.run("ROLLBACK");
-            return res.status(500).json({ error: err.message });
-          }
+          [
+            reverseReference,
+            transfer.date,
+            `Reversal: ${transfer.description}`,
+          ],
+          function (err) {
+            if (err) {
+              db.run("ROLLBACK");
+              return res.status(500).json({ error: err.message });
+            }
 
-          const reversalEntryId = this.lastID;
+            const reversalEntryId = this.lastID;
 
-          // Reverse Debit & Credit for Reversal Entry
-          db.run(
-            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
+            // Reverse Debit & Credit for Reversal Entry
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
              VALUES (?, ?, 0, ?, 'FUNDS TRANSFER REVERSAL')`,
-            [reversalEntryId, transfer.to_account, transfer.amount],
-            function (err) {
-              if (err) {
-                db.run("ROLLBACK");
-                return res.status(500).json({ error: err.message });
+              [reversalEntryId, transfer.to_account, transfer.amount],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
               }
-            }
-          );
+            );
 
-          db.run(
-            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, entry_type)
              VALUES (?, ?, ?, 0, 'FUNDS TRANSFER REVERSAL')`,
-            [reversalEntryId, transfer.from_account, transfer.amount],
-            function (err) {
-              if (err) {
-                db.run("ROLLBACK");
-                return res.status(500).json({ error: err.message });
+              [reversalEntryId, transfer.from_account, transfer.amount],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
               }
-            }
-          );
+            );
 
-          // Mark transfer as REVERSED in funds_transfers
-          db.run(
-            `UPDATE funds_transfers SET status = 'REVERSED' WHERE id = ?`,
-            [id],
-            function (err) {
-              if (err) {
-                db.run("ROLLBACK");
-                return res.status(500).json({ error: err.message });
+            // Mark transfer as REVERSED in funds_transfers
+            db.run(
+              `UPDATE funds_transfers SET status = 'REVERSED' WHERE id = ?`,
+              [id],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
               }
-            }
-          );
+            );
 
-          // Log Reversal in audit_trails
-          db.run(
-            `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+            // Log Reversal in audit_trails
+            db.run(
+              `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
              VALUES (?, 'funds_transfer', ?, 'update', ?)`,
-            [user_id, id, JSON.stringify({ status: "REVERSED" })],
-            function (err) {
-              if (err) {
-                db.run("ROLLBACK");
-                return res.status(500).json({ error: err.message });
+              [user_id, id, JSON.stringify({ status: "REVERSED" })],
+              function (err) {
+                if (err) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({ error: err.message });
+                }
               }
-            }
-          );
+            );
 
-          db.run("COMMIT");
-          res.json({ message: "Funds transfer reversed successfully" });
-        }
-      );
-    });
-  });
+            db.run("COMMIT");
+            res.json({ message: "Funds transfer reversed successfully" });
+          }
+        );
+      });
+    }
+  );
 });
-
 
 // DELETE FUNDS TRANSFER
 app.delete("/funds-transfer/:id", (req, res) => {
   const { id } = req.params;
 
-  db.get(`SELECT * FROM journal_entries WHERE id = ? AND adjustment_type = 'FUNDS TRANSFER'`, [id], (err, entry) => {
-    if (err || !entry) return res.status(404).json({ error: "Transfer not found" });
+  db.get(
+    `SELECT * FROM journal_entries WHERE id = ? AND adjustment_type = 'FUNDS TRANSFER'`,
+    [id],
+    (err, entry) => {
+      if (err || !entry)
+        return res.status(404).json({ error: "Transfer not found" });
 
-    db.serialize(() => {
-      db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
+      db.serialize(() => {
+        db.run(
+          `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
+          [id],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
 
-        db.run(`DELETE FROM journal_entries WHERE id = ?`, [id], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-
-          db.run(
-            `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
-             VALUES (?, 'funds_transfer', ?, 'delete', ?)`,
-            [1, id, JSON.stringify({ message: "Funds transfer deleted" })],
-            function (err) {
+            db.run(`DELETE FROM journal_entries WHERE id = ?`, [id], (err) => {
               if (err) return res.status(500).json({ error: err.message });
-            }
-          );
 
-          res.json({ message: "Funds transfer deleted successfully" });
-        });
+              db.run(
+                `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes)
+             VALUES (?, 'funds_transfer', ?, 'delete', ?)`,
+                [1, id, JSON.stringify({ message: "Funds transfer deleted" })],
+                function (err) {
+                  if (err) return res.status(500).json({ error: err.message });
+                }
+              );
+
+              res.json({ message: "Funds transfer deleted successfully" });
+            });
+          }
+        );
       });
-    });
-  });
+    }
+  );
 });
 // ===================== Customer Groups Endpoints =====================
 
@@ -4522,9 +4664,9 @@ app.post("/transactions", (req, res) => {
     description,
     debit_account_id,
   } = req.body;
-  account_id=credit_account_id
-  payment_method_id = debit_account_id
-console.log("account id",account_id)
+  account_id = credit_account_id;
+  payment_method_id = debit_account_id;
+  console.log("account id", account_id);
   const reference_number = `TXN${Date.now()}`;
   const date = transaction_date;
   const transaction_description = description || "Transaction entry";
