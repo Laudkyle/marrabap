@@ -11,6 +11,7 @@ import Header from "./components/Header";
 import ProductList from "./components/ProductList";
 import Transactions from "./components/Transactions";
 import Adjustments from "./components/Adjustments";
+import JournalEntry from "./components/JournalEntry";
 import AddPurchaseOrder from "./components/AddPurchaseOrder";
 import EditPurchaseOrder from "./components/EditPurchaseOrder";
 import ExpenseList from "./components/ExpenseList";
@@ -134,6 +135,7 @@ const App = () => {
             <Route path="/funds-transfer" element={<PrivateRoute><FundsTransferComponent /></PrivateRoute>} />
             <Route path="/balance-sheet" element={<PrivateRoute><BalanceSheet /></PrivateRoute>} />
             <Route path="/trial-balance" element={<PrivateRoute><TrailBalance /></PrivateRoute>} />
+            <Route path="/journal-entry" element={<PrivateRoute><JournalEntry /></PrivateRoute>} />
           </Routes>
         </div>
       </div>

@@ -664,6 +664,12 @@ db.run(`CREATE TABLE expense_invoices (
   FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
 );
 `)
+
+db.run(`-- Create a temporary table to hold the journal entry ID
+CREATE TABLE IF NOT EXISTS temp_journal_id (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    journal_entry_id INTEGER
+);`)
 db.run(`CREATE TABLE transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   transaction_date DATE NOT NULL,
@@ -758,7 +764,9 @@ BEGIN
 END;
 `);
 
-db.run(`CREATE TRIGGER handle_sales_updates
+db.run(`
+
+CREATE TRIGGER handle_sales_updates
 AFTER INSERT ON sales
 BEGIN
     -- Create a new journal entry for the sale
@@ -770,10 +778,14 @@ BEGIN
         'posted'
     );
 
-    -- Sales Revenue (Based on selling price minus discount, before tax)
+    -- Store the newly created journal_entry_id
+    INSERT INTO temp_journal_id (journal_entry_id) 
+    VALUES (last_insert_rowid());
+
+    -- Retrieve the stored journal_entry_id
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     VALUES (
-        (SELECT last_insert_rowid()),
+        (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1),
         (SELECT id FROM chart_of_accounts WHERE account_code = '4000'),
         0,
         NEW.selling_price * NEW.quantity - 
@@ -784,10 +796,10 @@ BEGIN
             END
     );
 
-    -- Accounts Receivable for credit sales (total price including all taxes)
+    -- Accounts Receivable for credit sales
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT
-        (SELECT last_insert_rowid()),
+        (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1),
         (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),
         NEW.total_price,
         0
@@ -796,7 +808,7 @@ BEGIN
     -- Cost of Goods Sold
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     VALUES (
-        (SELECT last_insert_rowid()),
+        (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1),
         (SELECT id FROM chart_of_accounts WHERE account_code = '5000'),
         ROUND((SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id), 2),
         0
@@ -805,7 +817,7 @@ BEGIN
     -- Inventory reduction
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     VALUES (
-        (SELECT last_insert_rowid()),
+        (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1),
         (SELECT id FROM chart_of_accounts WHERE account_code = '1020'),
         0,
         ROUND((SELECT cost_per_unit * NEW.quantity FROM inventory WHERE inventory.product_id = NEW.product_id), 2)
@@ -814,7 +826,7 @@ BEGIN
     -- Discount Entries (if applicable)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT 
-        (SELECT last_insert_rowid()),
+        (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1),
         (SELECT id FROM chart_of_accounts WHERE account_code = '6000'),
         ROUND(
             CASE 
@@ -830,7 +842,7 @@ BEGIN
     -- Accounts Receivable adjustment for discount (if applicable)
     INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit)
     SELECT 
-        (SELECT last_insert_rowid()),
+        (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1),
         (SELECT id FROM chart_of_accounts WHERE account_code = '1010'),
         0,
         ROUND(
@@ -842,7 +854,11 @@ BEGIN
             2
         )
     WHERE NEW.discount_amount > 0 AND NEW.payment_method = 'credit';
-END;`)
+
+    -- Clean up the temp table entry after inserting journal entry lines
+    DELETE FROM temp_journal_id WHERE journal_entry_id = (SELECT journal_entry_id FROM temp_journal_id ORDER BY id DESC LIMIT 1);
+END;
+`)
 
 
   db.run(`CREATE TRIGGER handle_tax_journal_entries

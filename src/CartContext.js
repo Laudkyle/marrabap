@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import API from "./api";
 
 const CartContext = createContext();
 
@@ -87,21 +88,15 @@ export const CartProvider = ({ children }) => {
 
       console.log("Sales data:", salesData);
 
-      const response = await fetch("http://localhost:5000/sales", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(salesData),
-      });
+      const response = await API.post("/sales",salesData);
 
-      if (!response.ok) {
-        const errorText = await response.text();
+      if (!response.status==201) {
+        const errorText = await response.status;
         console.error("Error response text:", errorText);
         throw new Error(`Failed to process sale: ${errorText}`);
       }
 
-      const responseData = await response.json();
+      const responseData = await response.data;
       console.log("Sales logged:", responseData);
 
       return response;

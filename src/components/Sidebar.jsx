@@ -183,6 +183,11 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Transfer Funds",
           icon: <ArrowLeftRight className="w-4 h-4" />,
         },
+        {
+          path: "/journal-entry",
+          label: "Journal Entry",
+          icon: <BookOpenCheck className="w-4 h-4" />,
+        },
       ],
     },
     {

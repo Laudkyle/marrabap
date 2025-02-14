@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { toast } from "react-toastify";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import DataTable from "react-data-table-component";
-import API from "../api";
+import API from "../api"
 const AdjustmentsComponent = () => {
   const [adjustments, setAdjustments] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -34,8 +34,8 @@ const AdjustmentsComponent = () => {
     try {
       const queryParams = new URLSearchParams(filters).toString();
       const [adjustmentsRes, accountsRes] = await Promise.all([
-        API.get(`/adjustments?${queryParams}`),
-        API.get("/accounts"),
+        API.get(`http://localhost:5000/adjustments?${queryParams}`),
+        API.get("http://localhost:5000/accounts"),
       ]);
 
       const adjustmentsData = adjustmentsRes.ok
@@ -63,8 +63,8 @@ const AdjustmentsComponent = () => {
 
     try {
       const endpoint = currentAdjustment.id
-        ? `/adjustments/${currentAdjustment.id}`
-        : "/adjustments";
+        ? `http://localhost:5000/adjustments/${currentAdjustment.id}`
+        : "http://localhost:5000/adjustments";
 
       const method = currentAdjustment.id ? "PUT" : "POST";
 
@@ -145,7 +145,7 @@ const AdjustmentsComponent = () => {
       return;
 
     try {
-      await fetch(`/adjustments/${id}`, {
+      await fetch(`http://localhost:5000/adjustments/${id}`, {
         method: "DELETE",
       });
       toast.success("Adjustment deleted!");

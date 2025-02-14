@@ -1568,10 +1568,10 @@ app.get("/drafts/:id",authenticateUser, (req, res) => {
     }
   });
 });
-
 // Add a new draft
-app.post("/drafts",authenticateUser, (req, res) => {
+app.post("/drafts", authenticateUser, (req, res) => {
   const { referenceNumber, details, date, status } = req.body;
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
   if (!referenceNumber || !details || !date) {
     return res
@@ -1589,8 +1589,18 @@ app.post("/drafts",authenticateUser, (req, res) => {
         console.error("Error adding draft:", err.message);
         res.status(500).send("Error adding draft");
       } else {
+        const newDraftId = this.lastID;
+
+        // Log audit trail for draft creation
+        logAuditTrail(req, db, "drafts", newDraftId, "insert", {
+          reference_number: referenceNumber,
+          details,
+          date,
+          status: status || "pending",
+        });
+
         res.status(201).json({
-          id: this.lastID,
+          id: newDraftId,
           referenceNumber,
           details,
           date,
@@ -1602,28 +1612,33 @@ app.post("/drafts",authenticateUser, (req, res) => {
 });
 
 // Update a draft
-app.put("/drafts/:id",authenticateUser, (req, res) => {
+app.put("/drafts/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { referenceNumber, details, date, status } = req.body;
 
   const fields = [];
   const values = [];
+  const changes = {};
 
   if (referenceNumber) {
     fields.push("reference_number = ?");
     values.push(referenceNumber);
+    changes.reference_number = referenceNumber;
   }
   if (details) {
     fields.push("details = ?");
     values.push(JSON.stringify(details));
+    changes.details = details;
   }
   if (date) {
     fields.push("date = ?");
     values.push(date);
+    changes.date = date;
   }
   if (status) {
     fields.push("status = ?");
     values.push(status);
+    changes.status = status;
   }
 
   if (fields.length === 0) {
@@ -1641,29 +1656,50 @@ app.put("/drafts/:id",authenticateUser, (req, res) => {
     } else if (this.changes === 0) {
       res.status(404).send("Draft not found");
     } else {
+      // Log audit trail for draft update
+      logAuditTrail(req, db, "drafts", id, "update", changes);
+
       res.json({ id, referenceNumber, details, date, status });
     }
   });
 });
 
 // Delete a draft
-app.delete("/drafts/:id",authenticateUser, (req, res) => {
+app.delete("/drafts/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
-  db.run("DELETE FROM drafts WHERE id = ?", [id], function (err) {
+
+  db.get("SELECT * FROM drafts WHERE id = ?", [id], (err, draft) => {
     if (err) {
-      console.error("Error deleting draft:", err.message);
-      res.status(500).send("Error deleting draft");
-    } else if (this.changes === 0) {
-      res.status(404).send("Draft not found");
-    } else {
-      res.status(204).send();
+      console.error("Error finding draft:", err.message);
+      return res.status(500).send("Error deleting draft");
     }
+
+    if (!draft) {
+      return res.status(404).send("Draft not found");
+    }
+
+    db.run("DELETE FROM drafts WHERE id = ?", [id], function (err) {
+      if (err) {
+        console.error("Error deleting draft:", err.message);
+        res.status(500).send("Error deleting draft");
+      } else {
+        // Log audit trail for draft deletion
+        logAuditTrail(req, db, "drafts", id, "delete", {
+          reference_number: draft.reference_number,
+          details: JSON.parse(draft.details),
+          date: draft.date,
+          status: draft.status,
+        });
+
+        res.status(204).send();
+      }
+    });
   });
 });
-// ===================== Invoice Endpoints =====================
 
+// ===================== Invoice Endpoints =====================
 // Create invoice (POST request)
-app.post("/invoices",authenticateUser, (req, res) => {
+app.post("/invoices", authenticateUser, (req, res) => {
   const {
     reference_number,
     customer_id,
@@ -1672,6 +1708,8 @@ app.post("/invoices",authenticateUser, (req, res) => {
     due_date = null,
     status = "unpaid",
   } = req.body;
+
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
   const sql = `
     INSERT INTO invoices (reference_number, customer_id, total_amount, amount_paid, due_date, status)
@@ -1692,7 +1730,19 @@ app.post("/invoices",authenticateUser, (req, res) => {
       if (err) {
         res.status(500).json({ error: err.message });
       } else {
-        res.status(201).json({ id: this.lastID });
+        const newInvoiceId = this.lastID;
+
+        // Log audit trail for invoice creation
+        logAuditTrail(req, db, "invoices", newInvoiceId, "insert", {
+          reference_number,
+          customer_id,
+          total_amount,
+          amount_paid,
+          due_date,
+          status,
+        });
+
+        res.status(201).json({ id: newInvoiceId });
       }
     }
   );
@@ -1741,52 +1791,87 @@ app.get("/invoices/customer/:customer_id",authenticateUser, (req, res) => {
     }
   });
 });
-
 // Update an invoice (PUT request)
-app.put("/invoices/:reference_number",authenticateUser, (req, res) => {
+app.put("/invoices/:reference_number", authenticateUser, (req, res) => {
   const { reference_number } = req.params;
   const { total_amount, amount_paid, due_date, status } = req.body;
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
-  const sql = `
-    UPDATE invoices
-    SET total_amount = ?, amount_paid = ?, due_date = ?, status = ?
-    WHERE reference_number = ?
-  `;
+  // Fetch existing invoice before updating
+  const fetchInvoiceSQL = "SELECT * FROM invoices WHERE reference_number = ?";
 
-  db.run(
-    sql,
-    [total_amount, amount_paid, due_date, status, reference_number],
-    function (err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-      } else if (this.changes === 0) {
-        res.status(404).json({ message: "Invoice not found" });
-      } else {
+  db.get(fetchInvoiceSQL, [reference_number], (err, existingInvoice) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    } else if (!existingInvoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    const sql = `
+      UPDATE invoices
+      SET total_amount = ?, amount_paid = ?, due_date = ?, status = ?
+      WHERE reference_number = ?
+    `;
+
+    db.run(
+      sql,
+      [total_amount, amount_paid, due_date, status, reference_number],
+      function (err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        } else if (this.changes === 0) {
+          return res.status(404).json({ message: "No changes made to the invoice" });
+        }
+
+        // Log audit trail for invoice update
+        logAuditTrail(req, db, "invoices", reference_number, "update", {
+          previous: existingInvoice,
+          updated: { total_amount, amount_paid, due_date, status },
+        });
+
         res.status(200).json({ message: "Invoice updated successfully" });
       }
-    }
-  );
+    );
+  });
 });
 
 // Delete an invoice (DELETE request)
-app.delete("/invoices/:reference_number",authenticateUser, (req, res) => {
+app.delete("/invoices/:reference_number", authenticateUser, (req, res) => {
   const { reference_number } = req.params;
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
-  const sql = "DELETE FROM invoices WHERE reference_number = ?";
+  // Fetch invoice before deleting for audit logging
+  const fetchInvoiceSQL = "SELECT * FROM invoices WHERE reference_number = ?";
 
-  db.run(sql, [reference_number], function (err) {
+  db.get(fetchInvoiceSQL, [reference_number], (err, existingInvoice) => {
     if (err) {
-      res.status(500).json({ error: err.message });
-    } else if (this.changes === 0) {
-      res.status(404).json({ message: "Invoice not found" });
-    } else {
-      res.status(200).json({ message: "Invoice deleted successfully" });
+      return res.status(500).json({ error: err.message });
+    } else if (!existingInvoice) {
+      return res.status(404).json({ message: "Invoice not found" });
     }
+
+    const sql = "DELETE FROM invoices WHERE reference_number = ?";
+
+    db.run(sql, [reference_number], function (err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      } else if (this.changes === 0) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Log audit trail for invoice deletion
+      logAuditTrail(req, db, "invoices", reference_number, "delete", {
+        deleted_invoice: existingInvoice,
+      });
+
+      res.status(200).json({ message: "Invoice deleted successfully" });
+    });
   });
 });
 
 // ===================== Supplier Payments Endpoints =====================
-app.post("/supplier_payments",authenticateUser, (req, res) => {
+// ===================== Supplier Payments Endpoints =====================
+app.post("/supplier_payments", authenticateUser, (req, res) => {
   const {
     supplier_id,
     purchase_order_id,
@@ -1794,6 +1879,8 @@ app.post("/supplier_payments",authenticateUser, (req, res) => {
     payment_method,
     payment_reference,
   } = req.body;
+
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
   if (!supplier_id || !amount_paid || !payment_method) {
     return res
@@ -1848,6 +1935,15 @@ app.post("/supplier_payments",authenticateUser, (req, res) => {
 
       const paymentId = this.lastID;
 
+      // ✅ Step 3: Log audit trail for new supplier payment
+      logAuditTrail(req, db, "supplier_payments", paymentId, "insert", {
+        supplier_id,
+        purchase_order_id,
+        amount_paid,
+        payment_method,
+        payment_reference,
+      });
+
       // Step 4: Update the purchase order's payment status if applicable
       if (purchase_order_id) {
         const updatePurchaseOrderQuery = `
@@ -1859,22 +1955,25 @@ app.post("/supplier_payments",authenticateUser, (req, res) => {
           END
           WHERE id = ?
         `;
-        db.run(
-          updatePurchaseOrderQuery,
-          [purchase_order_id, purchase_order_id],
-          (err) => {
-            if (err) {
-              console.error("Error updating purchase order:", err.message);
-            }
+
+        db.run(updatePurchaseOrderQuery, [purchase_order_id, purchase_order_id], function (err) {
+          if (err) {
+            console.error("Error updating purchase order:", err.message);
+          } else if (this.changes > 0) {
+            // ✅ Step 5: Log audit trail for purchase order payment update
+            logAuditTrail(req, db, "purchase_orders", purchase_order_id, "update", {
+              updated_payment_status: this.changes > 0 ? "Payment status updated" : "No changes",
+            });
           }
-        );
+        });
       }
 
-      // Step 5: Send success response
+      // Step 6: Send success response
       res.status(201).send({ id: paymentId });
     });
   });
 });
+
 
 // READ: Get all supplier payments
 app.get("/supplier_payments",authenticateUser, (req, res) => {
@@ -1904,8 +2003,10 @@ app.get("/supplier_payments/:id",authenticateUser, (req, res) => {
     res.status(200).json(row);
   });
 });
+
+
 // UPDATE: Update a supplier payment
-app.put("/supplier_payments/:id",authenticateUser, (req, res) => {
+app.put("/supplier_payments/:id", authenticateUser, (req, res) => {
   const {
     supplier_id,
     purchase_order_id,
@@ -1914,45 +2015,87 @@ app.put("/supplier_payments/:id",authenticateUser, (req, res) => {
     payment_reference,
   } = req.body;
 
-  const query = `
-    UPDATE supplier_payments
-    SET supplier_id = ?, purchase_order_id = ?, amount_paid = ?, payment_method = ?, payment_reference = ?
-    WHERE id = ?
-  `;
-  const params = [
-    supplier_id,
-    purchase_order_id,
-    amount_paid,
-    payment_method,
-    payment_reference,
-    req.params.id,
-  ];
+  const paymentId = req.params.id;
+  const userId = req.user.id; // Get user ID from authenticateUser middleware
 
-  db.run(query, params, function (err) {
+  // Fetch existing payment details before update (for logging)
+  db.get("SELECT * FROM supplier_payments WHERE id = ?", [paymentId], (err, oldPayment) => {
     if (err) {
-      console.error("Error updating supplier payment:", err.message);
-      return res.status(500).send("Failed to update supplier payment.");
+      console.error("Error fetching supplier payment:", err.message);
+      return res.status(500).send("Failed to fetch supplier payment.");
     }
-    if (this.changes === 0) {
+    if (!oldPayment) {
       return res.status(404).send("Supplier payment not found.");
     }
-    res.status(200).send("Supplier payment updated successfully.");
+
+    // Update supplier payment
+    const query = `
+      UPDATE supplier_payments
+      SET supplier_id = ?, purchase_order_id = ?, amount_paid = ?, payment_method = ?, payment_reference = ?
+      WHERE id = ?
+    `;
+    const params = [
+      supplier_id,
+      purchase_order_id,
+      amount_paid,
+      payment_method,
+      payment_reference,
+      paymentId,
+    ];
+
+    db.run(query, params, function (err) {
+      if (err) {
+        console.error("Error updating supplier payment:", err.message);
+        return res.status(500).send("Failed to update supplier payment.");
+      }
+      if (this.changes === 0) {
+        return res.status(404).send("Supplier payment not found.");
+      }
+
+      // ✅ Log audit trail for update
+      logAuditTrail(req, db, "supplier_payments", paymentId, "update", {
+        oldData: oldPayment,
+        newData: { supplier_id, purchase_order_id, amount_paid, payment_method, payment_reference },
+      });
+
+      res.status(200).send("Supplier payment updated successfully.");
+    });
   });
 });
-// DELETE: Delete a supplier payment
-app.delete("/supplier_payments/:id",authenticateUser, (req, res) => {
-  const query = "DELETE FROM supplier_payments WHERE id = ?";
-  const params = [req.params.id];
 
-  db.run(query, params, function (err) {
+// DELETE: Delete a supplier payment
+app.delete("/supplier_payments/:id", authenticateUser, (req, res) => {
+  const paymentId = req.params.id;
+  const userId = req.user.id;
+
+  // Fetch existing payment details before deletion (for logging)
+  db.get("SELECT * FROM supplier_payments WHERE id = ?", [paymentId], (err, oldPayment) => {
     if (err) {
-      console.error("Error deleting supplier payment:", err.message);
-      return res.status(500).send("Failed to delete supplier payment.");
+      console.error("Error fetching supplier payment:", err.message);
+      return res.status(500).send("Failed to fetch supplier payment.");
     }
-    if (this.changes === 0) {
+    if (!oldPayment) {
       return res.status(404).send("Supplier payment not found.");
     }
-    res.status(200).send("Supplier payment deleted successfully.");
+
+    // Delete supplier payment
+    const query = "DELETE FROM supplier_payments WHERE id = ?";
+    db.run(query, [paymentId], function (err) {
+      if (err) {
+        console.error("Error deleting supplier payment:", err.message);
+        return res.status(500).send("Failed to delete supplier payment.");
+      }
+      if (this.changes === 0) {
+        return res.status(404).send("Supplier payment not found.");
+      }
+
+      // ✅ Log audit trail for delete
+      logAuditTrail(req, db, "supplier_payments", paymentId, "delete", {
+        deletedData: oldPayment,
+      });
+
+      res.status(200).send("Supplier payment deleted successfully.");
+    });
   });
 });
 
@@ -1978,6 +2121,7 @@ app.post("/payment-methods",authenticateUser, (req, res) => {
       .send({ id: this.lastID, message: "Payment method created." });
   });
 });
+
 app.get("/payment-methods",authenticateUser, (req, res) => {
   const query = `
     SELECT 
@@ -6531,6 +6675,115 @@ app.get("/chart-of-accounts",authenticateUser, (req, res) => {
     );
     res.status(500).send("Failed to fetch chart of accounts.");
   }
+});
+
+// ===================== Journal Entry =====================
+// ✅ Get all journal entries
+app.get("/journal_entry", (req, res) => {
+  const sql = "SELECT * FROM journal_entries ORDER BY date DESC";
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// ✅ Get a specific journal entry and its lines
+app.get("/journal_entry/:id", (req, res) => {
+  const { id } = req.params;
+  db.get("SELECT * FROM journal_entries WHERE id = ?", [id], (err, entry) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!entry) return res.status(404).json({ message: "Entry not found" });
+
+    db.all("SELECT * FROM journal_entry_lines WHERE journal_entry_id = ?", [id], (err, lines) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ entry, lines });
+    });
+  });
+});
+
+// ✅ Create a new journal entry with lines
+app.post("/journal_entry", (req, res) => {
+  const { reference_number, date, description, adjustment_type, status, journal_lines } = req.body;
+
+  // Validate that debits equal credits
+  const totalDebit = journal_lines.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
+  const totalCredit = journal_lines.reduce((sum, line) => sum + parseFloat(line.credit || 0), 0);
+  if (totalDebit !== totalCredit) return res.status(400).json({ error: "Total debits must equal total credits" });
+
+  // Insert journal entry
+  const sql = `INSERT INTO journal_entries (reference_number, date, description, adjustment_type, status) VALUES (?, ?, ?, ?, ?)`;
+  const values = [reference_number, date, description, adjustment_type, status];
+
+  db.run(sql, values, function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const journalEntryId = this.lastID; // Get the inserted journal entry ID
+    const placeholders = journal_lines.map(() => "(?, ?, ?, ?)").join(",");
+    const lineValues = journal_lines.flatMap(line => [journalEntryId, line.account_id, line.debit, line.credit]);
+
+    // Insert journal entry lines
+    db.run(
+      `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES ${placeholders}`,
+      lineValues,
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Journal entry created successfully", journal_entry_id: journalEntryId });
+      }
+    );
+  });
+});
+
+// ✅ Update a journal entry
+app.put("/journal_entry/:id", (req, res) => {
+  const { id } = req.params;
+  const { reference_number, date, description, adjustment_type, status, journal_lines } = req.body;
+
+  // Validate that debits equal credits
+  const totalDebit = journal_lines.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
+  const totalCredit = journal_lines.reduce((sum, line) => sum + parseFloat(line.credit || 0), 0);
+  if (totalDebit !== totalCredit) return res.status(400).json({ error: "Total debits must equal total credits" });
+
+  // Update journal entry
+  const sql = `UPDATE journal_entries SET reference_number = ?, date = ?, description = ?, adjustment_type = ?, status = ? WHERE id = ?`;
+  const values = [reference_number, date, description, adjustment_type, status, id];
+
+  db.run(sql, values, function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    // Delete existing journal entry lines
+    db.run("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?", [id], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      // Insert new journal entry lines
+      const placeholders = journal_lines.map(() => "(?, ?, ?, ?)").join(",");
+      const lineValues = journal_lines.flatMap(line => [id, line.account_id, line.debit, line.credit]);
+
+      db.run(
+        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES ${placeholders}`,
+        lineValues,
+        function (err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ message: "Journal entry updated successfully" });
+        }
+      );
+    });
+  });
+});
+
+// ✅ Delete a journal entry
+app.delete("/journal_entry/:id", (req, res) => {
+  const { id } = req.params;
+
+  // Delete journal entry
+  db.run("DELETE FROM journal_entries WHERE id = ?", [id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    // Delete journal entry lines
+    db.run("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?", [id], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: "Journal entry deleted successfully" });
+    });
+  });
 });
 
 // ===================== Server Initialization =====================
