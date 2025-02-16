@@ -25,7 +25,7 @@ const Transactions = () => {
   // Fetch Transactions
   const fetchTransactions = async () => {
     try {
-      const response = await API.get("http://localhost:5000/transactions");
+      const response = await API.get("/transactions");
       setTransactions(response.data);
     } catch (error) {
       toast.error("Error fetching transactions");
