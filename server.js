@@ -603,7 +603,7 @@ app.delete("/inventory/:id", authenticateUser, (req, res) => {
 });
 
 // Get all purchase orders
-app.get("/purchase_orders", (req, res) => {
+app.get("/purchase_orders", authenticateUser,(req, res) => {
   db.all("SELECT * FROM purchase_orders ORDER BY id DESC", (err, rows) => {
     if (err) {
       console.error(err);
@@ -1502,9 +1502,8 @@ app.put("/accounts/:id",authenticateUser, (req, res) => {
 
 }
 );
-// Recursive function to update parent account balances
 const updateParentBalance = (parentId, callback) => {
-  if (!parentId) return callback(null); // If no parent, stop here
+  if (!parentId) return callback(null); // Stop if there's no parent
 
   db.all(
     "SELECT SUM(balance) AS total_balance FROM chart_of_accounts WHERE parent_account_id = ?",
@@ -1520,7 +1519,7 @@ const updateParentBalance = (parentId, callback) => {
         (err) => {
           if (err) return callback(err);
 
-          // Check if the parent itself has a parent and recursively update
+          // Recursively update the grandparent if exists
           db.get(
             "SELECT parent_account_id FROM chart_of_accounts WHERE id = ?",
             [parentId],
@@ -1534,6 +1533,32 @@ const updateParentBalance = (parentId, callback) => {
               }
             }
           );
+        }
+      );
+    }
+  );
+};
+
+// Function to update parent after removing a child
+const removeChildFromParent = (childId, callback) => {
+  db.get(
+    "SELECT parent_account_id FROM chart_of_accounts WHERE id = ?",
+    [childId],
+    (err, child) => {
+      if (err) return callback(err);
+      if (!child?.parent_account_id) return callback(null); // No parent, nothing to update
+
+      const oldParentId = child.parent_account_id;
+
+      // Remove the child-parent link
+      db.run(
+        "UPDATE chart_of_accounts SET parent_account_id = NULL WHERE id = ?",
+        [childId],
+        (err) => {
+          if (err) return callback(err);
+
+          // Recalculate the old parent's balance
+          updateParentBalance(oldParentId, callback);
         }
       );
     }
@@ -2690,7 +2715,7 @@ app.post("/sales",authenticateUser, async(req, res) => {
   }
 });
 
-app.get("/sales", (req, res) => {
+app.get("/sales",authenticateUser, (req, res) => {
   db.all(
     `SELECT 
         sales.id, 
@@ -5181,142 +5206,159 @@ app.get("/processpayment/:id",authenticateUser, (req, res) => {
     res.json(row);
   });
 });
-
 // ✅ 3. Create a new payment
-app.post("/processpayment",authenticateUser, (req, res) => {
+app.post("/processpayment", authenticateUser, (req, res) => {
   const { payment_date, amount, account_id, payment_method_id, description } =
     req.body;
 
   const reference_number = `PAY-${Date.now()}`;
   const payment_description = description || "Payment processed";
 
-  db.run(
-    `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-    [reference_number, payment_date, payment_description],
-    function (err) {
-      if (err) {
-        console.error("Error creating journal entry:", err.message);
-        return res.status(500).send("Error creating journal entry");
+  // Fetch account_id from payment_methods table
+  db.get(
+    `SELECT account_id FROM payment_methods WHERE id = ?`,
+    [payment_method_id],
+    (err, paymentMethod) => {
+      if (err || !paymentMethod) {
+        console.error(
+          "Error fetching payment method account:",
+          err?.message || "Payment method not found"
+        );
+        return res.status(500).send("Error fetching payment method account");
       }
 
-      const journal_entry_id = this.lastID;
+      const actual_payment_method_id = paymentMethod.account_id;
 
-      // Fetch account types
-      db.get(
-        `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
-        [account_id],
-        (err, account) => {
-          if (err || !account) {
-            console.error(
-              "Error fetching account type:",
-              err?.message || "Account not found"
-            );
-            return res.status(500).send("Error fetching account type");
+      // Create journal entry
+      db.run(
+        `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+        [reference_number, payment_date, payment_description],
+        function (err) {
+          if (err) {
+            console.error("Error creating journal entry:", err.message);
+            return res.status(500).send("Error creating journal entry");
           }
 
+          const journal_entry_id = this.lastID;
+
+          // Fetch account types
           db.get(
             `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
-            [payment_method_id],
-            (err, payment_account) => {
-              if (err || !payment_account) {
+            [account_id],
+            (err, account) => {
+              if (err || !account) {
                 console.error(
-                  "Error fetching payment method account type:",
-                  err?.message || "Payment method not found"
+                  "Error fetching account type:",
+                  err?.message || "Account not found"
                 );
-                return res
-                  .status(500)
-                  .send("Error fetching payment method account type");
+                return res.status(500).send("Error fetching account type");
               }
 
-              const transactionAccountType = account.account_type;
-              const paymentAccountType = payment_account.account_type;
-
-              // Determine debit/credit for transaction account
-              let debitAmount = 0,
-                creditAmount = 0;
-              if (
-                transactionAccountType === "liability" ||
-                transactionAccountType === "equity"
-              ) {
-                debitAmount = amount; // Reduce liability or equity
-              } else {
-                creditAmount = amount; // Other account types are credited
-              }
-
-              db.run(
-                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                [journal_entry_id, account_id, debitAmount, creditAmount],
-                function (err) {
-                  if (err) {
+              db.get(
+                `SELECT account_type FROM chart_of_accounts WHERE id = ?`,
+                [actual_payment_method_id],
+                (err, payment_account) => {
+                  if (err || !payment_account) {
                     console.error(
-                      "Error creating transaction journal entry line:",
-                      err.message
+                      "Error fetching payment method account type:",
+                      err?.message || "Payment method not found"
                     );
                     return res
                       .status(500)
-                      .send("Error creating transaction journal entry line");
+                      .send("Error fetching payment method account type");
                   }
 
-                  // Determine debit/credit for payment method
-                  let paymentDebitAmount = 0,
-                    paymentCreditAmount = 0;
+                  const transactionAccountType = account.account_type;
+                  const paymentAccountType = payment_account.account_type;
 
+                  // Determine debit/credit for transaction account
+                  let debitAmount = 0,
+                    creditAmount = 0;
                   if (
-                    paymentAccountType === "asset" ||
-                    paymentAccountType === "expense"
+                    transactionAccountType === "liability" ||
+                    transactionAccountType === "equity"
                   ) {
-                    paymentCreditAmount = amount; // Reduce assets (Cash, Bank) or expenses
+                    debitAmount = amount; // Reduce liability or equity
                   } else {
-                    paymentDebitAmount = amount; // Other account types are debited
+                    creditAmount = amount; // Other account types are credited
                   }
 
                   db.run(
                     `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                    [
-                      journal_entry_id,
-                      payment_method_id,
-                      paymentDebitAmount,
-                      paymentCreditAmount,
-                    ],
+                    [journal_entry_id, account_id, debitAmount, creditAmount],
                     function (err) {
                       if (err) {
                         console.error(
-                          "Error creating payment journal entry line:",
+                          "Error creating transaction journal entry line:",
                           err.message
                         );
                         return res
                           .status(500)
-                          .send("Error creating payment journal entry line");
+                          .send("Error creating transaction journal entry line");
                       }
 
-                      // Insert into payments table
+                      // Determine debit/credit for payment method
+                      let paymentDebitAmount = 0,
+                        paymentCreditAmount = 0;
+
+                      if (
+                        paymentAccountType === "asset" ||
+                        paymentAccountType === "expense"
+                      ) {
+                        paymentCreditAmount = amount; // Reduce assets (Cash, Bank) or expenses
+                      } else {
+                        paymentDebitAmount = amount; // Other account types are debited
+                      }
+
                       db.run(
-                        `INSERT INTO processpayments (reference_number,payment_date, amount, account_id, payment_method_id, description, journal_entry_id) 
-                     VALUES (?,?, ?, ?, ?, ?, ?)`,
+                        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
                         [
-                          reference_number,
-                          payment_date,
-                          amount,
-                          account_id,
-                          payment_method_id,
-                          description,
                           journal_entry_id,
+                          actual_payment_method_id,
+                          paymentDebitAmount,
+                          paymentCreditAmount,
                         ],
                         function (err) {
                           if (err) {
                             console.error(
-                              "Error recording payment:",
+                              "Error creating payment journal entry line:",
                               err.message
                             );
                             return res
                               .status(500)
-                              .send("Error recording payment");
+                              .send("Error creating payment journal entry line");
                           }
 
-                          res.status(201).json({
-                            message: "Payment processed successfully",
-                            journal_entry_id: journal_entry_id,
-                          });
+                          // Insert into payments table
+                          db.run(
+                            `INSERT INTO processpayments (reference_number,payment_date, amount, account_id, payment_method_id, description, journal_entry_id) 
+                     VALUES (?,?, ?, ?, ?, ?, ?)`,
+                            [
+                              reference_number,
+                              payment_date,
+                              amount,
+                              account_id,
+                              actual_payment_method_id, // Use the retrieved account_id
+                              description,
+                              journal_entry_id,
+                            ],
+                            function (err) {
+                              if (err) {
+                                console.error(
+                                  "Error recording payment:",
+                                  err.message
+                                );
+                                return res
+                                  .status(500)
+                                  .send("Error recording payment");
+                              }
+
+                              res.status(201).json({
+                                message: "Payment processed successfully",
+                                journal_entry_id: journal_entry_id,
+                              });
+                            }
+                          );
                         }
                       );
                     }
@@ -6701,6 +6743,7 @@ app.get("/journal_entry/:id", (req, res) => {
   });
 });
 
+
 // ✅ Create a new journal entry with lines
 app.post("/journal_entry", (req, res) => {
   const { reference_number, date, description, adjustment_type, status, journal_lines } = req.body;
@@ -6708,7 +6751,7 @@ app.post("/journal_entry", (req, res) => {
   // Validate that debits equal credits
   const totalDebit = journal_lines.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
   const totalCredit = journal_lines.reduce((sum, line) => sum + parseFloat(line.credit || 0), 0);
-  if (totalDebit !== totalCredit) return res.status(400).json({ error: "Total debits must equal total credits" });
+  if (totalDebit.toFixed(2) !== totalCredit.toFixed(2)) return res.status(400).json({ error: "Total debits must equal total credits" });
 
   // Insert journal entry
   const sql = `INSERT INTO journal_entries (reference_number, date, description, adjustment_type, status) VALUES (?, ?, ?, ?, ?)`;
@@ -6741,7 +6784,7 @@ app.put("/journal_entry/:id", (req, res) => {
   // Validate that debits equal credits
   const totalDebit = journal_lines.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
   const totalCredit = journal_lines.reduce((sum, line) => sum + parseFloat(line.credit || 0), 0);
-  if (totalDebit !== totalCredit) return res.status(400).json({ error: "Total debits must equal total credits" });
+  if (totalDebit.toFixed(2) !== totalCredit.toFixed(2)) return res.status(400).json({ error: "Total debits must equal total credits" });
 
   // Update journal entry
   const sql = `UPDATE journal_entries SET reference_number = ?, date = ?, description = ?, adjustment_type = ?, status = ? WHERE id = ?`;
@@ -6771,7 +6814,7 @@ app.put("/journal_entry/:id", (req, res) => {
 });
 
 // ✅ Delete a journal entry
-app.delete("/journal_entry/:id", (req, res) => {
+app.delete("/journal_entry/:id",authenticateUser, (req, res) => {
   const { id } = req.params;
 
   // Delete journal entry

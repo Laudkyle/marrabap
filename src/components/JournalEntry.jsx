@@ -107,6 +107,7 @@ const JournalEntry = () => {
     { name: "Date", selector: (row) => row.date, sortable: true },
     { name: "Description", selector: (row) => row.description, sortable: true },
     { name: "Status", selector: (row) => row.status, sortable: true },
+    
   ];
 
   return (
