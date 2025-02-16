@@ -5206,107 +5206,83 @@ app.post("/processpayment", authenticateUser, (req, res) => {
 });
 
 // ✅ 4. Update a payment
-app.put("/processpayment/:id",authenticateUser, (req, res) => {
+// ✅ Update a payment
+app.put("/processpayment/:id", authenticateUser, (req, res) => {
   const paymentId = req.params.id;
-  const { payment_date, amount, account_id, payment_method_id, description } =
-    req.body;
+  const { payment_date, amount, account_id, payment_method_id, description } = req.body;
 
-  db.get(
-    `SELECT journal_entry_id FROM processpayments WHERE id = ?`,
-    [paymentId],
-    (err, payment) => {
-      if (err || !payment) {
-        console.error(
-          "Payment not found:",
-          err?.message || "Payment does not exist"
-        );
-        return res.status(404).send("Payment not found");
-      }
+  db.get(`SELECT journal_entry_id FROM processpayments WHERE id = ?`, [paymentId], (err, payment) => {
+    if (err || !payment) {
+      console.error("Payment not found:", err?.message || "Payment does not exist");
+      return res.status(404).send("Payment not found");
+    }
 
-      const journal_entry_id = payment.journal_entry_id;
+    const journal_entry_id = payment.journal_entry_id;
 
-      // Step 1: Update the journal entry
-      db.run(
-        `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
-        [
-          payment_date,
-          description || "Updated payment entry",
-          journal_entry_id,
-        ],
-        function (err) {
+    // Step 1: Update the journal entry
+    db.run(
+      `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
+      [payment_date, description || "Updated payment entry", journal_entry_id],
+      function (err) {
+        if (err) {
+          console.error("Error updating journal entry:", err.message);
+          return res.status(500).send("Error updating journal entry");
+        }
+
+        // Step 2: Remove existing journal entry lines
+        db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journal_entry_id], function (err) {
           if (err) {
-            console.error("Error updating journal entry:", err.message);
-            return res.status(500).send("Error updating journal entry");
+            console.error("Error deleting journal entry lines:", err.message);
+            return res.status(500).send("Error deleting journal entry lines");
           }
 
-          // Step 2: Remove existing journal entry lines
-          db.run(
-            `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
-            [journal_entry_id],
-            function (err) {
-              if (err) {
-                console.error(
-                  "Error deleting journal entry lines:",
-                  err.message
-                );
-                return res
-                  .status(500)
-                  .send("Error deleting journal entry lines");
-              }
-
-              // Reinsert new journal entry lines with the updated data
-              db.run(
-                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                [journal_entry_id, account_id, amount, 0], // Debit the liability
-                function (err) {
-                  if (err) {
-                    return res
-                      .status(500)
-                      .send("Error updating transaction journal entry line");
-                  }
-
-                  db.run(
-                    `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                    [journal_entry_id, payment_method_id, 0, amount], // Credit the asset
-                    function (err) {
-                      if (err) {
-                        return res
-                          .status(500)
-                          .send("Error updating payment journal entry line");
-                      }
-
-                      db.run(
-                        `UPDATE processpayments SET payment_date = ?, amount = ?, account_id = ?, payment_method_id = ?, description = ? WHERE id = ?`,
-                        [
-                          payment_date,
-                          amount,
-                          account_id,
-                          payment_method_id,
-                          description,
-                          paymentId,
-                        ],
-                        function (err) {
-                          if (err) {
-                            return res
-                              .status(500)
-                              .send("Error updating payment");
-                          }
-
-                          res
-                            .status(200)
-                            .json({ message: "Payment updated successfully" });
-                        }
-                      );
-                    }
-                  );
-                }
-              );
+          // Step 3: Fetch account_id from payment_methods
+          db.get(`SELECT account_id FROM payment_methods WHERE id = ?`, [payment_method_id], (err, paymentMethod) => {
+            if (err || !paymentMethod) {
+              console.error("Error fetching payment method account:", err?.message || "Payment method not found");
+              return res.status(500).send("Error fetching payment method account");
             }
-          );
-        }
-      );
-    }
-  );
+
+            const actual_payment_account_id = paymentMethod.account_id;
+
+            // Step 4: Reinsert new journal entry lines with updated data
+            db.run(
+              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+              [journal_entry_id, account_id, amount, 0], // Debit the liability
+              function (err) {
+                if (err) {
+                  return res.status(500).send("Error updating transaction journal entry line");
+                }
+
+                db.run(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                  [journal_entry_id, actual_payment_account_id, 0, amount], // Credit the asset (Fetched account ID)
+                  function (err) {
+                    if (err) {
+                      return res.status(500).send("Error updating payment journal entry line");
+                    }
+
+                    // Step 5: Update the processpayments table
+                    db.run(
+                      `UPDATE processpayments SET payment_date = ?, amount = ?, account_id = ?, payment_method_id = ?, description = ? WHERE id = ?`,
+                      [payment_date, amount, account_id, actual_payment_account_id, description, paymentId],
+                      function (err) {
+                        if (err) {
+                          return res.status(500).send("Error updating payment");
+                        }
+
+                        res.status(200).json({ message: "Payment updated successfully" });
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          });
+        });
+      }
+    );
+  });
 });
 
 // ✅ 5. Delete a payment
