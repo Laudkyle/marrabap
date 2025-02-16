@@ -82,7 +82,7 @@ const ExpenseComponent = () => {
       } else {
         await API.post("http://localhost:5000/expenses", dataToSend);
       }
-
+      toast.success("Expense added successfully!!!");
       setShowAddModal(false);
       setNewExpense({
         expense_date: "",
@@ -95,6 +95,7 @@ const ExpenseComponent = () => {
       setSelectedExpense(null);
       fetchExpenses();
     } catch (error) {
+      toast.error("Error adding Expense. Please try again later!!!");
       console.error("Error saving expense:", error.message);
     } finally {
       setLoading(false); // Stop loading
@@ -107,9 +108,7 @@ const ExpenseComponent = () => {
     try {
       const response = await API.put(
         `http://localhost:5000/expenses/pay/${expenseId}`,
-        { payment_method_id: selectedMethod,
-          payAmount:amount
-         }
+        { payment_method_id: selectedMethod, payAmount: amount }
       );
 
       toast.success("Expense payment updated successfully!", {
@@ -137,7 +136,6 @@ const ExpenseComponent = () => {
       setLoading(false);
       setShowModal(false);
       setSelectedExpense(null);
-
     }
   };
 
@@ -210,8 +208,8 @@ const ExpenseComponent = () => {
         <div className="flex space-x-4">
           {row.status === "unpaid" && (
             <FaEdit
-              onClick={() => {handleEditExpense(row)
-
+              onClick={() => {
+                handleEditExpense(row);
               }}
               className="cursor-pointer text-yellow-500 hover:text-yellow-700"
               title="Edit"
@@ -222,7 +220,7 @@ const ExpenseComponent = () => {
             className="cursor-pointer text-red-500 hover:text-red-700"
             title="Delete"
           />
-          {(row.status === "unpaid" || row.status==="partial")&& ( // Show Pay button only if unpaid
+          {(row.status === "unpaid" || row.status === "partial") && ( // Show Pay button only if unpaid
             <FaMoneyCheckAlt
               onClick={() => handlePayClick(row.id)}
               className="cursor-pointer text-green-500 hover:text-green-700"
@@ -304,11 +302,7 @@ const ExpenseComponent = () => {
               </button>
               <button
                 onClick={() =>
-                  handleConfirmPayment(
-                    selectedExpense,
-                    selectedMethod,
-                    amount
-                  )
+                  handleConfirmPayment(selectedExpense, selectedMethod, amount)
                 }
                 className={`px-4 py-2 text-white rounded-md ${
                   loading
