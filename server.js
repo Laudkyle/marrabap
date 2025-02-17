@@ -74,7 +74,6 @@ const documentStorage = multer.diskStorage({
 
 const documentUpload = multer({ storage: documentStorage });
 
-
 // Generate Token Functions
 const generateAccessToken = (user) => {
   return jwt.sign(
@@ -94,12 +93,14 @@ const generateRefreshToken = (user) => {
 
 // REGISTER
 // REGISTER NEW USER (Only Admins)
-app.post("/register", authenticateUser,async(req, res) => {
+app.post("/register", authenticateUser, async (req, res) => {
   const { email, username, phone, password } = req.body;
-  
+
   // Ensure only admins can register users
   if (req.user.role !== "admin") {
-    return res.status(403).json({ error: "Forbidden. Only admins can create users." });
+    return res
+      .status(403)
+      .json({ error: "Forbidden. Only admins can create users." });
   }
 
   if (!email || !username || !phone || !password) {
@@ -117,7 +118,6 @@ app.post("/register", authenticateUser,async(req, res) => {
     }
   );
 });
-
 
 // LOGIN
 app.post("/login", (req, res) => {
@@ -146,7 +146,7 @@ app.post("/login", (req, res) => {
 });
 
 // REFRESH TOKEN
-app.post("/refresh",authenticateUser, (req, res) => {
+app.post("/refresh", authenticateUser, (req, res) => {
   const refreshToken = req.cookies.refreshToken;
   if (!refreshToken)
     return res.status(403).json({ error: "Refresh token required." });
@@ -183,7 +183,9 @@ const logAuditTrail = (req, db, tableName, recordId, action, changes) => {
     if (err) {
       console.error("Error logging audit trail:", err.message);
     } else {
-      console.log(`Audit trail logged for ${action} on ${tableName} (Record ID: ${recordId}) by User ID: ${userId}`);
+      console.log(
+        `Audit trail logged for ${action} on ${tableName} (Record ID: ${recordId}) by User ID: ${userId}`
+      );
     }
   });
 };
@@ -218,7 +220,7 @@ app.get("/products", (req, res) => {
 });
 
 // Get a specific product by ID with quantity in stock from inventory
-app.get("/products/:id", authenticateUser,(req, res) => {
+app.get("/products/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `
     SELECT 
@@ -255,7 +257,9 @@ app.post("/products/bulk", authenticateUser, (req, res) => {
   }
 
   if (!Array.isArray(products) || products.length === 0) {
-    return res.status(400).send("Products array is required and cannot be empty.");
+    return res
+      .status(400)
+      .send("Products array is required and cannot be empty.");
   }
 
   const invalidProduct = products.find(
@@ -268,7 +272,11 @@ app.post("/products/bulk", authenticateUser, (req, res) => {
   );
 
   if (invalidProduct) {
-    return res.status(400).send("Each product must have a name, cp, and sp with non-negative values.");
+    return res
+      .status(400)
+      .send(
+        "Each product must have a name, cp, and sp with non-negative values."
+      );
   }
 
   db.serialize(() => {
@@ -283,39 +291,48 @@ app.post("/products/bulk", authenticateUser, (req, res) => {
         "INSERT INTO products (name, cp, sp, suppliers_id) VALUES (?, ?, ?, ?)"
       );
 
-      stmt.run(product.name, product.cp, product.sp, suppliers_id, function (err) {
-        if (err) {
-          console.error("Error inserting product:", err.message);
-          errorOccurred = true;
-        } else {
-          const productId = this.lastID;
+      stmt.run(
+        product.name,
+        product.cp,
+        product.sp,
+        suppliers_id,
+        function (err) {
+          if (err) {
+            console.error("Error inserting product:", err.message);
+            errorOccurred = true;
+          } else {
+            const productId = this.lastID;
 
-          // Collect audit log data
-          auditLogs.push({
-            table: "products",
-            recordId: productId,
-            action: "insert",
-            changes: product,
-          });
+            // Collect audit log data
+            auditLogs.push({
+              table: "products",
+              recordId: productId,
+              action: "insert",
+              changes: product,
+            });
 
-          // Prepare inventory entry for the newly added product
-          inventoryInserts.push(
-            new Promise((resolve, reject) => {
-              db.run(
-                "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
-                [productId, 0, product.cp],
-                (err) => {
-                  if (err) {
-                    console.error("Error inserting into inventory:", err.message);
-                    return reject(err);
+            // Prepare inventory entry for the newly added product
+            inventoryInserts.push(
+              new Promise((resolve, reject) => {
+                db.run(
+                  "INSERT INTO inventory (product_id, quantity_in_stock, cost_per_unit) VALUES (?, ?, ?)",
+                  [productId, 0, product.cp],
+                  (err) => {
+                    if (err) {
+                      console.error(
+                        "Error inserting into inventory:",
+                        err.message
+                      );
+                      return reject(err);
+                    }
+                    resolve();
                   }
-                  resolve();
-                }
-              );
-            })
-          );
+                );
+              })
+            );
+          }
         }
-      });
+      );
 
       stmt.finalize();
     });
@@ -325,7 +342,9 @@ app.post("/products/bulk", authenticateUser, (req, res) => {
       .then(() => {
         if (errorOccurred) {
           db.run("ROLLBACK");
-          return res.status(500).send("Failed to add products. Transaction rolled back.");
+          return res
+            .status(500)
+            .send("Failed to add products. Transaction rolled back.");
         }
 
         // Log all audit trails after successful commit
@@ -334,20 +353,23 @@ app.post("/products/bulk", authenticateUser, (req, res) => {
             logAuditTrail(req, db, table, recordId, action, changes);
           });
 
-          res.status(201).send("Products and inventory entries added successfully.");
+          res
+            .status(201)
+            .send("Products and inventory entries added successfully.");
         });
       })
       .catch((err) => {
         console.error("Error during inventory insertion:", err.message);
         db.run("ROLLBACK");
-        res.status(500).send("Failed to add inventory entries. Transaction rolled back.");
+        res
+          .status(500)
+          .send("Failed to add inventory entries. Transaction rolled back.");
       });
   });
 });
 
-
 // Add a new product
-app.post("/products", upload.single("image"),authenticateUser, (req, res) => {
+app.post("/products", upload.single("image"), authenticateUser, (req, res) => {
   const { name, cp, sp, suppliers_id } = req.body;
   const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
 
@@ -379,65 +401,70 @@ app.post("/products", upload.single("image"),authenticateUser, (req, res) => {
 });
 
 // Update a product
-app.put("/products/:id", upload.single("image"), authenticateUser,(req, res) => {
-  const { id } = req.params;
-  const { name, cp, sp, suppliers_id } = req.body;
-  const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
+app.put(
+  "/products/:id",
+  upload.single("image"),
+  authenticateUser,
+  (req, res) => {
+    const { id } = req.params;
+    const { name, cp, sp, suppliers_id } = req.body;
+    const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
 
-  const fields = [];
-  const values = [];
+    const fields = [];
+    const values = [];
 
-  // Dynamically add fields for update based on input
-  if (name) {
-    fields.push("name = ?");
-    values.push(name);
-  }
-  if (cp >= 0) {
-    fields.push("cp = ?");
-    values.push(cp);
-  }
-  if (sp >= 0) {
-    fields.push("sp = ?");
-    values.push(sp);
-  }
-  if (suppliers_id) {
-    fields.push("suppliers_id = ?");
-    values.push(suppliers_id);
-  }
-  if (imagePath) {
-    fields.push("image = ?");
-    values.push(imagePath);
-  }
-
-  if (fields.length === 0) {
-    return res.status(400).send("No valid fields provided for update.");
-  }
-
-  values.push(id);
-
-  const query = `UPDATE products SET ${fields.join(", ")} WHERE id = ?`;
-
-  db.run(query, values, function (err) {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error updating product");
-    } else if (this.changes === 0) {
-      res.status(404).send("Product not found");
-    } else {
-      res.json({
-        id,
-        name,
-        cp,
-        sp,
-        image: imagePath,
-        suppliers_id,
-      });
+    // Dynamically add fields for update based on input
+    if (name) {
+      fields.push("name = ?");
+      values.push(name);
     }
-  });
-});
+    if (cp >= 0) {
+      fields.push("cp = ?");
+      values.push(cp);
+    }
+    if (sp >= 0) {
+      fields.push("sp = ?");
+      values.push(sp);
+    }
+    if (suppliers_id) {
+      fields.push("suppliers_id = ?");
+      values.push(suppliers_id);
+    }
+    if (imagePath) {
+      fields.push("image = ?");
+      values.push(imagePath);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).send("No valid fields provided for update.");
+    }
+
+    values.push(id);
+
+    const query = `UPDATE products SET ${fields.join(", ")} WHERE id = ?`;
+
+    db.run(query, values, function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error updating product");
+      } else if (this.changes === 0) {
+        res.status(404).send("Product not found");
+      } else {
+        res.json({
+          id,
+          name,
+          cp,
+          sp,
+          image: imagePath,
+          suppliers_id,
+        });
+      }
+    });
+  }
+);
 
 // Delete a product
-app.delete("/products/:id",authenticateUser, (req, res) => {
+app.delete("/products/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
     if (err) {
@@ -489,7 +516,7 @@ app.post("/inventory", authenticateUser, (req, res) => {
 });
 
 // Read All Inventory Items
-app.get("/inventory",authenticateUser, (req, res) => {
+app.get("/inventory", authenticateUser, (req, res) => {
   db.all("SELECT * FROM inventory", [], (err, rows) => {
     if (err) {
       return res.status(500).send("Failed to retrieve inventory.");
@@ -499,7 +526,7 @@ app.get("/inventory",authenticateUser, (req, res) => {
 });
 
 // Read Single Inventory Item by ID
-app.get("/inventory/:id",authenticateUser, (req, res) => {
+app.get("/inventory/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get("SELECT * FROM inventory WHERE id = ?", [id], (err, row) => {
@@ -603,7 +630,7 @@ app.delete("/inventory/:id", authenticateUser, (req, res) => {
 });
 
 // Get all purchase orders
-app.get("/purchase_orders", authenticateUser,(req, res) => {
+app.get("/purchase_orders", authenticateUser, (req, res) => {
   db.all("SELECT * FROM purchase_orders ORDER BY id DESC", (err, rows) => {
     if (err) {
       console.error(err);
@@ -615,7 +642,7 @@ app.get("/purchase_orders", authenticateUser,(req, res) => {
 });
 
 // Get a single purchase order by ID
-app.get("/purchase_orders/:id",authenticateUser, (req, res) => {
+app.get("/purchase_orders/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get("SELECT * FROM purchase_orders WHERE id = ?", [id], (err, row) => {
@@ -629,180 +656,284 @@ app.get("/purchase_orders/:id",authenticateUser, (req, res) => {
     }
   });
 });
-app.patch("/purchase_orders/:id/order_status", authenticateUser, async (req, res) => {
-  const { id } = req.params;
-  const { order_status, reference_number } = req.body;
-  const user_id = req.user.id; // Get the logged-in user ID
+app.patch(
+  "/purchase_orders/:id/order_status",
+  authenticateUser,
+  async (req, res) => {
+    const { id } = req.params;
+    const { order_status, reference_number } = req.body;
+    const user_id = req.user.id; // Get the logged-in user ID
 
-  if (!["pending", "received", "cancelled"].includes(order_status)) {
-    return res.status(400).send("Invalid status.");
-  }
-
-  try {
-    const row = await new Promise((resolve, reject) => {
-      db.get(`SELECT order_status FROM purchase_orders WHERE id = ?`, [id], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-
-    if (!row) return res.status(404).send("Purchase order not found.");
-    
-    const oldStatus = row.order_status;
-    if (oldStatus === order_status) return res.status(400).send("Status is already updated.");
-
-    // Process status change
-    if (order_status === "received") {
-      const items = await new Promise((resolve, reject) => {
-        db.all(`SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`, 
-          [id], (err, items) => {
-          if (err) reject(err);
-          else resolve(items);
-        });
-      });
-
-      if (items.length === 0) return res.status(404).send("No items found for this purchase order.");
-
-      let totalValue = 0;
-      const inventoryUpdates = items.map(({ product_id, quantity, unit_price }) => {
-        totalValue += quantity * unit_price;
-        return new Promise((resolve, reject) => {
-          db.run(`UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ? WHERE product_id = ?`, 
-            [quantity, unit_price, product_id], (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      });
-
-      await Promise.all(inventoryUpdates);
-
-      const journalEntryId = await new Promise((resolve, reject) => {
-        db.run(`INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, date('now'), ?, 'posted')`, 
-          [reference_number, `Purchase order #${id} received`], function (err) {
-          if (err) reject(err);
-          else resolve(this.lastID);
-        });
-      });
-
-      const journalLines = [
-        { journal_entry_id: journalEntryId, account_id: 3, debit: totalValue, credit: 0, isLiability: false },
-        { journal_entry_id: journalEntryId, account_id: 5, debit: 0, credit: totalValue, isLiability: true },
-      ];
-
-      await Promise.all(journalLines.map(line => new Promise((resolve, reject) => {
-        db.run(`INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`, 
-          [line.journal_entry_id, line.account_id, line.debit, line.credit], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      })));
-
-      await new Promise((resolve, reject) => {
-        db.run(`UPDATE purchase_orders SET order_status = ? WHERE id = ?`, [order_status, id], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      const changes = JSON.stringify({ old_status: oldStatus, new_status: order_status });
-      await new Promise((resolve, reject) => {
-        db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
-          [user_id, "purchase_orders", id, "update", changes], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      res.send("Status updated and records updated successfully.");
-    } else {
-      await new Promise((resolve, reject) => {
-        db.run(`UPDATE purchase_orders SET order_status = ? WHERE id = ?`, [order_status, id], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      const changes = JSON.stringify({ old_status: oldStatus, new_status: order_status });
-      await new Promise((resolve, reject) => {
-        db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
-          [user_id, "purchase_orders", id, "update", changes], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      res.send("Status updated successfully.");
+    if (!["pending", "received", "cancelled"].includes(order_status)) {
+      return res.status(400).send("Invalid status.");
     }
-  } catch (error) {
-    console.error("Error processing purchase order:", error);
-    res.status(500).send("An error occurred while processing the purchase order.");
+
+    try {
+      const row = await new Promise((resolve, reject) => {
+        db.get(
+          `SELECT order_status FROM purchase_orders WHERE id = ?`,
+          [id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      if (!row) return res.status(404).send("Purchase order not found.");
+
+      const oldStatus = row.order_status;
+      if (oldStatus === order_status)
+        return res.status(400).send("Status is already updated.");
+
+      // Process status change
+      if (order_status === "received") {
+        const items = await new Promise((resolve, reject) => {
+          db.all(
+            `SELECT product_id, quantity, unit_price FROM purchase_order_details WHERE purchase_order_id = ?`,
+            [id],
+            (err, items) => {
+              if (err) reject(err);
+              else resolve(items);
+            }
+          );
+        });
+
+        if (items.length === 0)
+          return res
+            .status(404)
+            .send("No items found for this purchase order.");
+
+        let totalValue = 0;
+        const inventoryUpdates = items.map(
+          ({ product_id, quantity, unit_price }) => {
+            totalValue += quantity * unit_price;
+            return new Promise((resolve, reject) => {
+              db.run(
+                `UPDATE inventory SET quantity_in_stock = quantity_in_stock + ?, cost_per_unit = ? WHERE product_id = ?`,
+                [quantity, unit_price, product_id],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+          }
+        );
+
+        await Promise.all(inventoryUpdates);
+
+        const journalEntryId = await new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, date('now'), ?, 'posted')`,
+            [reference_number, `Purchase order #${id} received`],
+            function (err) {
+              if (err) reject(err);
+              else resolve(this.lastID);
+            }
+          );
+        });
+
+        const journalLines = [
+          {
+            journal_entry_id: journalEntryId,
+            account_id: 3,
+            debit: totalValue,
+            credit: 0,
+            isLiability: false,
+          },
+          {
+            journal_entry_id: journalEntryId,
+            account_id: 5,
+            debit: 0,
+            credit: totalValue,
+            isLiability: true,
+          },
+        ];
+
+        await Promise.all(
+          journalLines.map(
+            (line) =>
+              new Promise((resolve, reject) => {
+                db.run(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                  [
+                    line.journal_entry_id,
+                    line.account_id,
+                    line.debit,
+                    line.credit,
+                  ],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              })
+          )
+        );
+
+        await new Promise((resolve, reject) => {
+          db.run(
+            `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+            [order_status, id],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+
+        const changes = JSON.stringify({
+          old_status: oldStatus,
+          new_status: order_status,
+        });
+        await new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`,
+            [user_id, "purchase_orders", id, "update", changes],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+
+        res.send("Status updated and records updated successfully.");
+      } else {
+        await new Promise((resolve, reject) => {
+          db.run(
+            `UPDATE purchase_orders SET order_status = ? WHERE id = ?`,
+            [order_status, id],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+
+        const changes = JSON.stringify({
+          old_status: oldStatus,
+          new_status: order_status,
+        });
+        await new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`,
+            [user_id, "purchase_orders", id, "update", changes],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+
+        res.send("Status updated successfully.");
+      }
+    } catch (error) {
+      console.error("Error processing purchase order:", error);
+      res
+        .status(500)
+        .send("An error occurred while processing the purchase order.");
+    }
   }
-});
+);
 app.put("/purchase_orders/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { reference_number, supplier_id, total_amount } = req.body;
   const user_id = req.user.id; // Get the logged-in user ID
 
-  const query = "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ? WHERE id = ?";
-  db.run(query, [reference_number, supplier_id, total_amount, id], function (err) {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error updating purchase order");
-    } else if (this.changes === 0) {
-      res.status(404).send("Purchase order not found");
-    } else {
-      const changes = JSON.stringify({ reference_number, supplier_id, total_amount });
+  const query =
+    "UPDATE purchase_orders SET reference_number = ?, supplier_id = ?, total_amount = ? WHERE id = ?";
+  db.run(
+    query,
+    [reference_number, supplier_id, total_amount, id],
+    function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error updating purchase order");
+      } else if (this.changes === 0) {
+        res.status(404).send("Purchase order not found");
+      } else {
+        const changes = JSON.stringify({
+          reference_number,
+          supplier_id,
+          total_amount,
+        });
 
-      db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
-        [user_id, "purchase_orders", id, "update", changes], (err) => {
-        if (err) console.error(err);
-      });
+        db.run(
+          `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`,
+          [user_id, "purchase_orders", id, "update", changes],
+          (err) => {
+            if (err) console.error(err);
+          }
+        );
 
-      res.json({ id, reference_number, supplier_id, total_amount });
+        res.json({ id, reference_number, supplier_id, total_amount });
+      }
     }
-  });
+  );
 });
 app.delete("/purchase_orders/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const user_id = req.user.id; // Get the logged-in user ID
 
-  db.get(`SELECT supplier_id, total_amount FROM purchase_orders WHERE id = ?`, [id], (err, purchaseOrder) => {
-    if (err) {
-      console.error("Error fetching purchase order:", err);
-      return res.status(500).send("Error deleting purchase order.");
-    }
-
-    if (!purchaseOrder) return res.status(404).send("Purchase order not found.");
-
-    db.run(`DELETE FROM purchase_orders WHERE id = ?`, [id], (err) => {
+  db.get(
+    `SELECT supplier_id, total_amount FROM purchase_orders WHERE id = ?`,
+    [id],
+    (err, purchaseOrder) => {
       if (err) {
-        console.error("Error deleting purchase order:", err);
+        console.error("Error fetching purchase order:", err);
         return res.status(500).send("Error deleting purchase order.");
       }
 
-      db.run(`UPDATE suppliers SET total_purchase_due = total_purchase_due - ? WHERE id = ?`, 
-        [purchaseOrder.total_amount, purchaseOrder.supplier_id], (err) => {
+      if (!purchaseOrder)
+        return res.status(404).send("Purchase order not found.");
+
+      db.run(`DELETE FROM purchase_orders WHERE id = ?`, [id], (err) => {
         if (err) {
-          console.error("Error updating supplier's total_purchase_due:", err);
-          return res.status(500).send("Error updating supplier's total_purchase_due.");
+          console.error("Error deleting purchase order:", err);
+          return res.status(500).send("Error deleting purchase order.");
         }
 
-        const changes = JSON.stringify({ supplier_id: purchaseOrder.supplier_id, total_amount: purchaseOrder.total_amount });
-        db.run(`INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`, 
-          [user_id, "purchase_orders", id, "delete", changes], (err) => {
-          if (err) console.error(err);
-        });
+        db.run(
+          `UPDATE suppliers SET total_purchase_due = total_purchase_due - ? WHERE id = ?`,
+          [purchaseOrder.total_amount, purchaseOrder.supplier_id],
+          (err) => {
+            if (err) {
+              console.error(
+                "Error updating supplier's total_purchase_due:",
+                err
+              );
+              return res
+                .status(500)
+                .send("Error updating supplier's total_purchase_due.");
+            }
 
-        res.send("Purchase order deleted and supplier's total_purchase_due updated.");
+            const changes = JSON.stringify({
+              supplier_id: purchaseOrder.supplier_id,
+              total_amount: purchaseOrder.total_amount,
+            });
+            db.run(
+              `INSERT INTO audit_trails (user_id, table_name, record_id, action, changes) VALUES (?, ?, ?, ?, ?)`,
+              [user_id, "purchase_orders", id, "delete", changes],
+              (err) => {
+                if (err) console.error(err);
+              }
+            );
+
+            res.send(
+              "Purchase order deleted and supplier's total_purchase_due updated."
+            );
+          }
+        );
       });
-    });
-  });
+    }
+  );
 });
 // Create Purchase Order
 app.post("/purchase_orders", authenticateUser, (req, res) => {
-  const { reference_number, supplier_id, total_amount, status, items } = req.body;
-  
+  const { reference_number, supplier_id, total_amount, status, items } =
+    req.body;
+
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).send("Product details are required");
   }
@@ -870,7 +1001,7 @@ app.post("/purchase_orders", authenticateUser, (req, res) => {
 });
 
 // Get purchase order details by purchase order ID
-app.get("/purchase_orders/:id/details",authenticateUser, (req, res) => {
+app.get("/purchase_orders/:id/details", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.all(
@@ -944,11 +1075,18 @@ app.put(
           res.status(404).send("Purchase order detail not found");
         } else {
           // Log audit trail after successful update
-          logAuditTrail(req, db, "purchase_order_details", detail_id, "update", {
-            purchase_order_id,
-            quantity,
-            unit_price,
-          });
+          logAuditTrail(
+            req,
+            db,
+            "purchase_order_details",
+            detail_id,
+            "update",
+            {
+              purchase_order_id,
+              quantity,
+              unit_price,
+            }
+          );
 
           res.json({
             purchase_order_id,
@@ -1014,7 +1152,7 @@ app.post(
 
 // ===================== Accounts Endpoints =====================
 // Get all accounts
-app.get("/accounts",authenticateUser, (req, res) => {
+app.get("/accounts", authenticateUser, (req, res) => {
   db.all("SELECT * FROM chart_of_accounts", [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -1023,7 +1161,6 @@ app.get("/accounts",authenticateUser, (req, res) => {
     }
   });
 });
-
 
 app.post("/accounts", authenticateUser, (req, res) => {
   const { account_name, account_type, balance, parent_account_id } = req.body;
@@ -1146,19 +1283,33 @@ app.post("/accounts", authenticateUser, (req, res) => {
                       }
 
                       // Log audit trail for journal entry
-                      logAuditTrail(req, db, "journal_entries", journalEntryId, "insert", {
-                        reference_number: referenceNumber,
-                        date,
-                        description,
-                        status: "posted",
-                      });
+                      logAuditTrail(
+                        req,
+                        db,
+                        "journal_entries",
+                        journalEntryId,
+                        "insert",
+                        {
+                          reference_number: referenceNumber,
+                          date,
+                          description,
+                          status: "posted",
+                        }
+                      );
 
                       // Log audit trail for journal entry line
-                      logAuditTrail(req, db, "journal_entry_lines", journalEntryId, "insert", {
-                        account_id: newAccountId,
-                        debit,
-                        credit,
-                      });
+                      logAuditTrail(
+                        req,
+                        db,
+                        "journal_entry_lines",
+                        journalEntryId,
+                        "insert",
+                        {
+                          account_id: newAccountId,
+                          debit,
+                          credit,
+                        }
+                      );
 
                       res.status(201).json({
                         id: newAccountId,
@@ -1190,7 +1341,6 @@ app.post("/accounts", authenticateUser, (req, res) => {
   });
 });
 
-
 app.delete("/accounts/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const userId = req.user.id; // Get user ID from authenticateUser middleware
@@ -1201,7 +1351,9 @@ app.delete("/accounts/:id", authenticateUser, (req, res) => {
   db.get(selectQuery, [id], (err, account) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: "Failed to retrieve account details." });
+      return res
+        .status(500)
+        .json({ error: "Failed to retrieve account details." });
     }
 
     if (!account) {
@@ -1233,8 +1385,7 @@ app.delete("/accounts/:id", authenticateUser, (req, res) => {
   });
 });
 
-
-app.put("/accounts/:id",authenticateUser, (req, res) => {
+app.put("/accounts/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { account_name, account_type, balance, parent_account_id } = req.body;
 
@@ -1270,7 +1421,6 @@ app.put("/accounts/:id",authenticateUser, (req, res) => {
     ", "
   )} WHERE id = ?`;
   params.push(id);
-  
 
   // Fetch the original account data before the update
   db.get(
@@ -1477,31 +1627,35 @@ app.put("/accounts/:id",authenticateUser, (req, res) => {
           }
         }
       });
- 
-  // Construct changes object for logging
-  const changes = {};
-  if (account_name !== undefined && account_name !== account.account_name) {
-    changes.account_name = { old: account.account_name, new: account_name };
-  }
-  if (account_type !== undefined && account_type !== account.account_type) {
-    changes.account_type = { old: account.account_type, new: account_type };
-  }
-  if (balance !== undefined && balance !== originalBalance) {
-    changes.balance = { old: originalBalance, new: balance };
-  }
-  if (parent_account_id !== undefined && parent_account_id !== account.parent_account_id) {
-    changes.parent_account_id = { old: account.parent_account_id, new: parent_account_id };
-  }
 
-  // Log audit trail if there are changes
-  if (Object.keys(changes).length > 0) {
-    logAuditTrail(req, db, "chart_of_accounts", id, "update", changes);
-  }
+      // Construct changes object for logging
+      const changes = {};
+      if (account_name !== undefined && account_name !== account.account_name) {
+        changes.account_name = { old: account.account_name, new: account_name };
+      }
+      if (account_type !== undefined && account_type !== account.account_type) {
+        changes.account_type = { old: account.account_type, new: account_type };
+      }
+      if (balance !== undefined && balance !== originalBalance) {
+        changes.balance = { old: originalBalance, new: balance };
+      }
+      if (
+        parent_account_id !== undefined &&
+        parent_account_id !== account.parent_account_id
+      ) {
+        changes.parent_account_id = {
+          old: account.parent_account_id,
+          new: parent_account_id,
+        };
+      }
 
+      // Log audit trail if there are changes
+      if (Object.keys(changes).length > 0) {
+        logAuditTrail(req, db, "chart_of_accounts", id, "update", changes);
+      }
+    }
+  );
 });
-
-}
-);
 const updateParentBalance = (parentId, callback) => {
   if (!parentId) return callback(null); // Stop if there's no parent
 
@@ -1568,7 +1722,7 @@ const removeChildFromParent = (childId, callback) => {
 // ===================== Draft Endpoints =====================
 
 // Get all drafts
-app.get("/drafts",authenticateUser, (req, res) => {
+app.get("/drafts", authenticateUser, (req, res) => {
   db.all("SELECT * FROM drafts ORDER BY date DESC", (err, rows) => {
     if (err) {
       console.error("Error fetching drafts:", err.message);
@@ -1580,7 +1734,7 @@ app.get("/drafts",authenticateUser, (req, res) => {
 });
 
 // Get a specific draft by ID
-app.get("/drafts/:id",authenticateUser, (req, res) => {
+app.get("/drafts/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM drafts WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -1774,7 +1928,7 @@ app.post("/invoices", authenticateUser, (req, res) => {
 });
 
 // Get all invoices (GET request)
-app.get("/invoices",authenticateUser, (req, res) => {
+app.get("/invoices", authenticateUser, (req, res) => {
   const sql = "SELECT * FROM invoices";
 
   db.all(sql, [], (err, rows) => {
@@ -1787,7 +1941,7 @@ app.get("/invoices",authenticateUser, (req, res) => {
 });
 
 // Get a single invoice by reference_number (GET request)
-app.get("/invoices/:reference_number",authenticateUser, (req, res) => {
+app.get("/invoices/:reference_number", authenticateUser, (req, res) => {
   const { reference_number } = req.params;
 
   const sql = "SELECT * FROM invoices WHERE reference_number = ?";
@@ -1803,7 +1957,7 @@ app.get("/invoices/:reference_number",authenticateUser, (req, res) => {
   });
 });
 // Get invoices by customer and status (unpaid or partial)
-app.get("/invoices/customer/:customer_id",authenticateUser, (req, res) => {
+app.get("/invoices/customer/:customer_id", authenticateUser, (req, res) => {
   const { customer_id } = req.params;
   const sql =
     'SELECT * FROM invoices WHERE customer_id = ? AND (status = "unpaid" OR status = "partial")';
@@ -1845,7 +1999,9 @@ app.put("/invoices/:reference_number", authenticateUser, (req, res) => {
         if (err) {
           return res.status(500).json({ error: err.message });
         } else if (this.changes === 0) {
-          return res.status(404).json({ message: "No changes made to the invoice" });
+          return res
+            .status(404)
+            .json({ message: "No changes made to the invoice" });
         }
 
         // Log audit trail for invoice update
@@ -1981,16 +2137,28 @@ app.post("/supplier_payments", authenticateUser, (req, res) => {
           WHERE id = ?
         `;
 
-        db.run(updatePurchaseOrderQuery, [purchase_order_id, purchase_order_id], function (err) {
-          if (err) {
-            console.error("Error updating purchase order:", err.message);
-          } else if (this.changes > 0) {
-            // ✅ Step 5: Log audit trail for purchase order payment update
-            logAuditTrail(req, db, "purchase_orders", purchase_order_id, "update", {
-              updated_payment_status: this.changes > 0 ? "Payment status updated" : "No changes",
-            });
+        db.run(
+          updatePurchaseOrderQuery,
+          [purchase_order_id, purchase_order_id],
+          function (err) {
+            if (err) {
+              console.error("Error updating purchase order:", err.message);
+            } else if (this.changes > 0) {
+              // ✅ Step 5: Log audit trail for purchase order payment update
+              logAuditTrail(
+                req,
+                db,
+                "purchase_orders",
+                purchase_order_id,
+                "update",
+                {
+                  updated_payment_status:
+                    this.changes > 0 ? "Payment status updated" : "No changes",
+                }
+              );
+            }
           }
-        });
+        );
       }
 
       // Step 6: Send success response
@@ -1999,9 +2167,8 @@ app.post("/supplier_payments", authenticateUser, (req, res) => {
   });
 });
 
-
 // READ: Get all supplier payments
-app.get("/supplier_payments",authenticateUser, (req, res) => {
+app.get("/supplier_payments", authenticateUser, (req, res) => {
   const query = "SELECT * FROM supplier_payments";
 
   db.all(query, [], (err, rows) => {
@@ -2013,7 +2180,7 @@ app.get("/supplier_payments",authenticateUser, (req, res) => {
   });
 });
 // READ: Get a specific supplier payment by ID
-app.get("/supplier_payments/:id",authenticateUser, (req, res) => {
+app.get("/supplier_payments/:id", authenticateUser, (req, res) => {
   const query = "SELECT * FROM supplier_payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -2029,7 +2196,6 @@ app.get("/supplier_payments/:id",authenticateUser, (req, res) => {
   });
 });
 
-
 // UPDATE: Update a supplier payment
 app.put("/supplier_payments/:id", authenticateUser, (req, res) => {
   const {
@@ -2044,48 +2210,58 @@ app.put("/supplier_payments/:id", authenticateUser, (req, res) => {
   const userId = req.user.id; // Get user ID from authenticateUser middleware
 
   // Fetch existing payment details before update (for logging)
-  db.get("SELECT * FROM supplier_payments WHERE id = ?", [paymentId], (err, oldPayment) => {
-    if (err) {
-      console.error("Error fetching supplier payment:", err.message);
-      return res.status(500).send("Failed to fetch supplier payment.");
-    }
-    if (!oldPayment) {
-      return res.status(404).send("Supplier payment not found.");
-    }
+  db.get(
+    "SELECT * FROM supplier_payments WHERE id = ?",
+    [paymentId],
+    (err, oldPayment) => {
+      if (err) {
+        console.error("Error fetching supplier payment:", err.message);
+        return res.status(500).send("Failed to fetch supplier payment.");
+      }
+      if (!oldPayment) {
+        return res.status(404).send("Supplier payment not found.");
+      }
 
-    // Update supplier payment
-    const query = `
+      // Update supplier payment
+      const query = `
       UPDATE supplier_payments
       SET supplier_id = ?, purchase_order_id = ?, amount_paid = ?, payment_method = ?, payment_reference = ?
       WHERE id = ?
     `;
-    const params = [
-      supplier_id,
-      purchase_order_id,
-      amount_paid,
-      payment_method,
-      payment_reference,
-      paymentId,
-    ];
+      const params = [
+        supplier_id,
+        purchase_order_id,
+        amount_paid,
+        payment_method,
+        payment_reference,
+        paymentId,
+      ];
 
-    db.run(query, params, function (err) {
-      if (err) {
-        console.error("Error updating supplier payment:", err.message);
-        return res.status(500).send("Failed to update supplier payment.");
-      }
-      if (this.changes === 0) {
-        return res.status(404).send("Supplier payment not found.");
-      }
+      db.run(query, params, function (err) {
+        if (err) {
+          console.error("Error updating supplier payment:", err.message);
+          return res.status(500).send("Failed to update supplier payment.");
+        }
+        if (this.changes === 0) {
+          return res.status(404).send("Supplier payment not found.");
+        }
 
-      // ✅ Log audit trail for update
-      logAuditTrail(req, db, "supplier_payments", paymentId, "update", {
-        oldData: oldPayment,
-        newData: { supplier_id, purchase_order_id, amount_paid, payment_method, payment_reference },
+        // ✅ Log audit trail for update
+        logAuditTrail(req, db, "supplier_payments", paymentId, "update", {
+          oldData: oldPayment,
+          newData: {
+            supplier_id,
+            purchase_order_id,
+            amount_paid,
+            payment_method,
+            payment_reference,
+          },
+        });
+
+        res.status(200).send("Supplier payment updated successfully.");
       });
-
-      res.status(200).send("Supplier payment updated successfully.");
-    });
-  });
+    }
+  );
 });
 
 // DELETE: Delete a supplier payment
@@ -2094,38 +2270,42 @@ app.delete("/supplier_payments/:id", authenticateUser, (req, res) => {
   const userId = req.user.id;
 
   // Fetch existing payment details before deletion (for logging)
-  db.get("SELECT * FROM supplier_payments WHERE id = ?", [paymentId], (err, oldPayment) => {
-    if (err) {
-      console.error("Error fetching supplier payment:", err.message);
-      return res.status(500).send("Failed to fetch supplier payment.");
-    }
-    if (!oldPayment) {
-      return res.status(404).send("Supplier payment not found.");
-    }
-
-    // Delete supplier payment
-    const query = "DELETE FROM supplier_payments WHERE id = ?";
-    db.run(query, [paymentId], function (err) {
+  db.get(
+    "SELECT * FROM supplier_payments WHERE id = ?",
+    [paymentId],
+    (err, oldPayment) => {
       if (err) {
-        console.error("Error deleting supplier payment:", err.message);
-        return res.status(500).send("Failed to delete supplier payment.");
+        console.error("Error fetching supplier payment:", err.message);
+        return res.status(500).send("Failed to fetch supplier payment.");
       }
-      if (this.changes === 0) {
+      if (!oldPayment) {
         return res.status(404).send("Supplier payment not found.");
       }
 
-      // ✅ Log audit trail for delete
-      logAuditTrail(req, db, "supplier_payments", paymentId, "delete", {
-        deletedData: oldPayment,
-      });
+      // Delete supplier payment
+      const query = "DELETE FROM supplier_payments WHERE id = ?";
+      db.run(query, [paymentId], function (err) {
+        if (err) {
+          console.error("Error deleting supplier payment:", err.message);
+          return res.status(500).send("Failed to delete supplier payment.");
+        }
+        if (this.changes === 0) {
+          return res.status(404).send("Supplier payment not found.");
+        }
 
-      res.status(200).send("Supplier payment deleted successfully.");
-    });
-  });
+        // ✅ Log audit trail for delete
+        logAuditTrail(req, db, "supplier_payments", paymentId, "delete", {
+          deletedData: oldPayment,
+        });
+
+        res.status(200).send("Supplier payment deleted successfully.");
+      });
+    }
+  );
 });
 
 // ===================== Payments Methods Endpoints =====================
-app.post("/payment-methods",authenticateUser, (req, res) => {
+app.post("/payment-methods", authenticateUser, (req, res) => {
   const { name, account_id, description } = req.body;
 
   if (!name || !account_id) {
@@ -2147,7 +2327,7 @@ app.post("/payment-methods",authenticateUser, (req, res) => {
   });
 });
 
-app.get("/payment-methods",authenticateUser, (req, res) => {
+app.get("/payment-methods", authenticateUser, (req, res) => {
   const query = `
     SELECT 
       pm.id, 
@@ -2168,7 +2348,7 @@ app.get("/payment-methods",authenticateUser, (req, res) => {
     res.status(200).json(rows);
   });
 });
-app.get("/payment-methods/:id",authenticateUser, (req, res) => {
+app.get("/payment-methods/:id", authenticateUser, (req, res) => {
   const query = `
     SELECT 
       pm.id, 
@@ -2191,7 +2371,7 @@ app.get("/payment-methods/:id",authenticateUser, (req, res) => {
     res.status(200).json(row);
   });
 });
-app.put("/payment-methods/:id",authenticateUser, (req, res) => {
+app.put("/payment-methods/:id", authenticateUser, (req, res) => {
   const { name, account_id, description, is_active } = req.body;
 
   if (!name && !account_id && !description && is_active == null) {
@@ -2222,7 +2402,7 @@ app.put("/payment-methods/:id",authenticateUser, (req, res) => {
     }
   );
 });
-app.delete("/payment-methods/:id",authenticateUser, (req, res) => {
+app.delete("/payment-methods/:id", authenticateUser, (req, res) => {
   const query = "DELETE FROM payment_methods WHERE id = ?";
   db.run(query, [req.params.id], function (err) {
     if (err) {
@@ -2236,7 +2416,7 @@ app.delete("/payment-methods/:id",authenticateUser, (req, res) => {
 });
 
 // ===================== Payments Endpoints =====================
-app.post("/payments",authenticateUser, (req, res) => {
+app.post("/payments", authenticateUser, (req, res) => {
   const {
     customerId,
     reference_number,
@@ -2353,7 +2533,7 @@ app.post("/payments",authenticateUser, (req, res) => {
 });
 
 // READ: Get all payments
-app.get("/payments",authenticateUser, (req, res) => {
+app.get("/payments", authenticateUser, (req, res) => {
   const query = "SELECT * FROM payments";
 
   db.all(query, [], (err, rows) => {
@@ -2366,7 +2546,7 @@ app.get("/payments",authenticateUser, (req, res) => {
 });
 
 // READ: Get a specific payment by ID
-app.get("/payments/:id",authenticateUser, (req, res) => {
+app.get("/payments/:id", authenticateUser, (req, res) => {
   const query = "SELECT * FROM payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -2383,7 +2563,7 @@ app.get("/payments/:id",authenticateUser, (req, res) => {
 });
 
 // UPDATE: Update a payment
-app.put("/payments/:id",authenticateUser, (req, res) => {
+app.put("/payments/:id", authenticateUser, (req, res) => {
   const {
     reference_number,
     payment_date,
@@ -2419,7 +2599,7 @@ app.put("/payments/:id",authenticateUser, (req, res) => {
 });
 
 // DELETE: Delete a payment
-app.delete("/payments/:id",authenticateUser, (req, res) => {
+app.delete("/payments/:id", authenticateUser, (req, res) => {
   const query = "DELETE FROM payments WHERE id = ?";
   const params = [req.params.id];
 
@@ -2436,7 +2616,7 @@ app.delete("/payments/:id",authenticateUser, (req, res) => {
 });
 
 // ===================== Sales Endpoints =====================
-app.post("/sales",authenticateUser, async(req, res) => {
+app.post("/sales", authenticateUser, async (req, res) => {
   const salesData = Array.isArray(req.body) ? req.body : [req.body];
 
   const dbPromise = new Promise((resolve, reject) => {
@@ -2715,7 +2895,7 @@ app.post("/sales",authenticateUser, async(req, res) => {
   }
 });
 
-app.get("/sales",authenticateUser, (req, res) => {
+app.get("/sales", authenticateUser, (req, res) => {
   db.all(
     `SELECT 
         sales.id, 
@@ -2768,7 +2948,7 @@ app.get("/sales",authenticateUser, (req, res) => {
   );
 });
 
-app.post("/sales-return",authenticateUser, async(req, res) => {
+app.post("/sales-return", authenticateUser, async (req, res) => {
   const returnData = req.body;
 
   // Ensure returnData is an array
@@ -2933,7 +3113,7 @@ app.post("/sales-return",authenticateUser, async(req, res) => {
 });
 
 // Get All Sales Returns
-app.get("/sales/returns", async(req, res) => {
+app.get("/sales/returns", async (req, res) => {
   try {
     db.all("SELECT * FROM returns", (err, rows) => {
       if (err) {
@@ -2950,7 +3130,7 @@ app.get("/sales/returns", async(req, res) => {
 });
 
 // Get Single Return by ID
-app.get("/sales/returns/:id", async(req, res) => {
+app.get("/sales/returns/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -2975,7 +3155,7 @@ app.get("/sales/returns/:id", async(req, res) => {
 // ===================== Suppliers Endpoints =====================
 
 // Get all suppliers
-app.get("/suppliers",authenticateUser, (req, res) => {
+app.get("/suppliers", authenticateUser, (req, res) => {
   db.all("SELECT * FROM suppliers", (err, rows) => {
     if (err) {
       console.error(err);
@@ -2987,7 +3167,7 @@ app.get("/suppliers",authenticateUser, (req, res) => {
 });
 
 // Get a specific supplier by ID
-app.get("/suppliers/:id",authenticateUser, (req, res) => {
+app.get("/suppliers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM suppliers WHERE contact_id = ?", [id], (err, row) => {
     if (err) {
@@ -3000,7 +3180,7 @@ app.get("/suppliers/:id",authenticateUser, (req, res) => {
     }
   });
 });
-app.post("/suppliers",authenticateUser, (req, res) => {
+app.post("/suppliers", authenticateUser, (req, res) => {
   const {
     type,
     contact_id,
@@ -3126,7 +3306,7 @@ app.post("/suppliers",authenticateUser, (req, res) => {
     }
   );
 });
-app.put("/suppliers/:id",authenticateUser, (req, res) => {
+app.put("/suppliers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     type,
@@ -3261,7 +3441,7 @@ app.put("/suppliers/:id",authenticateUser, (req, res) => {
 });
 
 // Delete a supplier
-app.delete("/suppliers/:id",authenticateUser, (req, res) => {
+app.delete("/suppliers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM suppliers WHERE contact_id = ?", [id], function (err) {
     if (err) {
@@ -3276,29 +3456,33 @@ app.delete("/suppliers/:id",authenticateUser, (req, res) => {
 });
 
 // Get all purchase orders for a specific supplier
-app.get("/suppliers/purchase_orders/:supplierId",authenticateUser, (req, res) => {
-  const { supplierId } = req.params;
+app.get(
+  "/suppliers/purchase_orders/:supplierId",
+  authenticateUser,
+  (req, res) => {
+    const { supplierId } = req.params;
 
-  const query = `
+    const query = `
     SELECT * 
     FROM purchase_orders 
     WHERE supplier_id = ?
   `;
 
-  db.all(query, [supplierId], (err, rows) => {
-    if (err) {
-      console.error(err.message);
-      res.status(500).send("Error fetching purchase orders for supplier.");
-    } else if (rows.length === 0) {
-      res.status(404).send("No purchase orders found for this supplier.");
-    } else {
-      res.json(rows);
-    }
-  });
-});
+    db.all(query, [supplierId], (err, rows) => {
+      if (err) {
+        console.error(err.message);
+        res.status(500).send("Error fetching purchase orders for supplier.");
+      } else if (rows.length === 0) {
+        res.status(404).send("No purchase orders found for this supplier.");
+      } else {
+        res.json(rows);
+      }
+    });
+  }
+);
 
 // Update supplier active status
-app.patch("/suppliers/:id",authenticateUser, (req, res) => {
+app.patch("/suppliers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { active_status } = req.body;
 
@@ -3320,48 +3504,53 @@ app.patch("/suppliers/:id",authenticateUser, (req, res) => {
 // ===================== Documents Endpoints =====================
 
 // CREATE: Add multiple or single documents
-app.post("/documents", documentUpload.array("files"),authenticateUser, async(req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: "No files uploaded" });
+app.post(
+  "/documents",
+  documentUpload.array("files"),
+  authenticateUser,
+  async (req, res) => {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    const { transaction_type, reference_number } = req.body;
+    const uploadedDocuments = [];
+
+    try {
+      await Promise.all(
+        req.files.map((file) => {
+          return new Promise((resolve, reject) => {
+            const filePath = `/uploads/documents/${file.filename}`;
+            const query = `INSERT INTO documents (transaction_type, reference_number, document_name, file_path) VALUES (?, ?, ?, ?)`;
+            db.run(
+              query,
+              [transaction_type, reference_number, file.originalname, filePath],
+              function (err) {
+                if (err) return reject(err);
+                uploadedDocuments.push({
+                  id: this.lastID,
+                  transaction_type,
+                  reference_number,
+                  document_name: file.originalname,
+                  file_path: filePath,
+                });
+                resolve();
+              }
+            );
+          });
+        })
+      );
+
+      return res.status(201).json(uploadedDocuments);
+    } catch (error) {
+      console.error("Error during document upload:", error.message);
+      return res.status(500).json({ message: "Error during document upload" });
+    }
   }
-
-  const { transaction_type, reference_number } = req.body;
-  const uploadedDocuments = [];
-
-  try {
-    await Promise.all(
-      req.files.map((file) => {
-        return new Promise((resolve, reject) => {
-          const filePath = `/uploads/documents/${file.filename}`;
-          const query = `INSERT INTO documents (transaction_type, reference_number, document_name, file_path) VALUES (?, ?, ?, ?)`;
-          db.run(
-            query,
-            [transaction_type, reference_number, file.originalname, filePath],
-            function (err) {
-              if (err) return reject(err);
-              uploadedDocuments.push({
-                id: this.lastID,
-                transaction_type,
-                reference_number,
-                document_name: file.originalname,
-                file_path: filePath,
-              });
-              resolve();
-            }
-          );
-        });
-      })
-    );
-
-    return res.status(201).json(uploadedDocuments);
-  } catch (error) {
-    console.error("Error during document upload:", error.message);
-    return res.status(500).json({ message: "Error during document upload" });
-  }
-});
+);
 
 // READ: Get all documents
-app.get("/documents",authenticateUser, (req, res) => {
+app.get("/documents", authenticateUser, (req, res) => {
   const query = `SELECT * FROM documents`;
   db.all(query, [], (err, rows) => {
     if (err) {
@@ -3372,7 +3561,7 @@ app.get("/documents",authenticateUser, (req, res) => {
 });
 
 // READ: Get a document by ID
-app.get("/documents/:id",authenticateUser, (req, res) => {
+app.get("/documents/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `SELECT * FROM documents WHERE id = ?`;
   db.get(query, [id], (err, row) => {
@@ -3387,7 +3576,7 @@ app.get("/documents/:id",authenticateUser, (req, res) => {
 });
 
 // DELETE: Delete a document by ID
-app.delete("/documents/:id",authenticateUser, (req, res) => {
+app.delete("/documents/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `DELETE FROM documents WHERE id = ?`;
   db.run(query, [id], function (err) {
@@ -3401,22 +3590,26 @@ app.delete("/documents/:id",authenticateUser, (req, res) => {
   });
 });
 
-app.get("/documents/by-reference/:referenceNumber",authenticateUser, (req, res) => {
-  const { referenceNumber } = req.params;
-  const query = `SELECT * FROM documents WHERE reference_number = ?`;
+app.get(
+  "/documents/by-reference/:referenceNumber",
+  authenticateUser,
+  (req, res) => {
+    const { referenceNumber } = req.params;
+    const query = `SELECT * FROM documents WHERE reference_number = ?`;
 
-  db.all(query, [referenceNumber], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(200).json(rows);
-  });
-});
+    db.all(query, [referenceNumber], (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.status(200).json(rows);
+    });
+  }
+);
 
 // ===================== Customers Endpoints =====================
 
 // Get all customers
-app.get("/customers",authenticateUser, (req, res) => {
+app.get("/customers", authenticateUser, (req, res) => {
   db.all("SELECT * FROM customers", (err, rows) => {
     if (err) {
       console.error(err);
@@ -3428,7 +3621,7 @@ app.get("/customers",authenticateUser, (req, res) => {
 });
 
 // Get a specific customer by ID
-app.get("/customers/:id",authenticateUser, (req, res) => {
+app.get("/customers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM customers WHERE contact_id = ?", [id], (err, row) => {
     if (err) {
@@ -3442,7 +3635,7 @@ app.get("/customers/:id",authenticateUser, (req, res) => {
   });
 });
 
-app.post("/customers",authenticateUser, (req, res) => {
+app.post("/customers", authenticateUser, (req, res) => {
   const {
     contact_id,
     customer_type,
@@ -3592,7 +3785,7 @@ app.post("/customers",authenticateUser, (req, res) => {
   );
 });
 
-app.put("/customers/:id",authenticateUser, (req, res) => {
+app.put("/customers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     contact_id,
@@ -3790,7 +3983,7 @@ app.put("/customers/:id",authenticateUser, (req, res) => {
 });
 
 // Delete a customer
-app.delete("/customers/:id",authenticateUser, (req, res) => {
+app.delete("/customers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM customers WHERE contact_id = ?", [id], function (err) {
     if (err) {
@@ -3804,7 +3997,7 @@ app.delete("/customers/:id",authenticateUser, (req, res) => {
   });
 });
 // Update customer active status
-app.patch("/customers/:id",authenticateUser, (req, res) => {
+app.patch("/customers/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { active_status } = req.body;
 
@@ -3941,7 +4134,7 @@ const createJournalEntry = (adjustment) => {
 };
 
 // CREATE ADJUSTMENT
-app.post("/adjustments",authenticateUser, (req, res) => {
+app.post("/adjustments", authenticateUser, (req, res) => {
   const {
     account_id,
     adjustment_type,
@@ -4015,7 +4208,7 @@ app.post("/adjustments",authenticateUser, (req, res) => {
 });
 
 // READ ADJUSTMENTS
-app.get("/adjustments",authenticateUser, (req, res) => {
+app.get("/adjustments", authenticateUser, (req, res) => {
   const { startDate, endDate, type, account, status } = req.query;
 
   let query = `
@@ -4059,7 +4252,7 @@ app.get("/adjustments",authenticateUser, (req, res) => {
 });
 
 // UPDATE ADJUSTMENT
-app.put("/adjustments/:id",authenticateUser, (req, res) => {
+app.put("/adjustments/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     account_id,
@@ -4136,7 +4329,7 @@ app.put("/adjustments/:id",authenticateUser, (req, res) => {
 });
 
 // DELETE ADJUSTMENT
-app.delete("/adjustments/:id",authenticateUser, (req, res) => {
+app.delete("/adjustments/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get(`SELECT * FROM adjustments WHERE id = ?`, [id], (err, adjustment) => {
@@ -4188,7 +4381,7 @@ app.delete("/adjustments/:id",authenticateUser, (req, res) => {
 });
 
 // ===================== Funds Transfer Endpoints =====================
-app.post("/funds-transfer",authenticateUser, (req, res) => {
+app.post("/funds-transfer", authenticateUser, (req, res) => {
   const { fromAccount, toAccount, amount, description, date } = req.body;
   const user_id = 1;
 
@@ -4286,7 +4479,7 @@ app.post("/funds-transfer",authenticateUser, (req, res) => {
 });
 
 // GET ALL FUNDS TRANSFERS
-app.get("/funds-transfer",authenticateUser, (req, res) => {
+app.get("/funds-transfer", authenticateUser, (req, res) => {
   db.all(
     `SELECT ft.id, ft.reference_number, ft.date, ft.amount, ft.description, ft.status,
             ca_from.account_name AS from_account, 
@@ -4301,7 +4494,7 @@ app.get("/funds-transfer",authenticateUser, (req, res) => {
   );
 });
 
-app.post("/funds-transfer/reverse/:id",authenticateUser, (req, res) => {
+app.post("/funds-transfer/reverse/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const user_id = 1;
   db.get(
@@ -4398,7 +4591,7 @@ app.post("/funds-transfer/reverse/:id",authenticateUser, (req, res) => {
 });
 
 // DELETE FUNDS TRANSFER
-app.delete("/funds-transfer/:id",authenticateUser, (req, res) => {
+app.delete("/funds-transfer/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get(
@@ -4438,7 +4631,7 @@ app.delete("/funds-transfer/:id",authenticateUser, (req, res) => {
 // ===================== Customer Groups Endpoints =====================
 
 // Get all customer groups
-app.get("/customer_groups",authenticateUser, (req, res) => {
+app.get("/customer_groups", authenticateUser, (req, res) => {
   db.all("SELECT * FROM customer_groups", (err, rows) => {
     if (err) {
       console.error(err);
@@ -4450,7 +4643,7 @@ app.get("/customer_groups",authenticateUser, (req, res) => {
 });
 
 // Get a specific customer group by ID
-app.get("/customer_groups/:id",authenticateUser, (req, res) => {
+app.get("/customer_groups/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM customer_groups WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -4465,7 +4658,7 @@ app.get("/customer_groups/:id",authenticateUser, (req, res) => {
 });
 
 // Add a new customer group
-app.post("/customer_groups",authenticateUser, (req, res) => {
+app.post("/customer_groups", authenticateUser, (req, res) => {
   const {
     group_name,
     discount,
@@ -4504,7 +4697,7 @@ app.post("/customer_groups",authenticateUser, (req, res) => {
 });
 
 // Update a customer group
-app.put("/customer_groups/:id",authenticateUser, (req, res) => {
+app.put("/customer_groups/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     group_name,
@@ -4570,7 +4763,7 @@ app.put("/customer_groups/:id",authenticateUser, (req, res) => {
 });
 
 // Delete a customer group
-app.delete("/customer_groups/:id",authenticateUser, (req, res) => {
+app.delete("/customer_groups/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM customer_groups WHERE id = ?", [id], function (err) {
     if (err) {
@@ -4585,7 +4778,7 @@ app.delete("/customer_groups/:id",authenticateUser, (req, res) => {
 });
 
 // Update customer group active status
-app.patch("/customer_groups/:id",authenticateUser, (req, res) => {
+app.patch("/customer_groups/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { active_status } = req.body;
 
@@ -4606,7 +4799,7 @@ app.patch("/customer_groups/:id",authenticateUser, (req, res) => {
 
 // ===================== Server Initialization =====================
 // CREATE - Add a new tax
-app.post("/taxes",authenticateUser, async(req, res) => {
+app.post("/taxes", authenticateUser, async (req, res) => {
   const { tax_name, tax_rate, tax_type, account_code } = req.body;
 
   // Validate required fields
@@ -4675,7 +4868,7 @@ app.post("/taxes",authenticateUser, async(req, res) => {
 });
 
 // READ - Get all taxes
-app.get("/taxes",authenticateUser, (req, res) => {
+app.get("/taxes", authenticateUser, (req, res) => {
   db.all(
     `SELECT t.id, t.tax_name, t.tax_rate, t.tax_type, coa.account_code, coa.account_name, coa.account_type
      FROM taxes t
@@ -4693,7 +4886,7 @@ app.get("/taxes",authenticateUser, (req, res) => {
 });
 
 // READ - Get a single tax by ID
-app.get("/taxes/:id",authenticateUser, (req, res) => {
+app.get("/taxes/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.get(
@@ -4716,7 +4909,7 @@ app.get("/taxes/:id",authenticateUser, (req, res) => {
 });
 
 // UPDATE - Update a tax
-app.put("/taxes/:id",authenticateUser, async(req, res) => {
+app.put("/taxes/:id", authenticateUser, async (req, res) => {
   const { id } = req.params;
   const { tax_name, tax_rate, tax_type, account_code } = req.body;
 
@@ -4792,7 +4985,7 @@ app.put("/taxes/:id",authenticateUser, async(req, res) => {
 });
 
 // DELETE - Delete a tax
-app.delete("/taxes/:id",authenticateUser, (req, res) => {
+app.delete("/taxes/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   db.run("DELETE FROM taxes WHERE id = ?", [id], function (err) {
@@ -4811,7 +5004,7 @@ app.delete("/taxes/:id",authenticateUser, (req, res) => {
 
 // ==================== CREATE TRANSACTION ====================
 // ✅ 1. Get all transactions
-app.get("/transactions",authenticateUser, (req, res) => {
+app.get("/transactions", authenticateUser, (req, res) => {
   db.all(
     "SELECT * FROM transactions ORDER BY transaction_date DESC",
     [],
@@ -4825,7 +5018,7 @@ app.get("/transactions",authenticateUser, (req, res) => {
 });
 
 // ✅ 2. Get a single transaction by ID
-app.get("/transactions/:id",authenticateUser, (req, res) => {
+app.get("/transactions/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM transactions WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -4840,7 +5033,13 @@ app.get("/transactions/:id",authenticateUser, (req, res) => {
 
 /// ✅ 3. Create a new transaction
 app.post("/transactions", authenticateUser, (req, res) => {
-  const { transaction_date, amount, credit_account_id, description, debit_account_id } = req.body;
+  const {
+    transaction_date,
+    amount,
+    credit_account_id,
+    description,
+    debit_account_id,
+  } = req.body;
 
   const reference_number = `TXN${Date.now()}`;
   const transaction_description = description || "Transaction entry";
@@ -4863,8 +5062,13 @@ app.post("/transactions", authenticateUser, (req, res) => {
         [journal_entry_id, debit_account_id, amount],
         function (err) {
           if (err) {
-            console.error("Error creating debit journal entry line:", err.message);
-            return res.status(500).send("Error creating debit journal entry line");
+            console.error(
+              "Error creating debit journal entry line:",
+              err.message
+            );
+            return res
+              .status(500)
+              .send("Error creating debit journal entry line");
           }
 
           // ✅ Insert Credit Entry (credit_account_id)
@@ -4873,8 +5077,13 @@ app.post("/transactions", authenticateUser, (req, res) => {
             [journal_entry_id, credit_account_id, amount],
             function (err) {
               if (err) {
-                console.error("Error creating credit journal entry line:", err.message);
-                return res.status(500).send("Error creating credit journal entry line");
+                console.error(
+                  "Error creating credit journal entry line:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error creating credit journal entry line");
               }
 
               // ✅ Final response
@@ -4890,7 +5099,7 @@ app.post("/transactions", authenticateUser, (req, res) => {
   );
 });
 
-app.put("/transactions/:id",authenticateUser, (req, res) => {
+app.put("/transactions/:id", authenticateUser, (req, res) => {
   const transactionId = req.params.id;
   const {
     transaction_date,
@@ -5086,7 +5295,7 @@ app.put("/transactions/:id",authenticateUser, (req, res) => {
 });
 
 // ✅ 5. Delete a transaction
-app.delete("/transactions/:id",authenticateUser, (req, res) => {
+app.delete("/transactions/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM transactions WHERE id = ?", [id], function (err) {
     if (err) {
@@ -5101,7 +5310,7 @@ app.delete("/transactions/:id",authenticateUser, (req, res) => {
 // ==================== CREATE PROCESS PAYMENT ====================
 
 // ✅ 1. Get all payments
-app.get("/processpayment",authenticateUser, (req, res) => {
+app.get("/processpayment", authenticateUser, (req, res) => {
   db.all(
     `SELECT p.*, a.account_name AS account_name, pm.account_name AS payment_method_name 
      FROM processpayments p
@@ -5119,7 +5328,7 @@ app.get("/processpayment",authenticateUser, (req, res) => {
 });
 
 // ✅ 2. Get a single payment by ID
-app.get("/processpayment/:id",authenticateUser, (req, res) => {
+app.get("/processpayment/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM payments WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -5133,160 +5342,240 @@ app.get("/processpayment/:id",authenticateUser, (req, res) => {
 });
 // ✅ 3. Create a new payment
 app.post("/processpayment", authenticateUser, (req, res) => {
-  const { payment_date, amount, account_id, payment_method_id, description } = req.body;
+  const { payment_date, amount, account_id, payment_method_id, description } =
+    req.body;
 
   const reference_number = `PAY-${Date.now()}`;
   const payment_description = description || "Payment processed";
 
   // Fetch account_id from payment_methods table
-  db.get(`SELECT account_id FROM payment_methods WHERE id = ?`, [payment_method_id], (err, paymentMethod) => {
-    if (err || !paymentMethod) {
-      console.error("Error fetching payment method account:", err?.message || "Payment method not found");
-      return res.status(500).send("Error fetching payment method account");
-    }
-
-    const actual_payment_method_id = paymentMethod.account_id; // Use this instead of the provided payment_method_id
-
-    // Create journal entry
-    db.run(
-      `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
-      [reference_number, payment_date, payment_description],
-      function (err) {
-        if (err) {
-          console.error("Error creating journal entry:", err.message);
-          return res.status(500).send("Error creating journal entry");
-        }
-
-        const journal_entry_id = this.lastID;
-
-        // ✅ Insert Debit Entry (Account being paid)
-        db.run(
-          `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, 0)`,
-          [journal_entry_id, account_id, amount],
-          function (err) {
-            if (err) {
-              console.error("Error creating debit journal entry line:", err.message);
-              return res.status(500).send("Error creating debit journal entry line");
-            }
-
-            // ✅ Insert Credit Entry (Payment method)
-            db.run(
-              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, 0, ?)`,
-              [journal_entry_id, actual_payment_method_id, amount],
-              function (err) {
-                if (err) {
-                  console.error("Error creating credit journal entry line:", err.message);
-                  return res.status(500).send("Error creating credit journal entry line");
-                }
-
-                // ✅ Insert into payments table
-                db.run(
-                  `INSERT INTO processpayments (reference_number, payment_date, amount, account_id, payment_method_id, description, journal_entry_id) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                  [reference_number, payment_date, amount, account_id, actual_payment_method_id, description, journal_entry_id],
-                  function (err) {
-                    if (err) {
-                      console.error("Error recording payment:", err.message);
-                      return res.status(500).send("Error recording payment");
-                    }
-
-                    res.status(201).json({
-                      message: "Payment processed successfully",
-                      journal_entry_id: journal_entry_id,
-                    });
-                  }
-                );
-              }
-            );
-          }
+  db.get(
+    `SELECT account_id FROM payment_methods WHERE id = ?`,
+    [payment_method_id],
+    (err, paymentMethod) => {
+      if (err || !paymentMethod) {
+        console.error(
+          "Error fetching payment method account:",
+          err?.message || "Payment method not found"
         );
+        return res.status(500).send("Error fetching payment method account");
       }
-    );
-  });
+
+      const actual_payment_method_id = paymentMethod.account_id; // Use this instead of the provided payment_method_id
+
+      // Create journal entry
+      db.run(
+        `INSERT INTO journal_entries (reference_number, date, description, status) VALUES (?, ?, ?, 'posted')`,
+        [reference_number, payment_date, payment_description],
+        function (err) {
+          if (err) {
+            console.error("Error creating journal entry:", err.message);
+            return res.status(500).send("Error creating journal entry");
+          }
+
+          const journal_entry_id = this.lastID;
+
+          // ✅ Insert Debit Entry (Account being paid)
+          db.run(
+            `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, 0)`,
+            [journal_entry_id, account_id, amount],
+            function (err) {
+              if (err) {
+                console.error(
+                  "Error creating debit journal entry line:",
+                  err.message
+                );
+                return res
+                  .status(500)
+                  .send("Error creating debit journal entry line");
+              }
+
+              // ✅ Insert Credit Entry (Payment method)
+              db.run(
+                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, 0, ?)`,
+                [journal_entry_id, actual_payment_method_id, amount],
+                function (err) {
+                  if (err) {
+                    console.error(
+                      "Error creating credit journal entry line:",
+                      err.message
+                    );
+                    return res
+                      .status(500)
+                      .send("Error creating credit journal entry line");
+                  }
+
+                  // ✅ Insert into payments table
+                  db.run(
+                    `INSERT INTO processpayments (reference_number, payment_date, amount, account_id, payment_method_id, description, journal_entry_id) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      reference_number,
+                      payment_date,
+                      amount,
+                      account_id,
+                      actual_payment_method_id,
+                      description,
+                      journal_entry_id,
+                    ],
+                    function (err) {
+                      if (err) {
+                        console.error("Error recording payment:", err.message);
+                        return res.status(500).send("Error recording payment");
+                      }
+
+                      res.status(201).json({
+                        message: "Payment processed successfully",
+                        journal_entry_id: journal_entry_id,
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // ✅ 4. Update a payment
 // ✅ Update a payment
 app.put("/processpayment/:id", authenticateUser, (req, res) => {
   const paymentId = req.params.id;
-  const { payment_date, amount, account_id, payment_method_id, description } = req.body;
+  const { payment_date, amount, account_id, payment_method_id, description } =
+    req.body;
 
-  db.get(`SELECT journal_entry_id FROM processpayments WHERE id = ?`, [paymentId], (err, payment) => {
-    if (err || !payment) {
-      console.error("Payment not found:", err?.message || "Payment does not exist");
-      return res.status(404).send("Payment not found");
-    }
+  db.get(
+    `SELECT journal_entry_id FROM processpayments WHERE id = ?`,
+    [paymentId],
+    (err, payment) => {
+      if (err || !payment) {
+        console.error(
+          "Payment not found:",
+          err?.message || "Payment does not exist"
+        );
+        return res.status(404).send("Payment not found");
+      }
 
-    const journal_entry_id = payment.journal_entry_id;
+      const journal_entry_id = payment.journal_entry_id;
 
-    // Step 1: Update the journal entry
-    db.run(
-      `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
-      [payment_date, description || "Updated payment entry", journal_entry_id],
-      function (err) {
-        if (err) {
-          console.error("Error updating journal entry:", err.message);
-          return res.status(500).send("Error updating journal entry");
-        }
-
-        // Step 2: Remove existing journal entry lines
-        db.run(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`, [journal_entry_id], function (err) {
+      // Step 1: Update the journal entry
+      db.run(
+        `UPDATE journal_entries SET date = ?, description = ? WHERE id = ?`,
+        [
+          payment_date,
+          description || "Updated payment entry",
+          journal_entry_id,
+        ],
+        function (err) {
           if (err) {
-            console.error("Error deleting journal entry lines:", err.message);
-            return res.status(500).send("Error deleting journal entry lines");
+            console.error("Error updating journal entry:", err.message);
+            return res.status(500).send("Error updating journal entry");
           }
 
-          // Step 3: Fetch account_id from payment_methods
-          db.get(`SELECT account_id FROM payment_methods WHERE id = ?`, [payment_method_id], (err, paymentMethod) => {
-            if (err || !paymentMethod) {
-              console.error("Error fetching payment method account:", err?.message || "Payment method not found");
-              return res.status(500).send("Error fetching payment method account");
-            }
-
-            const actual_payment_account_id = paymentMethod.account_id;
-
-            // Step 4: Reinsert new journal entry lines with updated data
-            db.run(
-              `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-              [journal_entry_id, account_id, amount, 0], // Debit the liability
-              function (err) {
-                if (err) {
-                  return res.status(500).send("Error updating transaction journal entry line");
-                }
-
-                db.run(
-                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                  [journal_entry_id, actual_payment_account_id, 0, amount], // Credit the asset (Fetched account ID)
-                  function (err) {
-                    if (err) {
-                      return res.status(500).send("Error updating payment journal entry line");
-                    }
-
-                    // Step 5: Update the processpayments table
-                    db.run(
-                      `UPDATE processpayments SET payment_date = ?, amount = ?, account_id = ?, payment_method_id = ?, description = ? WHERE id = ?`,
-                      [payment_date, amount, account_id, actual_payment_account_id, description, paymentId],
-                      function (err) {
-                        if (err) {
-                          return res.status(500).send("Error updating payment");
-                        }
-
-                        res.status(200).json({ message: "Payment updated successfully" });
-                      }
-                    );
-                  }
+          // Step 2: Remove existing journal entry lines
+          db.run(
+            `DELETE FROM journal_entry_lines WHERE journal_entry_id = ?`,
+            [journal_entry_id],
+            function (err) {
+              if (err) {
+                console.error(
+                  "Error deleting journal entry lines:",
+                  err.message
                 );
+                return res
+                  .status(500)
+                  .send("Error deleting journal entry lines");
               }
-            );
-          });
-        });
-      }
-    );
-  });
+
+              // Step 3: Fetch account_id from payment_methods
+              db.get(
+                `SELECT account_id FROM payment_methods WHERE id = ?`,
+                [payment_method_id],
+                (err, paymentMethod) => {
+                  if (err || !paymentMethod) {
+                    console.error(
+                      "Error fetching payment method account:",
+                      err?.message || "Payment method not found"
+                    );
+                    return res
+                      .status(500)
+                      .send("Error fetching payment method account");
+                  }
+
+                  const actual_payment_account_id = paymentMethod.account_id;
+
+                  // Step 4: Reinsert new journal entry lines with updated data
+                  db.run(
+                    `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                    [journal_entry_id, account_id, amount, 0], // Debit the liability
+                    function (err) {
+                      if (err) {
+                        return res
+                          .status(500)
+                          .send(
+                            "Error updating transaction journal entry line"
+                          );
+                      }
+
+                      db.run(
+                        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                        [
+                          journal_entry_id,
+                          actual_payment_account_id,
+                          0,
+                          amount,
+                        ], // Credit the asset (Fetched account ID)
+                        function (err) {
+                          if (err) {
+                            return res
+                              .status(500)
+                              .send(
+                                "Error updating payment journal entry line"
+                              );
+                          }
+
+                          // Step 5: Update the processpayments table
+                          db.run(
+                            `UPDATE processpayments SET payment_date = ?, amount = ?, account_id = ?, payment_method_id = ?, description = ? WHERE id = ?`,
+                            [
+                              payment_date,
+                              amount,
+                              account_id,
+                              actual_payment_account_id,
+                              description,
+                              paymentId,
+                            ],
+                            function (err) {
+                              if (err) {
+                                return res
+                                  .status(500)
+                                  .send("Error updating payment");
+                              }
+
+                              res.status(200).json({
+                                message: "Payment updated successfully",
+                              });
+                            }
+                          );
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // ✅ 5. Delete a payment
-app.delete("/processpayment/:id",authenticateUser, (req, res) => {
+app.delete("/processpayment/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM processpayments WHERE id = ?", [id], function (err) {
     if (err) {
@@ -5342,46 +5631,82 @@ app.post("/expenses", authenticateUser, (req, res) => {
               [journal_entry_id, accountsPayableId, 0, amount],
               function (err) {
                 if (err) {
-                  console.error("Error creating Accounts Payable journal entry line:", err.message);
-                  return res.status(500).send("Error creating Accounts Payable journal entry line");
+                  console.error(
+                    "Error creating Accounts Payable journal entry line:",
+                    err.message
+                  );
+                  return res
+                    .status(500)
+                    .send("Error creating Accounts Payable journal entry line");
                 }
 
                 // Step 4: Create the expense record
-                createExpenseRecord(expense_date, amount, expense_account_id, description, journal_entry_id, payment_method, res);
+                createExpenseRecord(
+                  expense_date,
+                  amount,
+                  expense_account_id,
+                  description,
+                  journal_entry_id,
+                  payment_method,
+                  res
+                );
               }
             );
           } else {
             // Step 3: Fetch account_id from payment_methods for non-credit payments
-            db.get(`SELECT account_id FROM payment_methods WHERE id = ?`, [payment_method_id], (err, paymentMethod) => {
-              if (err || !paymentMethod) {
-                console.error("Error fetching payment method account:", err?.message || "Payment method not found");
-                return res.status(500).send("Error fetching payment method account");
-              }
-
-              const actual_payment_account_id = paymentMethod.account_id;
-
-              // Step 4: Credit the fetched payment account
-              db.run(
-                `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
-                [journal_entry_id, actual_payment_account_id, 0, amount],
-                function (err) {
-                  if (err) {
-                    console.error("Error creating payment method journal entry line:", err.message);
-                    return res.status(500).send("Error creating payment method journal entry line");
-                  }
-
-                  // Step 5: Create the expense record
-                  createExpenseRecord(expense_date, amount, expense_account_id, description, journal_entry_id, actual_payment_account_id, res);
+            db.get(
+              `SELECT account_id FROM payment_methods WHERE id = ?`,
+              [payment_method_id],
+              (err, paymentMethod) => {
+                if (err || !paymentMethod) {
+                  console.error(
+                    "Error fetching payment method account:",
+                    err?.message || "Payment method not found"
+                  );
+                  return res
+                    .status(500)
+                    .send("Error fetching payment method account");
                 }
-              );
-            });
+
+                const actual_payment_account_id = paymentMethod.account_id;
+
+                // Step 4: Credit the fetched payment account
+                db.run(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)`,
+                  [journal_entry_id, actual_payment_account_id, 0, amount],
+                  function (err) {
+                    if (err) {
+                      console.error(
+                        "Error creating payment method journal entry line:",
+                        err.message
+                      );
+                      return res
+                        .status(500)
+                        .send(
+                          "Error creating payment method journal entry line"
+                        );
+                    }
+
+                    // Step 5: Create the expense record
+                    createExpenseRecord(
+                      expense_date,
+                      amount,
+                      expense_account_id,
+                      description,
+                      journal_entry_id,
+                      actual_payment_account_id,
+                      res
+                    );
+                  }
+                );
+              }
+            );
           }
         }
       );
     }
   );
 });
-
 
 function createExpenseRecord(
   expense_date,
@@ -5444,7 +5769,7 @@ function createExpenseInvoice(expense_id, total_amount, payment_method, res) {
 }
 
 // ==================== READ EXPENSES ====================
-app.get("/expenses",authenticateUser, (req, res) => {
+app.get("/expenses", authenticateUser, (req, res) => {
   const query = `
     SELECT e.*, ei.status, ei.balance_due
     FROM expenses e
@@ -5462,7 +5787,7 @@ app.get("/expenses",authenticateUser, (req, res) => {
 });
 
 // ==================== READ SINGLE EXPENSE ====================
-app.get("/expenses/:id",authenticateUser, (req, res) => {
+app.get("/expenses/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const query = `SELECT * FROM expenses WHERE id = ?`;
 
@@ -5480,7 +5805,7 @@ app.get("/expenses/:id",authenticateUser, (req, res) => {
   });
 });
 
-app.put("/expenses/pay/:id",authenticateUser, (req, res) => {
+app.put("/expenses/pay/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { payment_method_id, payAmount } = req.body;
 
@@ -5598,7 +5923,7 @@ app.put("/expenses/pay/:id",authenticateUser, (req, res) => {
   );
 });
 // ==================== UPDATE EXPENSE ====================
-app.put("/expenses/:id",authenticateUser, (req, res) => {
+app.put("/expenses/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const {
     expense_date,
@@ -5768,7 +6093,7 @@ function updateExpenseInvoice(invoice_id, amount, res, callback) {
   );
 }
 
-app.patch("/expenses/payment/:id",authenticateUser, (req, res) => {
+app.patch("/expenses/payment/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { payment_method_id, amount } = req.body;
 
@@ -5847,7 +6172,7 @@ app.patch("/expenses/payment/:id",authenticateUser, (req, res) => {
 });
 
 // ==================== DELETE EXPENSE ====================
-app.delete("/expenses/:id",authenticateUser, (req, res) => {
+app.delete("/expenses/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   // Step 1: Get journal entry ID for the expense
@@ -6008,7 +6333,7 @@ function deleteExpenseAndInvoice(journal_entry_id, expense_id, res) {
 }
 
 // 🔹 Get All Invoices
-app.get("/expense-invoices",authenticateUser, (req, res) => {
+app.get("/expense-invoices", authenticateUser, (req, res) => {
   db.all("SELECT * FROM expense_invoices", [], (err, rows) => {
     if (err) {
       console.error("Error fetching invoices:", err.message);
@@ -6019,7 +6344,7 @@ app.get("/expense-invoices",authenticateUser, (req, res) => {
 });
 
 // 🔹 Get Single Invoice by ID
-app.get("/expense-invoices/:id",authenticateUser, (req, res) => {
+app.get("/expense-invoices/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM expense_invoices WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -6032,7 +6357,7 @@ app.get("/expense-invoices/:id",authenticateUser, (req, res) => {
 });
 
 // 🔹 Create New Invoice
-app.post("/expense-invoices",authenticateUser, (req, res) => {
+app.post("/expense-invoices", authenticateUser, (req, res) => {
   const { expense_id, total_amount } = req.body;
   if (!expense_id || !total_amount) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -6056,7 +6381,7 @@ app.post("/expense-invoices",authenticateUser, (req, res) => {
 });
 
 // 🔹 Update Invoice (Payment)
-app.put("/expense-invoices/:id",authenticateUser, (req, res) => {
+app.put("/expense-invoices/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { amount_paid } = req.body;
 
@@ -6085,7 +6410,7 @@ app.put("/expense-invoices/:id",authenticateUser, (req, res) => {
 });
 
 // 🔹 Delete Invoice
-app.delete("/expense-invoices/:id",authenticateUser, (req, res) => {
+app.delete("/expense-invoices/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM expense_invoices WHERE id = ?", [id], function (err) {
     if (err) {
@@ -6097,7 +6422,7 @@ app.delete("/expense-invoices/:id",authenticateUser, (req, res) => {
 });
 
 // ===================== income statement =====================
-app.get("/reports/income-statement",authenticateUser, (req, res) => {
+app.get("/reports/income-statement", authenticateUser, (req, res) => {
   const { date } = req.query; // Get date from query parameter
 
   if (!date) {
@@ -6167,7 +6492,6 @@ app.get("/reports/income-statement",authenticateUser, (req, res) => {
   }
 });
 
-
 app.get("/reports/balance-sheet", authenticateUser, async (req, res) => {
   const { date } = req.query; // Extract date from query parameters
 
@@ -6181,13 +6505,27 @@ app.get("/reports/balance-sheet", authenticateUser, async (req, res) => {
     // Define balance sheet queries
     const queries = {
       currentAssets: `
-        SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
-        FROM journal_entry_lines jel
-        INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
-        INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
-        WHERE coa.account_type = 'asset' AND coa.is_current = TRUE
-        AND je.date <= ?
-        GROUP BY coa.account_name
+SELECT 
+  CASE
+    WHEN coa.parent_account_id IN (SELECT id FROM chart_of_accounts WHERE account_code IN ('0101', '1015')) THEN 'Cash & Cash Equivalents'
+    ELSE coa.account_name
+  END AS account_name, 
+  SUM(jel.debit - jel.credit) AS amount
+FROM journal_entry_lines jel
+INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
+INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
+WHERE 
+  coa.account_type = 'asset' 
+  AND coa.is_current = TRUE
+  AND je.date <= ?
+GROUP BY 
+  CASE
+    WHEN coa.parent_account_id IN (SELECT id FROM chart_of_accounts WHERE account_code IN ('1000', '1015')) THEN 'Cash & Cash Equivalents'
+    ELSE coa.account_name
+  END;
+
+
+
       `,
       nonCurrentAssets: `
         SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
@@ -6245,21 +6583,24 @@ app.get("/reports/balance-sheet", authenticateUser, async (req, res) => {
 
     // Execute all queries in parallel
     const results = await Promise.all(
-      Object.entries(queries).map(([key, query]) =>
-        new Promise((resolve, reject) => {
-          db.all(query, [dateFormatted], (err, rows) => {
-            if (err) {
-              console.error(`Error in ${key} query:`, err.message);
-              reject(err);
-            }
-            resolve({ key, rows });
-          });
-        })
+      Object.entries(queries).map(
+        ([key, query]) =>
+          new Promise((resolve, reject) => {
+            db.all(query, [dateFormatted], (err, rows) => {
+              if (err) {
+                console.error(`Error in ${key} query:`, err.message);
+                reject(err);
+              }
+              resolve({ key, rows });
+            });
+          })
       )
     );
 
     // Process query results into a structured response
-    const data = Object.fromEntries(results.map(({ key, rows }) => [key, rows]));
+    const data = Object.fromEntries(
+      results.map(({ key, rows }) => [key, rows])
+    );
 
     // Compute net profit (Revenue - Expenses)
     const totalRevenue = data.revenue[0]?.total_revenue || 0;
@@ -6267,7 +6608,10 @@ app.get("/reports/balance-sheet", authenticateUser, async (req, res) => {
     const netProfit = totalRevenue - totalExpense;
 
     // Add net profit to retained earnings (equity)
-    data.equity.push({ account_name: "Retained Earnings (Net Profit)", amount: netProfit });
+    data.equity.push({
+      account_name: "Net Income",
+      amount: netProfit,
+    });
 
     res.json(data);
   } catch (error) {
@@ -6276,8 +6620,7 @@ app.get("/reports/balance-sheet", authenticateUser, async (req, res) => {
   }
 });
 
-
-app.get("/reports/trial-balance",authenticateUser, (req, res) => {
+app.get("/reports/trial-balance", authenticateUser, (req, res) => {
   try {
     const query = `
     SELECT
@@ -6313,7 +6656,7 @@ app.get("/reports/trial-balance",authenticateUser, (req, res) => {
 });
 // API endpoint to fetch ledger with balances
 
-app.get("/ledger",authenticateUser, (req, res) => {
+app.get("/ledger", authenticateUser, (req, res) => {
   const { accountId, startDate, endDate } = req.query;
 
   if (!accountId || !startDate || !endDate) {
@@ -6373,7 +6716,7 @@ app.get("/ledger",authenticateUser, (req, res) => {
 });
 
 // API endpoint to fetch chart of accounts with balances
-app.get("/chart-of-accounts",authenticateUser, (req, res) => {
+app.get("/chart-of-accounts", authenticateUser, (req, res) => {
   try {
     const query = `
       WITH RECURSIVE AccountHierarchy AS (
@@ -6476,22 +6819,41 @@ app.get("/journal_entry/:id", (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!entry) return res.status(404).json({ message: "Entry not found" });
 
-    db.all("SELECT * FROM journal_entry_lines WHERE journal_entry_id = ?", [id], (err, lines) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ entry, lines });
-    });
+    db.all(
+      "SELECT * FROM journal_entry_lines WHERE journal_entry_id = ?",
+      [id],
+      (err, lines) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ entry, lines });
+      }
+    );
   });
 });
 
-
 // ✅ Create a new journal entry with lines
 app.post("/journal_entry", (req, res) => {
-  const { reference_number, date, description, adjustment_type, status, journal_lines } = req.body;
+  const {
+    reference_number,
+    date,
+    description,
+    adjustment_type,
+    status,
+    journal_lines,
+  } = req.body;
 
   // Validate that debits equal credits
-  const totalDebit = journal_lines.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
-  const totalCredit = journal_lines.reduce((sum, line) => sum + parseFloat(line.credit || 0), 0);
-  if (totalDebit.toFixed(2) !== totalCredit.toFixed(2)) return res.status(400).json({ error: "Total debits must equal total credits" });
+  const totalDebit = journal_lines.reduce(
+    (sum, line) => sum + parseFloat(line.debit || 0),
+    0
+  );
+  const totalCredit = journal_lines.reduce(
+    (sum, line) => sum + parseFloat(line.credit || 0),
+    0
+  );
+  if (totalDebit.toFixed(2) !== totalCredit.toFixed(2))
+    return res
+      .status(400)
+      .json({ error: "Total debits must equal total credits" });
 
   // Insert journal entry
   const sql = `INSERT INTO journal_entries (reference_number, date, description, adjustment_type, status) VALUES (?, ?, ?, ?, ?)`;
@@ -6502,7 +6864,12 @@ app.post("/journal_entry", (req, res) => {
 
     const journalEntryId = this.lastID; // Get the inserted journal entry ID
     const placeholders = journal_lines.map(() => "(?, ?, ?, ?)").join(",");
-    const lineValues = journal_lines.flatMap(line => [journalEntryId, line.account_id, line.debit, line.credit]);
+    const lineValues = journal_lines.flatMap((line) => [
+      journalEntryId,
+      line.account_id,
+      line.debit,
+      line.credit,
+    ]);
 
     // Insert journal entry lines
     db.run(
@@ -6510,7 +6877,10 @@ app.post("/journal_entry", (req, res) => {
       lineValues,
       function (err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Journal entry created successfully", journal_entry_id: journalEntryId });
+        res.json({
+          message: "Journal entry created successfully",
+          journal_entry_id: journalEntryId,
+        });
       }
     );
   });
@@ -6519,42 +6889,74 @@ app.post("/journal_entry", (req, res) => {
 // ✅ Update a journal entry
 app.put("/journal_entry/:id", (req, res) => {
   const { id } = req.params;
-  const { reference_number, date, description, adjustment_type, status, journal_lines } = req.body;
+  const {
+    reference_number,
+    date,
+    description,
+    adjustment_type,
+    status,
+    journal_lines,
+  } = req.body;
 
   // Validate that debits equal credits
-  const totalDebit = journal_lines.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
-  const totalCredit = journal_lines.reduce((sum, line) => sum + parseFloat(line.credit || 0), 0);
-  if (totalDebit.toFixed(2) !== totalCredit.toFixed(2)) return res.status(400).json({ error: "Total debits must equal total credits" });
+  const totalDebit = journal_lines.reduce(
+    (sum, line) => sum + parseFloat(line.debit || 0),
+    0
+  );
+  const totalCredit = journal_lines.reduce(
+    (sum, line) => sum + parseFloat(line.credit || 0),
+    0
+  );
+  if (totalDebit.toFixed(2) !== totalCredit.toFixed(2))
+    return res
+      .status(400)
+      .json({ error: "Total debits must equal total credits" });
 
   // Update journal entry
   const sql = `UPDATE journal_entries SET reference_number = ?, date = ?, description = ?, adjustment_type = ?, status = ? WHERE id = ?`;
-  const values = [reference_number, date, description, adjustment_type, status, id];
+  const values = [
+    reference_number,
+    date,
+    description,
+    adjustment_type,
+    status,
+    id,
+  ];
 
   db.run(sql, values, function (err) {
     if (err) return res.status(500).json({ error: err.message });
 
     // Delete existing journal entry lines
-    db.run("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?", [id], function (err) {
-      if (err) return res.status(500).json({ error: err.message });
+    db.run(
+      "DELETE FROM journal_entry_lines WHERE journal_entry_id = ?",
+      [id],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
 
-      // Insert new journal entry lines
-      const placeholders = journal_lines.map(() => "(?, ?, ?, ?)").join(",");
-      const lineValues = journal_lines.flatMap(line => [id, line.account_id, line.debit, line.credit]);
+        // Insert new journal entry lines
+        const placeholders = journal_lines.map(() => "(?, ?, ?, ?)").join(",");
+        const lineValues = journal_lines.flatMap((line) => [
+          id,
+          line.account_id,
+          line.debit,
+          line.credit,
+        ]);
 
-      db.run(
-        `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES ${placeholders}`,
-        lineValues,
-        function (err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ message: "Journal entry updated successfully" });
-        }
-      );
-    });
+        db.run(
+          `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit) VALUES ${placeholders}`,
+          lineValues,
+          function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Journal entry updated successfully" });
+          }
+        );
+      }
+    );
   });
 });
 
 // ✅ Delete a journal entry
-app.delete("/journal_entry/:id",authenticateUser, (req, res) => {
+app.delete("/journal_entry/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
 
   // Delete journal entry
@@ -6562,10 +6964,14 @@ app.delete("/journal_entry/:id",authenticateUser, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
 
     // Delete journal entry lines
-    db.run("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?", [id], function (err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ message: "Journal entry deleted successfully" });
-    });
+    db.run(
+      "DELETE FROM journal_entry_lines WHERE journal_entry_id = ?",
+      [id],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Journal entry deleted successfully" });
+      }
+    );
   });
 });
 
