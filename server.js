@@ -6602,16 +6602,28 @@ GROUP BY
       results.map(({ key, rows }) => [key, rows])
     );
 
-    // Compute net profit (Revenue - Expenses)
-    const totalRevenue = data.revenue[0]?.total_revenue || 0;
-    const totalExpense = data.expense[0]?.total_expense || 0;
-    const netProfit = totalRevenue - totalExpense;
+   // Compute net profit (Revenue - Expenses)
+const totalRevenue = data.revenue[0]?.total_revenue || 0;
+const totalExpense = data.expense[0]?.total_expense || 0;
+const netProfit = totalRevenue - totalExpense;
 
-    // Add net profit to retained earnings (equity)
-    data.equity.push({
-      account_name: "Net Income",
-      amount: netProfit,
-    });
+// Calculate 25% income tax on net profit
+const incomeTax =  netProfit * 0.25 ; // Only tax positive net profit
+
+// Add net profit to retained earnings (equity)
+data.equity.push({
+  account_name: "Net Income",
+  amount: netProfit - incomeTax, // Net income after tax
+});
+
+
+// Add Income Tax Payable as a liability
+if (incomeTax) {
+  data.currentLiabilities.push({
+    account_name: "Income Tax Payable",
+    amount: incomeTax,
+  });
+}
 
     res.json(data);
   } catch (error) {
