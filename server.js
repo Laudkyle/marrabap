@@ -6167,21 +6167,20 @@ app.get("/reports/income-statement",authenticateUser, (req, res) => {
   }
 });
 
-app.get("/reports/balance-sheet",authenticateUser, async(req, res) => {
-  const { date } = req.query; // Extract the date from the query parameters
 
-  // Validate the date
+app.get("/reports/balance-sheet", authenticateUser, async (req, res) => {
+  const { date } = req.query; // Extract date from query parameters
+
   if (!date) {
-    return res.status(400).send("Date is required.");
+    return res.status(400).json({ error: "Date is required." });
   }
 
-  // Convert the date to a format suitable for SQL query (assuming the date is in 'YYYY-MM-DD' format)
-  const dateFormatted = new Date(date).toISOString().split("T")[0]; // Format as 'YYYY-MM-DD'
+  const dateFormatted = new Date(date).toISOString().split("T")[0];
 
   try {
-    // Define queries with date filters using journal_entry.date
+    // Define balance sheet queries
     const queries = {
-      currentAssetsQuery: `
+      currentAssets: `
         SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
@@ -6190,7 +6189,7 @@ app.get("/reports/balance-sheet",authenticateUser, async(req, res) => {
         AND je.date <= ?
         GROUP BY coa.account_name
       `,
-      nonCurrentAssetsQuery: `
+      nonCurrentAssets: `
         SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
@@ -6199,7 +6198,7 @@ app.get("/reports/balance-sheet",authenticateUser, async(req, res) => {
         AND je.date <= ?
         GROUP BY coa.account_name
       `,
-      currentLiabilitiesQuery: `
+      currentLiabilities: `
         SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
@@ -6208,7 +6207,7 @@ app.get("/reports/balance-sheet",authenticateUser, async(req, res) => {
         AND je.date <= ?
         GROUP BY coa.account_name
       `,
-      nonCurrentLiabilitiesQuery: `
+      nonCurrentLiabilities: `
         SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
@@ -6217,115 +6216,66 @@ app.get("/reports/balance-sheet",authenticateUser, async(req, res) => {
         AND je.date <= ?
         GROUP BY coa.account_name
       `,
-      equityQuery: `
+      equity: `
         SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
         INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
-        WHERE coa.account_type = 'equity' AND coa.is_current = TRUE
+        WHERE coa.account_type = 'equity'
         AND je.date <= ?
         GROUP BY coa.account_name
       `,
-      revenueQuery: `
-        SELECT coa.account_name, SUM(jel.credit - jel.debit) AS amount
+      revenue: `
+        SELECT SUM(jel.credit - jel.debit) AS total_revenue
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
         INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
-        WHERE coa.account_type = 'revenue' 
+        WHERE coa.account_type = 'revenue'
         AND je.date <= ?
-        GROUP BY coa.account_name
       `,
-      expenseQuery: `
-        SELECT coa.account_name, SUM(jel.debit - jel.credit) AS amount
+      expense: `
+        SELECT SUM(jel.debit - jel.credit) AS total_expense
         FROM journal_entry_lines jel
         INNER JOIN chart_of_accounts coa ON jel.account_id = coa.id
         INNER JOIN journal_entries je ON jel.journal_entry_id = je.id
-        WHERE coa.account_type = 'expense' 
+        WHERE coa.account_type = 'expense'
         AND je.date <= ?
-        GROUP BY coa.account_name
       `,
     };
 
-    // Prepare statements for each query, passing the date
-    const currentAssetsStmt = db.prepare(queries.currentAssetsQuery);
-    const nonCurrentAssetsStmt = db.prepare(queries.nonCurrentAssetsQuery);
-    const currentLiabilitiesStmt = db.prepare(queries.currentLiabilitiesQuery);
-    const nonCurrentLiabilitiesStmt = db.prepare(
-      queries.nonCurrentLiabilitiesQuery
+    // Execute all queries in parallel
+    const results = await Promise.all(
+      Object.entries(queries).map(([key, query]) =>
+        new Promise((resolve, reject) => {
+          db.all(query, [dateFormatted], (err, rows) => {
+            if (err) {
+              console.error(`Error in ${key} query:`, err.message);
+              reject(err);
+            }
+            resolve({ key, rows });
+          });
+        })
+      )
     );
-    const equityStmt = db.prepare(queries.equityQuery);
-    const revenueStmt = db.prepare(queries.revenueQuery);
-    const expenseStmt = db.prepare(queries.expenseQuery);
 
-    // Run queries in parallel using stmt.all()
-    const [
-      currentAssets,
-      nonCurrentAssets,
-      currentLiabilities,
-      nonCurrentLiabilities,
-      equity,
-      revenue,
-      expense,
-    ] = await Promise.all([
-      new Promise((resolve, reject) => {
-        currentAssetsStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-      new Promise((resolve, reject) => {
-        nonCurrentAssetsStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-      new Promise((resolve, reject) => {
-        currentLiabilitiesStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-      new Promise((resolve, reject) => {
-        nonCurrentLiabilitiesStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-      new Promise((resolve, reject) => {
-        equityStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-      new Promise((resolve, reject) => {
-        revenueStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-      new Promise((resolve, reject) => {
-        expenseStmt.all([dateFormatted], (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        });
-      }),
-    ]);
+    // Process query results into a structured response
+    const data = Object.fromEntries(results.map(({ key, rows }) => [key, rows]));
 
-    // Structure the response
-    res.json({
-      currentAssets,
-      nonCurrentAssets,
-      currentLiabilities,
-      nonCurrentLiabilities,
-      equity,
-      revenue,
-      expense,
-    });
+    // Compute net profit (Revenue - Expenses)
+    const totalRevenue = data.revenue[0]?.total_revenue || 0;
+    const totalExpense = data.expense[0]?.total_expense || 0;
+    const netProfit = totalRevenue - totalExpense;
+
+    // Add net profit to retained earnings (equity)
+    data.equity.push({ account_name: "Retained Earnings (Net Profit)", amount: netProfit });
+
+    res.json(data);
   } catch (error) {
     console.error("Error generating balance sheet:", error.message);
-    res.status(500).send("Failed to generate balance sheet.");
+    res.status(500).json({ error: "Failed to generate balance sheet." });
   }
 });
+
 
 app.get("/reports/trial-balance",authenticateUser, (req, res) => {
   try {
