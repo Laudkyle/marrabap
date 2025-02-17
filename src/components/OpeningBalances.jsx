@@ -14,6 +14,7 @@ const OpeningBalances = () => {
     account_type: "",
     balance: "",
     parent_account_id: "",
+    date: Date.now()
   }); // For adding a new account
   const [editModalOpen, setEditModalOpen] = useState(false); // Edit modal state
   const [addModalOpen, setAddModalOpen] = useState(false); // Add modal state
@@ -67,6 +68,7 @@ const OpeningBalances = () => {
       account_type: "",
       balance: "",
       parent_account_id: "",
+      date: Date.now()
     });
     setAddModalOpen(false);
   };
@@ -119,6 +121,7 @@ const OpeningBalances = () => {
         account_type,
         balance: parseFloat(balance),
         parent_account_id: parent_account_id || null,
+        date:addAccount.date,
       });
 
       setAccounts((prev) => [...prev, response.data]);
@@ -308,6 +311,26 @@ const OpeningBalances = () => {
                     setAddAccount({
                       ...addAccount,
                       account_name: e.target.value,
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                />
+              </div>
+              <div className="mb-4">
+                <label
+                  className="block text-sm font-medium mb-2"
+                  htmlFor="account_name"
+                >
+                  Date
+                </label>
+                <input
+                  type="date"
+                  id="date"
+                  value={addAccount.date}
+                  onChange={(e) =>
+                    setAddAccount({
+                      ...addAccount,
+                      date: e.target.value,
                     })
                   }
                   className="w-full border border-gray-300 rounded px-3 py-2"

@@ -1163,7 +1163,7 @@ app.get("/accounts", authenticateUser, (req, res) => {
 });
 
 app.post("/accounts", authenticateUser, (req, res) => {
-  const { account_name, account_type, balance, parent_account_id } = req.body;
+  const { account_name, account_type, balance, parent_account_id,date } = req.body;
   const userId = req.user.id; // Get user ID from authenticateUser middleware
 
   if (!account_name || !account_type) {
@@ -1218,7 +1218,7 @@ app.post("/accounts", authenticateUser, (req, res) => {
 
         if (balance !== 0) {
           const referenceNumber = `OB-${Date.now()}`;
-          const date = new Date().toISOString().split("T")[0];
+          // const date = new Date().toISOString().split("T")[0];
           const description = `Opening balance for ${account_name}`;
 
           const journalEntryQuery = `
