@@ -50,7 +50,7 @@ const FundsTransferComponent = () => {
     try {
       const res = await API.post("/funds-transfer",formData);
       const data = await res.data;
-      if (res.ok) {
+      if (res.status==201) {
         toast.success("Funds transferred successfully!");
         fetchTransfers();
         setShowModal(false);
@@ -74,7 +74,7 @@ const FundsTransferComponent = () => {
       return;
 
     try {
-      const res = await fetch(
+      const res = await API.post(
         `http://localhost:5000/funds-transfer/reverse/${id}`,
         {
           method: "POST",

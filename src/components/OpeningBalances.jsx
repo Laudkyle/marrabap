@@ -83,6 +83,7 @@ const OpeningBalances = () => {
 
     try {
       await API.put(`http://localhost:5000/accounts/${editAccount.id}`, {
+        account_name:editAccount.account_name,
         balance: parseFloat(editAccount.balance),
         parent_account_id: editAccount.parent_account_id || null,
       });
@@ -223,7 +224,9 @@ const OpeningBalances = () => {
                   type="text"
                   id="account_name"
                   value={editAccount.account_name}
-                  disabled
+                  onChange={(e) =>
+                    setEditAccount({ ...editAccount, account_name: e.target.value })
+                  }
                   className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
                 />
               </div>

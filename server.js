@@ -4470,7 +4470,7 @@ app.post("/funds-transfer", authenticateUser, (req, res) => {
             );
 
             db.run("COMMIT"); // Commit transaction
-            res.json({ message: "Funds transferred successfully", transferId });
+            res.status(201).json({ message: "Funds transferred successfully", transferId });
           }
         );
       }
