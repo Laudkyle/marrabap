@@ -21,7 +21,7 @@ const SaleReturn = () => {
 
   const fetchSales = async () => {
     try {
-      const response = await API.get("http://localhost:5000/sales");
+      const response = await API.get("/sales");
 
       const filtered = response.data.filter(
         (sale) =>
@@ -79,7 +79,7 @@ const SaleReturn = () => {
     };
     try {
       const response = await API.post(
-        "http://localhost:5000/sales-return",
+        "/sales-return",
         returnData
       );
   

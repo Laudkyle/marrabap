@@ -34,8 +34,8 @@ const AdjustmentsComponent = () => {
     try {
       const queryParams = new URLSearchParams(filters).toString();
       const [adjustmentsRes, accountsRes] = await Promise.all([
-        API.get(`http://localhost:5000/adjustments?${queryParams}`),
-        API.get("http://localhost:5000/accounts"),
+        API.get(`https://marrabap.onrender.com/adjustments?${queryParams}`),
+        API.get("https://marrabap.onrender.com/accounts"),
       ]);
 
       const adjustmentsData = adjustmentsRes.ok
@@ -63,8 +63,8 @@ const AdjustmentsComponent = () => {
 
     try {
       const endpoint = currentAdjustment.id
-        ? `http://localhost:5000/adjustments/${currentAdjustment.id}`
-        : "http://localhost:5000/adjustments";
+        ? `https://marrabap.onrender.com/adjustments/${currentAdjustment.id}`
+        : "https://marrabap.onrender.com/adjustments";
 
       const method = currentAdjustment.id ? "PUT" : "POST";
 
@@ -77,7 +77,7 @@ const AdjustmentsComponent = () => {
         affected_periods: calculateAffectedPeriods(currentAdjustment.date),
       };
 
-      const response = await fetch(endpoint, {
+      const response = await API(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(enrichedAdjustment),
@@ -145,7 +145,7 @@ const AdjustmentsComponent = () => {
       return;
 
     try {
-      await fetch(`http://localhost:5000/adjustments/${id}`, {
+      await API.delete(`https://marrabap.onrender.com/adjustments/${id}`, {
         method: "DELETE",
       });
       toast.success("Adjustment deleted!");

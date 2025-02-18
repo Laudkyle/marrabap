@@ -25,7 +25,7 @@ const EditPurchaseOrder = ({
     const fetchPurchaseOrderDetails = async () => {
       try {
         const purchaseOrderResponse = await API.get(
-          `http://localhost:5000/purchase_orders/${purchaseOrderId}`
+          `/purchase_orders/${purchaseOrderId}`
         );
         const purchaseOrder = purchaseOrderResponse.data;
 
@@ -33,7 +33,7 @@ const EditPurchaseOrder = ({
         setSupplierId(purchaseOrder.supplier_id);
 
         const itemsResponse = await API.get(
-          `http://localhost:5000/purchase_orders/${purchaseOrderId}/details`
+          `/purchase_orders/${purchaseOrderId}/details`
         );
         setSelectedProducts(
           itemsResponse.data.map((item) => ({
@@ -43,7 +43,7 @@ const EditPurchaseOrder = ({
         );
 
         const productsResponse = await API.get(
-          "http://localhost:5000/products"
+          "/products"
         );
         setProducts(productsResponse.data);
       } catch (error) {
@@ -114,7 +114,7 @@ const EditPurchaseOrder = ({
   
       // Fetch original purchase order details
       const originalResponse = await API.get(
-        `http://localhost:5000/purchase_orders/${purchaseOrderId}/details`
+        `/purchase_orders/${purchaseOrderId}/details`
       );
       const originalProducts = originalResponse.data;
   
@@ -129,12 +129,12 @@ const EditPurchaseOrder = ({
       // Perform delete operations for removed items
       for (const item of removedItems) {
         await API.delete(
-          `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details/${item.product_id}`
+          `/purchase_orders_with_details/${purchaseOrderId}/details/${item.product_id}`
         );
       }
   
       // Update the purchase order
-      await API.put(`http://localhost:5000/purchase_orders/${purchaseOrderId}`, {
+      await API.put(`/purchase_orders/${purchaseOrderId}`, {
         reference_number: referenceNumber,
         supplier_id: supplierId,
         total_amount: totalAmount,
@@ -152,7 +152,7 @@ const EditPurchaseOrder = ({
       // Update existing products
       for (const product of updatedProducts) {
         await API.put(
-          `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details/${product.product_id}`,
+          `/purchase_orders_with_details/${purchaseOrderId}/details/${product.product_id}`,
           {
             quantity: product.quantity,
             unit_price: product.cp,
@@ -163,7 +163,7 @@ const EditPurchaseOrder = ({
       // Add new products
       for (const product of newProducts) {
         await API.post(
-          `http://localhost:5000/purchase_orders_with_details/${purchaseOrderId}/details`,
+          `/purchase_orders_with_details/${purchaseOrderId}/details`,
           {
             product_id: product.id,
             quantity: product.quantity,
@@ -177,7 +177,7 @@ const EditPurchaseOrder = ({
         try {
           // Fetch all purchase orders for this supplier
           const response = await API.get(
-            `http://localhost:5000/suppliers/purchase_orders/${supplierId}`
+            `/suppliers/purchase_orders/${supplierId}`
           );
   
           const purchaseOrders = response.data;
@@ -190,7 +190,7 @@ const EditPurchaseOrder = ({
           );
   
           // Update the supplier's total due in the database
-          await API.put(`http://localhost:5000/suppliers/${supplierId}`, {
+          await API.put(`/suppliers/${supplierId}`, {
             total_purchase_due: totalDue,
           });
   

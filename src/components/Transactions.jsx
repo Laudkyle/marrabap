@@ -35,7 +35,7 @@ const Transactions = () => {
   // Fetch Accounts (Chart of Accounts)
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/accounts");
+      const response = await API.get("/accounts");
       setAccounts(response.data);
     } catch (error) {
       toast.error("Error fetching accounts");
@@ -52,10 +52,10 @@ const Transactions = () => {
     e.preventDefault();
     try {
       if (editId) {
-        await API.put(`http://localhost:5000/transactions/${editId}`, formData);
+        await API.put(`/transactions/${editId}`, formData);
         toast.success("Transaction updated successfully");
       } else {
-        await API.post("http://localhost:5000/transactions", formData);
+        await API.post("/transactions", formData);
         toast.success("Transaction added successfully");
       }
       setIsModalOpen(false);
@@ -84,7 +84,7 @@ const Transactions = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this transaction?")) {
       try {
-        await API.delete(`http://localhost:5000/transactions/${id}`);
+        await API.delete(`/transactions/${id}`);
         toast.success("Transaction deleted");
         fetchTransactions();
       } catch (error) {

@@ -14,7 +14,7 @@ const TrialBalance = () => {
       try {
         setLoading(true);
         const response = await API.get(
-          "http://localhost:5000/reports/trial-balance"
+          "/reports/trial-balance"
         );
         setTrialBalanceData(response.data);
       } catch (err) {

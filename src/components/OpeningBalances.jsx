@@ -22,7 +22,7 @@ const OpeningBalances = () => {
   const accountTypes = ["asset", "liability", "equity", "revenue", "expense"];
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/chart-of-accounts");
+      const response = await API.get("/chart-of-accounts");
       setAccounts(response.data);
       setFilteredAccounts(response.data); // Initialize filtered accounts
     } catch (error) {
@@ -82,7 +82,7 @@ const OpeningBalances = () => {
     }
 
     try {
-      await API.put(`http://localhost:5000/accounts/${editAccount.id}`, {
+      await API.put(`/accounts/${editAccount.id}`, {
         account_name:editAccount.account_name,
         balance: parseFloat(editAccount.balance),
         parent_account_id: editAccount.parent_account_id || null,
@@ -117,7 +117,7 @@ const OpeningBalances = () => {
     }
 
     try {
-      const response = await API.post("http://localhost:5000/accounts", {
+      const response = await API.post("/accounts", {
         account_name,
         account_type,
         balance: parseFloat(balance),

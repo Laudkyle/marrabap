@@ -15,7 +15,7 @@ const AddProducts = ({ onProductsAdded }) => {
     // Fetch suppliers from the API
     const fetchSuppliers = async () => {
       try {
-        const response = await API.get("http://localhost:5000/suppliers");
+        const response = await API.get("/suppliers");
         setSuppliers(response.data);
       } catch (error) {
         console.error("Error fetching suppliers:", error);
@@ -85,7 +85,7 @@ const AddProducts = ({ onProductsAdded }) => {
   
       // Send JSON payload
       const response = await API.post(
-        "http://localhost:5000/products/bulk",
+        "/products/bulk",
         payload,
         {
           headers: { "Content-Type": "application/json" },

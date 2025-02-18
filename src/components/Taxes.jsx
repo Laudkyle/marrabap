@@ -20,7 +20,7 @@ const Taxes = () => {
   // Fetch Taxes
   const fetchTaxes = async () => {
     try {
-      const response = await API.get("http://localhost:5000/taxes");
+      const response = await API.get("/taxes");
       setTaxes(response.data);
     } catch (err) {
       toast.error("Error fetching taxes.");
@@ -30,7 +30,7 @@ const Taxes = () => {
   // Fetch Accounts
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/accounts"); // Adjust endpoint if necessary
+      const response = await API.get("/accounts"); // Adjust endpoint if necessary
       setAccounts(response.data);
     } catch (err) {
       toast.error("Error fetching accounts.");
@@ -55,7 +55,7 @@ const Taxes = () => {
     }
 
     try {
-      await API.post("http://localhost:5000/taxes", {
+      await API.post("/taxes", {
         tax_name: taxName,
         tax_rate: parseFloat(taxRate),
         tax_type: taxType,

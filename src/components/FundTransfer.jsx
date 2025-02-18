@@ -75,7 +75,7 @@ const FundsTransferComponent = () => {
 
     try {
       const res = await API.post(
-        `http://localhost:5000/funds-transfer/reverse/${id}`,
+        `/funds-transfer/reverse/${id}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

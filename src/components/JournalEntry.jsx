@@ -38,7 +38,7 @@ const JournalEntry = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/accounts");
+      const response = await API.get("/accounts");
       setAccounts(response.data);
     } catch (error) {
       toast.error("Error fetching accounts");

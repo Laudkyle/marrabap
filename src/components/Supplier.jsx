@@ -40,7 +40,7 @@ const Supplier = () => {
     active_status: true, // Active by default
   });
   
-  const API_URL = "http://localhost:5000/suppliers"; // Update with your backend URL
+  const API_URL = "/suppliers"; // Update with your backend URL
 // Filter suppliers based on the search text
 const filteredSuppliersd = useMemo(() => {
   return Suppliers.filter((supplier) =>

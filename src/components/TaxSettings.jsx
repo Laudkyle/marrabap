@@ -30,7 +30,7 @@ const TaxSettings = () => {
 
   const fetchTaxes = async () => {
     try {
-      const response = await API.get("http://localhost:5000/taxes");
+      const response = await API.get("/taxes");
       setTaxes(response.data);
     } catch (error) {
       console.error("Error fetching taxes:", error);
@@ -42,7 +42,7 @@ const TaxSettings = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/accounts"); // Fetch accounts
+      const response = await API.get("/accounts"); // Fetch accounts
       setAccounts(response.data);
     } catch (error) {
       console.error("Error fetching accounts:", error);
@@ -57,7 +57,7 @@ const TaxSettings = () => {
 
   const handleDelete = async (id) => {
     try {
-      await API.delete(`http://localhost:5000/taxes/${id}`);
+      await API.delete(`/taxes/${id}`);
       toast.success("Tax deleted successfully");
       setShowDeleteConfirm(false);
       setTaxToDelete(null);
@@ -111,12 +111,12 @@ const TaxSettings = () => {
     try {
       if (editTax) {
         // Update tax using account_code
-        await API.put(`http://localhost:5000/taxes/${editTax.id}`, {
+        await API.put(`/taxes/${editTax.id}`, {
           ...formData,
         });
         toast.success("Tax updated successfully");
       } else {
-        await API.post("http://localhost:5000/taxes", formData); // Send account_code directly
+        await API.post("/taxes", formData); // Send account_code directly
         toast.success("Tax created successfully");
       }
       fetchTaxes();

@@ -28,7 +28,7 @@ const IncomeStatement = () => {
       try {
         setLoading(true);
         console.log("Fetching income statement for date:", date); // Log the date being fetched
-        const response = await API.get("http://localhost:5000/reports/income-statement", {
+        const response = await API.get("/reports/income-statement", {
           params: { date },
         });
         console.log("Received response:", response.data); // Log the response data

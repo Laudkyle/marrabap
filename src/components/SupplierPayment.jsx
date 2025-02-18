@@ -23,7 +23,7 @@ const SupplierPayment = () => {
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const response = await API.get("http://localhost:5000/suppliers");
+        const response = await API.get("/suppliers");
         setSuppliers(response.data);
       } catch (error) {
         console.error("Error fetching suppliers:", error);
@@ -37,7 +37,7 @@ const SupplierPayment = () => {
   useEffect(() => {
     const fetchPaymentMethods = async () => {
       try {
-        const response = await API.get("http://localhost:5000/payment-methods");
+        const response = await API.get("/payment-methods");
         setPaymentMethods(response.data);
       } catch (error) {
         console.error("Error fetching payment methods:", error);
@@ -72,7 +72,7 @@ const SupplierPayment = () => {
     if (supplierId) {
       try {
         const response = await API.get(
-          `http://localhost:5000/suppliers/purchase_orders/${supplierId}`
+          `/suppliers/purchase_orders/${supplierId}`
         );
         setPurchaseOrders(
           response.data.filter(
@@ -141,7 +141,7 @@ const SupplierPayment = () => {
     try {
       // Send payment data to the backend
       const paymentResponse = await API.post(
-        "http://localhost:5000/supplier_payments",
+        "/supplier_payments",
         paymentPayload
       );
   
@@ -155,7 +155,7 @@ const SupplierPayment = () => {
           formData.append("files", file);
         });
   
-        await API.post("http://localhost:5000/documents", formData, {
+        await API.post("/documents", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },

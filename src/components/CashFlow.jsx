@@ -16,7 +16,7 @@ const CashFlowStatement = () => {
     const fetchCashFlowStatement = async () => {
       try {
         setLoading(true);
-        const response = await API.get("http://localhost:5000/reports/cash-flow");
+        const response = await API.get("/reports/cash-flow");
         setCashFlowData(response.data);
       } catch (err) {
         setError("Failed to load cash flow data.");

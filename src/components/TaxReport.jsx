@@ -52,7 +52,7 @@ const TaxReport = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await API.get('http://localhost:5000/taxes');
+      const response = await API.get('/taxes');
       setTaxes(response.data);
       setFilteredTaxes(response.data);
     } catch (error) {

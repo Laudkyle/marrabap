@@ -22,7 +22,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
     // Fetch customers for dropdown
     const fetchCustomers = async () => {
       try {
-        const response = await API.get("http://localhost:5000/customers");
+        const response = await API.get("/customers");
         setCustomers(response.data);
       } catch (error) {
         console.error("Error fetching customers:", error);
@@ -37,7 +37,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
       if (customerId) {
         try {
           const response = await API.get(
-            `http://localhost:5000/invoices?customerId=${customerId}`
+            `/invoices?customerId=${customerId}`
           );
 
           // Filter invoices to show only 'partial' or 'unpaid' statuses
@@ -173,7 +173,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
 
     try {
       // Post payment data to the server
-      await API.post("http://localhost:5000/payments", paymentPayload);
+      await API.post("/payments", paymentPayload);
 
       // If documents are attached, upload them
       if (paymentData.documents.length > 0) {
@@ -182,7 +182,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
         formData.append("reference_number", selectedInvoice.reference_number);
         paymentData.documents.forEach((file) => formData.append("files", file));
 
-        await API.post("http://localhost:5000/documents", formData, {
+        await API.post("/documents", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
@@ -197,7 +197,7 @@ const [selectedInvoicedate, setSelectedInvoiceDate] = useState(null)
         status: updatedStatus,
       };
       await API.put(
-        `http://localhost:5000/invoices/${selectedInvoice.reference_number}`,
+        `/invoices/${selectedInvoice.reference_number}`,
         invoiceUpdatePayload
       );
 

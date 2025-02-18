@@ -43,7 +43,7 @@ const Customer = () => {
     total_sell_return_due: "",
     active_status: true,
   });
-  const API_URL = "http://localhost:5000/customers";
+  const API_URL = "/customers";
 
   const generateContact_id = () => {
     const timestamp = Date.now();

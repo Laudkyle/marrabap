@@ -24,13 +24,13 @@ const PurchaseOrdersTable = () => {
       try {
         // Fetch suppliers
         const suppliersResponse = await API.get(
-          "http://localhost:5000/suppliers"
+          "/suppliers"
         );
         const suppliersData = suppliersResponse.data;
 
         // Fetch purchase orders
         const purchaseOrdersResponse = await API.get(
-          "http://localhost:5000/purchase_orders"
+          "/purchase_orders"
         );
         const purchaseOrdersData = purchaseOrdersResponse.data;
 
@@ -64,7 +64,7 @@ const PurchaseOrdersTable = () => {
       return;
 
     try {
-      await API.delete(`http://localhost:5000/purchase_orders/${id}`);
+      await API.delete(`/purchase_orders/${id}`);
       setPurchaseOrders((prevOrders) =>
         prevOrders.filter((order) => order.id !== id)
       );
@@ -90,7 +90,7 @@ const PurchaseOrdersTable = () => {
     // Refetch purchase orders and suppliers
     setLoading(true);
     API
-      .get("http://localhost:5000/purchase_orders")
+      .get("/purchase_orders")
       .then((response) => {
         const purchaseOrdersData = response.data;
         const enhancedPurchaseOrders = purchaseOrdersData.map((order) => {
@@ -202,7 +202,7 @@ const PurchaseOrdersTable = () => {
 setLoading(true)
     try {
       await API.patch(
-        `http://localhost:5000/purchase_orders/${id}/order_status`,
+        `/purchase_orders/${id}/order_status`,
         {
           order_status: newStatus,
           reference_number:reference_number,

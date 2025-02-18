@@ -30,7 +30,7 @@ const ExpenseComponent = () => {
 
   const fetchExpenses = async () => {
     try {
-      const response = await API.get("http://localhost:5000/expenses");
+      const response = await API.get("/expenses");
       setExpenses(response.data);
     } catch (error) {
       console.error("Error fetching expenses:", error);
@@ -39,7 +39,7 @@ const ExpenseComponent = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/accounts");
+      const response = await API.get("/accounts");
       setAccounts(response.data);
     } catch (error) {
       console.error("Error fetching accounts:", error);
@@ -48,7 +48,7 @@ const ExpenseComponent = () => {
 
   const fetchPaymentMethods = async () => {
     try {
-      const response = await API.get("http://localhost:5000/payment-methods");
+      const response = await API.get("/payment-methods");
       setPaymentMethods(response.data);
     } catch (error) {
       console.error("Error fetching payment methods:", error);
@@ -76,11 +76,11 @@ const ExpenseComponent = () => {
 
       if (selectedExpense) {
         await API.put(
-          `http://localhost:5000/expenses/${selectedExpense.id}`,
+          `/expenses/${selectedExpense.id}`,
           dataToSend
         );
       } else {
-        await API.post("http://localhost:5000/expenses", dataToSend);
+        await API.post("/expenses", dataToSend);
       }
       toast.success("Expense added successfully!!!");
       setShowAddModal(false);
@@ -107,7 +107,7 @@ const ExpenseComponent = () => {
 
     try {
       const response = await API.put(
-        `http://localhost:5000/expenses/pay/${expenseId}`,
+        `/expenses/pay/${expenseId}`,
         { payment_method_id: selectedMethod, payAmount: amount }
       );
 
@@ -148,7 +148,7 @@ const ExpenseComponent = () => {
 
   const handleDeleteExpense = async (id) => {
     try {
-      await API.delete(`http://localhost:5000/expenses/${id}`);
+      await API.delete(`/expenses/${id}`);
       fetchExpenses();
     } catch (error) {
       console.error("Error deleting expense:", error);

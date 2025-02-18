@@ -42,7 +42,7 @@ function Shop({ companyName, companyAddress, email, phone }) {
 
   const fetchProducts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/products", {
+      const response = await API.get("/products", {
         timeout: 5000,
       });
       setProducts(response.data);

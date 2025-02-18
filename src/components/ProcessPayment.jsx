@@ -27,7 +27,7 @@ const ProcessPayment = () => {
   // Fetch Payments
   const fetchPayments = async () => {
     try {
-      const response = await API.get("http://localhost:5000/processpayment");
+      const response = await API.get("/processpayment");
       setPayments(response.data);
     } catch (error) {
       toast.error("Error fetching payments");
@@ -37,7 +37,7 @@ const ProcessPayment = () => {
   // Fetch Accounts
   const fetchAccounts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/accounts");
+      const response = await API.get("/accounts");
       setAccounts(response.data);
     } catch (error) {
       toast.error("Error fetching accounts");
@@ -47,7 +47,7 @@ const ProcessPayment = () => {
   // Fetch Payment Methods
   const fetchPaymentMethods = async () => {
     try {
-      const response = await API.get("http://localhost:5000/payment-methods");
+      const response = await API.get("/payment-methods");
       setPaymentMethods(response.data);
     } catch (error) {
       toast.error("Error fetching payment methods");
@@ -65,12 +65,12 @@ const ProcessPayment = () => {
     try {
       if (editId) {
         await API.put(
-          `http://localhost:5000/processpayment/${editId}`,
+          `/processpayment/${editId}`,
           formData
         );
         toast.success("Payment updated successfully");
       } else {
-        await API.post("http://localhost:5000/processpayment", formData);
+        await API.post("/processpayment", formData);
         toast.success("Payment added successfully");
       }
       setIsModalOpen(false);
@@ -105,7 +105,7 @@ const ProcessPayment = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this payment?")) {
       try {
-        await API.delete(`http://localhost:5000/processpayment/${id}`);
+        await API.delete(`/processpayment/${id}`);
         toast.success("Payment deleted");
         fetchPayments();
       } catch (error) {

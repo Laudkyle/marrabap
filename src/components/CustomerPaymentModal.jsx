@@ -21,7 +21,7 @@ const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
       if (customerId) {
         try {
           const response = await API.get(
-            `http://localhost:5000/invoices?customerId=${customerId}`
+            `/invoices?customerId=${customerId}`
           );
           const filteredInvoices = response.data.filter(
             (invoice) =>
@@ -96,7 +96,7 @@ const CustomerPaymentModal = ({ isOpen, onClose, customerId }) => {
     };
 
     try {
-      await API.post("http://localhost:5000/payments", paymentPayload);
+      await API.post("/payments", paymentPayload);
       toast.success("Payment processed successfully.");
       onClose();
     } catch (error) {

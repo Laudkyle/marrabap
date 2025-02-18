@@ -15,7 +15,7 @@ const SaleReturnList = () => {
 
   const fetchReturns = async () => {
     try {
-      const response = await API.get("http://localhost:5000/sales/returns");
+      const response = await API.get("/sales/returns");
       setReturns(response.data);
       setFilteredReturns(response.data);
     } catch (error) {

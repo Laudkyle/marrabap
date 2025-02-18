@@ -24,7 +24,7 @@ const Draft = () => {
   // Fetch drafts from the backend
   const fetchDrafts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/drafts");
+      const response = await API.get("/drafts");
       setDrafts(response.data);
     } catch (error) {
       console.error("Error fetching drafts:", error);
@@ -54,7 +54,7 @@ const Draft = () => {
       // Validate stock availability for each item in the cart
       const stockCheckPromises = draftDetails.map(async (item) => {
         const productResponse = await API.get(
-          `http://localhost:5000/products/${item.product_id}`
+          `/products/${item.product_id}`
         );
         const product = productResponse.data;
 
@@ -82,7 +82,7 @@ const Draft = () => {
         formData.append("reference_number", refNum);
 
         const response = await API.post(
-          "http://localhost:5000/documents",
+          "/documents",
           formData,
           {
             headers: { "Content-Type": "multipart/form-data" },
@@ -115,7 +115,7 @@ const Draft = () => {
       // Save or update the draft
       if (editDraftId) {
         const response = await API.put(
-          `http://localhost:5000/drafts/${editDraftId}`,
+          `/drafts/${editDraftId}`,
           draftPayload
         );
         setDrafts(
@@ -126,7 +126,7 @@ const Draft = () => {
         toast.success("Draft updated successfully!");
       } else {
         const response = await API.post(
-          "http://localhost:5000/drafts",
+          "/drafts",
           draftPayload
         );
         setDrafts([...drafts, response.data]);
@@ -167,7 +167,7 @@ const Draft = () => {
       // Validate stock availability for each item
       const stockCheckPromises = draftDetails.map(async (item) => {
         const productResponse = await API.get(
-          `http://localhost:5000/products/${item.product_id}`
+          `/products/${item.product_id}`
         );
         const product = productResponse.data;
 
@@ -185,7 +185,7 @@ const Draft = () => {
       if (editDraftId) {
         // Update an existing draft
         const response = await API.put(
-          `http://localhost:5000/drafts/${editDraftId}`,
+          `/drafts/${editDraftId}`,
           draftPayload
         );
         setDrafts(
@@ -197,7 +197,7 @@ const Draft = () => {
       } else {
         // Save a new draft
         const response = await API.post(
-          "http://localhost:5000/drafts",
+          "/drafts",
           draftPayload
         );
         setDrafts([...drafts, response.data]);
@@ -239,7 +239,7 @@ const Draft = () => {
       // Sync the updated cart with the backend draft
       if (editDraftId) {
         const response = await API.put(
-          `http://localhost:5000/drafts/${editDraftId}`,
+          `/drafts/${editDraftId}`,
           updatedDraftPayload
         );
 
@@ -275,7 +275,7 @@ const Draft = () => {
   // Delete a draft
   const handleDeleteDraft = async (draftId) => {
     try {
-      await API.delete(`http://localhost:5000/drafts/${draftId}`);
+      await API.delete(`/drafts/${draftId}`);
       setDrafts(drafts.filter((draft) => draft.id !== draftId));
     } catch (error) {
       console.error("Error deleting draft:", error);
@@ -285,7 +285,7 @@ const Draft = () => {
   // Mark a draft as completed
   const handleCompleteSalePut = async (draftId) => {
     try {
-      await API.put(`http://localhost:5000/drafts/${draftId}`, {
+      await API.put(`/drafts/${draftId}`, {
         status: "completed",
       });
       setDrafts(drafts.filter((draft) => draft.id !== draftId));
@@ -299,7 +299,7 @@ const Draft = () => {
     try {
       // Fetch draft details
       const response = await API.get(
-        `http://localhost:5000/drafts/${editDraftId}`
+        `/drafts/${editDraftId}`
       );
       const draft = response.data;
       const referenceNumber = draft.reference_number; // Extract reference number
@@ -310,7 +310,7 @@ const Draft = () => {
       // Validate stock availability for each item
       const stockCheckPromises = draftItems.map(async (item) => {
         const productResponse = await API.get(
-          `http://localhost:5000/products/${item.product_id}`
+          `/products/${item.product_id}`
         );
         const product = productResponse.data;
 
@@ -359,7 +359,7 @@ const Draft = () => {
   
     try {
       // Fetch draft details
-      const response = await API.get(`http://localhost:5000/drafts/${draftId}`);
+      const response = await API.get(`/drafts/${draftId}`);
       const draft = response.data;
   
       // Populate draft details
@@ -370,7 +370,7 @@ const Draft = () => {
       const draftItems = await Promise.all(
         JSON.parse(draft.details).map(async (item) => {
           const productResponse = await API.get(
-            `http://localhost:5000/products/${item.product_id}`
+            `/products/${item.product_id}`
           );
           const product = productResponse.data;
   
@@ -389,7 +389,7 @@ const Draft = () => {
   
       // Fetch documents
       const documentsResponse = await API.get(
-        `http://localhost:5000/documents/by-reference/${draft.reference_number}`
+        `/documents/by-reference/${draft.reference_number}`
       );
       setDocuments(documentsResponse.data);
     } catch (error) {
@@ -403,7 +403,7 @@ const Draft = () => {
   
     try {
       // Fetch draft details
-      const response = await API.get(`http://localhost:5000/drafts/${draftId}`);
+      const response = await API.get(`/drafts/${draftId}`);
       const draft = response.data;
   
       // Populate draft details
@@ -415,7 +415,7 @@ const Draft = () => {
       const draftItems = await Promise.all(
         JSON.parse(draft.details).map(async (item) => {
           const productResponse = await API.get(
-            `http://localhost:5000/products/${item.product_id}`
+            `/products/${item.product_id}`
           );
           const product = productResponse.data;
   
@@ -435,7 +435,7 @@ const Draft = () => {
   
       // Fetch documents
       const documentsResponse = await API.get(
-        `http://localhost:5000/documents/by-reference/${draft.reference_number}`
+        `/documents/by-reference/${draft.reference_number}`
       );
       setDocuments(documentsResponse.data);
       console.log("documents:", documentsResponse.data);
@@ -450,7 +450,7 @@ const Draft = () => {
     try {
       // Fetch draft details
       const response = await API.get(
-        `http://localhost:5000/drafts/${draftId}`
+        `/drafts/${draftId}`
       );
       const draft = response.data;
 
@@ -463,7 +463,7 @@ const Draft = () => {
       const draftItems = await Promise.all(
         JSON.parse(draft.details).map(async (item) => {
           const productResponse = await API.get(
-            `http://localhost:5000/products/${item.product_id}`
+            `/products/${item.product_id}`
           );
           const product = productResponse.data;
           return {
@@ -481,7 +481,7 @@ const Draft = () => {
 
       // Fetch documents
       const documentsResponse = await API.get(
-        `http://localhost:5000/documents/by-reference/${draft.reference_number}`
+        `/documents/by-reference/${draft.reference_number}`
       );
       setDocuments(documentsResponse.data);
       console.log("documents:", documentsResponse.data);

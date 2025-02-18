@@ -26,7 +26,7 @@ const GeneralLedgerComponent = () => {
 
   const fetchAccounts = async () => {
     try {
-      const res = await API.get("http://localhost:5000/accounts");
+      const res = await API.get("/accounts");
       const data = await res.data;
       setAccounts(data);
     } catch (error) {

@@ -14,6 +14,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
 import DataTable from "react-data-table-component";
+import API from "../api";
 // Set the app element for accessibility
 ReactModal.setAppElement("#root");
 
@@ -28,8 +29,8 @@ const StockList = () => {
   const [filterText, setFilterText] = useState("");
   // Fetch products from the backend
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/products")
+    API
+      .get("/products")
       .then((response) => {
         setProducts(response.data);
         setFilteredProducts(response.data); // Set initial filtered products
@@ -136,8 +137,8 @@ const StockList = () => {
 
   // Confirm delete
   const confirmDelete = () => {
-    axios
-      .delete(`http://localhost:5000/products/${productToDelete}`)
+    API
+      .delete(`/products/${productToDelete}`)
       .then(() => {
         setProducts(
           products.filter((product) => product.id !== productToDelete)
@@ -174,8 +175,8 @@ const StockList = () => {
       formData.append("image", blob, "product-image.jpg");
     }
 
-    axios
-      .put(`http://localhost:5000/products/${id}`, formData, {
+    API
+      .put(`/products/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect,useMemo } from "react";
 import axios from "axios";
 import DataTable from "react-data-table-component";
-
+import API from "../api";
 import {
   FaEdit,
   FaTrashAlt,
@@ -29,8 +29,8 @@ const ProductList = () => {
   const [imagePreview, setImagePreview] = useState(null);
   // Fetch products from the backend
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/products")
+    API
+      .get("/products")
       .then((response) => {
         setProducts(response.data);
       })
@@ -146,8 +146,8 @@ const ProductList = () => {
 
   // Confirm delete
   const confirmDelete = () => {
-    axios
-      .delete(`http://localhost:5000/products/${productToDelete}`)
+    API
+      .delete(`/products/${productToDelete}`)
       .then(() => {
         setProducts(
           products.filter((product) => product.id !== productToDelete)
@@ -180,8 +180,8 @@ const ProductList = () => {
       formData.append("image", blob, "product-image.jpg");
     }
 
-    axios
-      .put(`http://localhost:5000/products/${id}`, formData, {
+    API
+      .put(`/products/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },

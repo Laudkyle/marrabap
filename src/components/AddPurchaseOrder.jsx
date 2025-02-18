@@ -18,11 +18,11 @@ const AddPurchaseOrder = ({ onPurchaseOrderAdded }) => {
     const fetchProductsAndSuppliers = async () => {
       try {
         // Fetch products
-        const productsResponse = await API.get("http://localhost:5000/products");
+        const productsResponse = await API.get("/products");
         const productsData = productsResponse.data;
 
         // Fetch suppliers
-        const suppliersResponse = await API.get("http://localhost:5000/suppliers");
+        const suppliersResponse = await API.get("/suppliers");
         const suppliersData = suppliersResponse.data;
 
         // Map supplier names to products
@@ -111,7 +111,7 @@ const handleSubmit = async (e) => {
       return total + product.cp * product.quantity; // Assuming `sp` is the unit price of the product
     }, 0);
 
-    const response = await API.post("http://localhost:5000/purchase_orders", {
+    const response = await API.post("/purchase_orders", {
       reference_number: referenceNumber || `PUR-${Date.now()}`,
       supplier_id: supplierId, // Include supplier ID in the submitted data
       total_amount: totalAmount, // Include total_amount in the submitted data

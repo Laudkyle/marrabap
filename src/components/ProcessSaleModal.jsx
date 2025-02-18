@@ -28,7 +28,7 @@ function ProcessSaleModal({
   // Fetch customers from the database
   const fetchCustomers = async () => {
     try {
-      const response = await API.get("http://localhost:5000/customers", {
+      const response = await API.get("/customers", {
         timeout: 5000,
       });
       setCustomers(response.data);
@@ -44,7 +44,7 @@ function ProcessSaleModal({
   // Fetch taxes
   const fetchTaxes = async () => {
     try {
-      const response = await API.get("http://localhost:5000/taxes", {
+      const response = await API.get("/taxes", {
         timeout: 5000,
       });
       setTaxRates(response.data); // Assume response.data is an array of taxes
@@ -60,7 +60,7 @@ function ProcessSaleModal({
   }, []);
   const fetchProducts = async () => {
     try {
-      const response = await API.get("http://localhost:5000/products", {
+      const response = await API.get("/products", {
         timeout: 5000,
       });
       const fetchedProducts = response.data;
@@ -184,7 +184,7 @@ function ProcessSaleModal({
     if (documentId) {
       try {
         const response = await API.delete(
-          `http://localhost:5000/documents/${documentId}`
+          `/documents/${documentId}`
         );
         toast.success(response.data.message);
       } catch (error) {

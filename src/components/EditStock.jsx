@@ -14,7 +14,7 @@ const EditStock = ({ onStockUpdated }) => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await API.get("http://localhost:5000/products");
+        const response = await API.get("/products");
         setProducts(response.data);
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -62,7 +62,7 @@ const EditStock = ({ onStockUpdated }) => {
 
     try {
       const newStock = selectedProduct.stock + parseInt(additionalStock, 10);
-      await API.put(`http://localhost:5000/products/${selectedProduct.id}`, {
+      await API.put(`/products/${selectedProduct.id}`, {
         stock: newStock,
       });
 

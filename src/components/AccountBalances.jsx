@@ -13,7 +13,7 @@ const AccountBalances = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await API.get("http://localhost:5000/chart-of-accounts");
+        const response = await API.get("/chart-of-accounts");
         const data = response.data.map((account) => ({
           ...account,
           balance: account.balance || 0, // Ensure balance has a default value
