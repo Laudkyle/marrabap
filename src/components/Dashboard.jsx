@@ -229,7 +229,7 @@ const Dashboard = ({companyName}) => {
             <FiBarChart2 className="text-4xl text-purple-500 mb-2" />
             <div>
               <h2 className="text-sm font-light text-gray-700">Net Profit</h2>
-              <p className="text-2xl font-bold text-green-600">₵{netProfit}</p>
+              <p className="text-2xl font-bold text-green-600">₵{netProfit? parseFloat(netProfit).toFixed(2): 0}</p>
             </div>
           </div>
         </div>
