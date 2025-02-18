@@ -26,14 +26,14 @@ API.interceptors.response.use(
       try {
         // Try refreshing the token
         const refreshResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}/auth/refresh`,
+          `${process.env.REACT_APP_API_URL}/refresh`,
           {},
           { withCredentials: true }
         );
 
         const newAccessToken = refreshResponse.data.accessToken;
         localStorage.setItem("accessToken", newAccessToken);
-
+console.log("new request retry")
         // Retry the original request with the new token
         error.config.headers.Authorization = `Bearer ${newAccessToken}`;
         return API(error.config);

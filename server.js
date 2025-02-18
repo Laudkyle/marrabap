@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
+const cookieParser = require("cookie-parser");
 const { authenticateUser } = require("./middleware/authMiddleware");
 // Initialize the app
 const app = express();
@@ -49,7 +50,7 @@ app.use((req, res, next) => {
 // Serve static files from the `uploads` directory
 app.use("/uploads", express.static(uploadsDir));
 app.use("/uploads/documents", express.static(documentsDir));
-
+app.use(cookieParser()); 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -138,7 +139,7 @@ app.post("/login", (req, res) => {
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "Strict",
     });
     res.json({ accessToken });
@@ -146,8 +147,8 @@ app.post("/login", (req, res) => {
 });
 
 // REFRESH TOKEN
-app.post("/refresh", authenticateUser, (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
+app.post("/refresh", (req, res) => {
+  const refreshToken = req.cookies.refreshToken
   if (!refreshToken)
     return res.status(403).json({ error: "Refresh token required." });
 

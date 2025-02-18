@@ -54,7 +54,7 @@ const CustomerGroup = () => {
     const fetchCustomerGroups = async () => {
       try {
         const response = await API.get(API_URL); // Use API_URL here
-        const data = await response.json();
+        const data = await response.data;
         setCustomerGroups(data);
       } catch (error) {
         console.error("Error fetching customer groups:", error);
@@ -132,13 +132,13 @@ const CustomerGroup = () => {
   // Handle adding a new customer group
   const handleAddGroup = async () => {
     try {
-      const response = await fetch(API_URL, {
+      const response = await API.post(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      const newGroup = await response.json();
+      const newGroup = await response.data;
       setCustomerGroups([...customerGroups, newGroup]);
 
       setFormData({
@@ -179,13 +179,13 @@ const CustomerGroup = () => {
   // Handle updating a customer group
   const handleUpdateGroup = async () => {
     try {
-      const response = await fetch(`${API_URL}/${editingGroupId}`, {
+      const response = await API.put(`${API_URL}/${editingGroupId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      const updatedGroup = await response.json();
+      const updatedGroup = await response.data;
 
       setCustomerGroups(
         customerGroups.map((group) =>

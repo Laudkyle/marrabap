@@ -25,6 +25,8 @@ export const logout = async () => {
 export const refreshAccessToken = async () => {
   try {
     const res = await API.post("/refresh");
+    console.log("refresh reached")
+    
     localStorage.setItem("accessToken", res.data.accessToken);
     return res.data.accessToken;
   } catch (err) {
