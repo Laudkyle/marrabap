@@ -6894,6 +6894,7 @@ app.get("/journal_entry/:id", (req, res) => {
     );
   });
 });
+
 app.get("/oldest-entry-date", async (req, res) => {
   try {
     const result = await db.get("SELECT MIN(date) AS oldest_date FROM journal_entries");
