@@ -25,6 +25,7 @@
     "react-data-table-component": "^7.6.2",
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",
+    "react-modal": "^3.16.3",
     "react-router-dom": "^7.0.2",
     "react-scripts": "^5.0.1",
     "react-toastify": "^10.0.6",
@@ -32,13 +33,15 @@
     "reactstrap": "^9.2.3",
     "recharts": "^2.15.0",
     "sqlite3": "^5.1.7",
-    "typeface-inter": "^3.18.1"
+    "typeface-inter": "^3.18.1",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+      "package": "pkg server.js --targets node16-win-x64 --output app.exe"
   },
   "eslintConfig": {
     "extends": [
@@ -64,5 +67,14 @@
     "postcss": "^8.4.49",
     "shadcn-ui": "^0.9.4",
     "tailwindcss": "^3.4.16"
-  }
+  },
+ "pkg": {
+  "assets": [
+    "public/build/index.html",
+    "public/build/**/*",
+    "shopdb.sqlite"
+  ]
+}
+
+
 }

@@ -8,6 +8,10 @@ const GeneralLedgerComponent = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+const [journalEntries, setJournalEntries] = useState([]);
+const [modalOpen, setModalOpen] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     startDate: format(new Date().setDate(1), "yyyy-MM-dd"),
@@ -34,6 +38,27 @@ const GeneralLedgerComponent = () => {
     }
   };
 
+  const handleRowClick = async (row) => {
+    setSelectedTransaction(row);
+    setModalOpen(true);
+  
+    try {
+      const res = await API.get(`/journal-entries`, {
+        params: {
+          date: row.date,
+          description: row.description,
+        },
+      });
+  
+      setJournalEntries(res.data);
+    } catch (error) {
+      toast.error("Error fetching journal entries.");
+      console.error("Error fetching journal entries:", error);
+    }
+  };
+  
+  
+  
   const fetchTransactions = async (accountId) => {
     setLoading(true);
     try {
@@ -143,28 +168,84 @@ const GeneralLedgerComponent = () => {
             />
           </div>
         </div>
+        {modalOpen && (
+  <div className="fixed inset-0 flex z-10 items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 max-h-[80vh] overflow-y-auto">
+      <h3 className="text-xl font-bold mb-4">
+        Journal Entries for {selectedTransaction?.description}
+      </h3>
+
+      {journalEntries.length > 0 ? (
+        journalEntries.map((entry, index) => (
+          <div key={index} className="mb-6 p-4 border border-gray-300 rounded-lg shadow">
+            <h4 className="text-lg font-semibold text-gray-700">
+              Journal Entry #{entry.journal_entry_id} - {entry.date}
+            </h4>
+            <p className="text-gray-600">Description: {entry.description}</p>
+
+            <table className="w-full border-collapse border border-gray-300 mt-3">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="border border-gray-300 px-4 py-2 text-left">Account</th>
+                  <th className="border border-gray-300 px-4 py-2 text-right">Debit</th>
+                  <th className="border border-gray-300 px-4 py-2 text-right">Credit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entry.accounts.map((acc, i) => (
+                  <tr key={i} className="hover:bg-gray-100">
+                    <td className="border border-gray-300 px-4 py-2">{acc.account_name}</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      {acc.debit > 0 ? acc.debit.toFixed(2) : ""}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      {acc.credit > 0 ? acc.credit.toFixed(2) : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))
+      ) : (
+        <p className="text-gray-500 text-center">No journal entries found.</p>
+      )}
+
+      <div className="flex justify-end mt-4">
+        <button className="bg-gray-500 text-white py-2 px-4 rounded" onClick={() => setModalOpen(false)}>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Transactions Table */}
         <div className="border rounded-lg shadow-sm max-h-[calc(100vh-200px)] overflow-y-scroll">
-          <DataTable
-            columns={columns}
-            data={transactions}
-            progressPending={loading}
-            pagination
-            highlightOnHover
-            striped
-            customStyles={{
-              rows: { style: { minHeight: "50px", fontSize: "14px" } },
-              headCells: {
-                style: {
-                  backgroundColor: "#f3f4f6",
-                  fontWeight: "bold",
-                  fontSize: "15px",
-                },
-              },
-              pagination: { style: { fontSize: "14px" } },
-            }}
-          />
+        <DataTable
+  columns={columns}
+  data={transactions}
+  progressPending={loading}
+  pagination
+  highlightOnHover
+  striped
+  onRowClicked={(row) => handleRowClick(row)}
+  pointerOnHover
+  customStyles={{
+    rows: {
+      style: { cursor: "pointer", minHeight: "50px", fontSize: "14px",zIndex:1 },
+    },
+    headCells: {
+      style: {
+        backgroundColor: "#f3f4f6",
+        fontWeight: "bold",
+        fontSize: "15px",
+      },
+    },
+    pagination: { style: { fontSize: "14px" } },
+  }}
+/>
+
         </div>
       </div>
     </div>

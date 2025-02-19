@@ -6825,6 +6825,58 @@ app.get("/journal_entry", (req, res) => {
   });
 });
 
+app.get("/journal-entries", authenticateUser, (req, res) => {
+  const { date, description } = req.query;
+
+  if (!date || !description) {
+    return res.status(400).json({ error: "Missing required parameters" });
+  }
+
+  const query = `
+    SELECT 
+      je.id AS journal_entry_id,
+      je.date, 
+      je.description, 
+      jel.account_id, 
+      coa.account_name,
+      jel.debit, 
+      jel.credit
+    FROM journal_entry_lines jel
+    JOIN journal_entries je ON jel.journal_entry_id = je.id
+    JOIN chart_of_accounts coa ON jel.account_id = coa.id
+    WHERE je.date = ? AND je.description = ?
+    ORDER BY je.date ASC, jel.debit DESC;
+  `;
+
+  db.all(query, [date, description], (err, rows) => {
+    if (err) {
+      console.error("Error fetching journal entries:", err.message);
+      return res.status(500).json({ error: "Database query failed" });
+    }
+
+    // Group entries by journal entry ID
+    const groupedEntries = rows.reduce((acc, row) => {
+      if (!acc[row.journal_entry_id]) {
+        acc[row.journal_entry_id] = {
+          journal_entry_id: row.journal_entry_id,
+          date: row.date,
+          description: row.description,
+          accounts: [],
+        };
+      }
+      acc[row.journal_entry_id].accounts.push({
+        account_id: row.account_id,
+        account_name: row.account_name,
+        debit: row.debit,
+        credit: row.credit,
+      });
+      return acc;
+    }, {});
+
+    res.json(Object.values(groupedEntries));
+  });
+});
+
 // ✅ Get a specific journal entry and its lines
 app.get("/journal_entry/:id", (req, res) => {
   const { id } = req.params;
