@@ -13,6 +13,7 @@
     "cra-template": "1.2.0",
     "date-fns": "^4.1.0",
     "express": "^4.21.2",
+    "file-saver": "^2.0.5",
     "framer-motion": "^12.0.6",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.2",
@@ -22,12 +23,15 @@
     "react": "^18.3.1",
     "react-bootstrap": "^2.10.6",
     "react-chartjs-2": "^5.2.0",
+    "react-csv": "^2.2.2",
     "react-data-table-component": "^7.6.2",
+    "react-data-table-component-extensions": "^1.6.0",
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",
     "react-modal": "^3.16.3",
     "react-router-dom": "^7.0.2",
     "react-scripts": "^5.0.1",
+    "react-to-print": "^3.0.5",
     "react-toastify": "^10.0.6",
     "react-tooltip": "^5.28.0",
     "reactstrap": "^9.2.3",
@@ -41,7 +45,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-      "package": "pkg server.js --targets node16-win-x64 --output app.exe"
+    "package": "pkg server.js --targets node16-win-x64 --output app.exe"
   },
   "eslintConfig": {
     "extends": [
@@ -68,13 +72,11 @@
     "shadcn-ui": "^0.9.4",
     "tailwindcss": "^3.4.16"
   },
- "pkg": {
-  "assets": [
-    "public/build/index.html",
-    "public/build/**/*",
-    "shopdb.sqlite"
-  ]
-}
-
-
+  "pkg": {
+    "assets": [
+      "public/build/index.html",
+      "public/build/**/*",
+      "shopdb.sqlite"
+    ]
+  }
 }

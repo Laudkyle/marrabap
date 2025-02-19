@@ -1,16 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import DataTable from "react-data-table-component";
 import API from "../api";
+import { FiPrinter } from "react-icons/fi"; // Import Print Icon
+import { FaFileExcel } from "react-icons/fa"; // Import Excel Icon
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import { useReactToPrint } from "react-to-print";
+
 const GeneralLedgerComponent = () => {
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
-const [journalEntries, setJournalEntries] = useState([]);
-const [modalOpen, setModalOpen] = useState(false);
+  const [journalEntries, setJournalEntries] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -33,6 +39,17 @@ const [modalOpen, setModalOpen] = useState(false);
       const res = await API.get("/accounts");
       const data = await res.data;
       setAccounts(data);
+
+      // Fetch the oldest journal entry date
+      const journalRes = await API.get("/oldest-entry-date");
+      const oldestDate = journalRes.data?.oldest_date;
+      console.log(journalRes);
+      if (oldestDate) {
+        setFilters((prev) => ({
+          ...prev,
+          startDate: oldestDate,
+        }));
+      }
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
@@ -41,7 +58,7 @@ const [modalOpen, setModalOpen] = useState(false);
   const handleRowClick = async (row) => {
     setSelectedTransaction(row);
     setModalOpen(true);
-  
+
     try {
       const res = await API.get(`/journal-entries`, {
         params: {
@@ -49,16 +66,14 @@ const [modalOpen, setModalOpen] = useState(false);
           description: row.description,
         },
       });
-  
+
       setJournalEntries(res.data);
     } catch (error) {
       toast.error("Error fetching journal entries.");
       console.error("Error fetching journal entries:", error);
     }
   };
-  
-  
-  
+
   const fetchTransactions = async (accountId) => {
     setLoading(true);
     try {
@@ -106,6 +121,32 @@ const [modalOpen, setModalOpen] = useState(false);
     },
     { name: "Balance", selector: (row) => row.balance.toFixed(2), right: true },
   ];
+
+  // 🔵 EXPORT TO EXCEL FUNCTION
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(transactions);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "General Ledger");
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+    const data = new Blob([excelBuffer], { type: "application/octet-stream" });
+
+    saveAs(data, `General_Ledger_${new Date().toISOString()}.xlsx`);
+  };
+  // Reference for printing
+  const printRef = useRef();
+
+  const handlePrint = () => {
+    const printContent = document.getElementById("printable-table").innerHTML;
+    const originalContent = document.body.innerHTML;
+
+    document.body.innerHTML = printContent;
+    window.print();
+    document.body.innerHTML = originalContent;
+  };
 
   return (
     <div className="flex max-h-[calc(100vh-100px)] overflow-y-scroll bg-gray-100">
@@ -166,86 +207,133 @@ const [modalOpen, setModalOpen] = useState(false);
               }
               className="border rounded-md p-2 focus:ring focus:ring-blue-200"
             />
+            {/* Export to Excel Button */}
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 bg-green-600 text-white py-1 px-3 text-sm rounded-md hover:bg-green-700 transition"
+            >
+              <FaFileExcel className="text-lg" /> Export
+            </button>
+
+            {/* Print Ledger Button */}
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-blue-600 text-white py-1 px-3 text-sm rounded-md hover:bg-blue-700 transition"
+            >
+              <FiPrinter className="text-lg" /> Print
+            </button>
           </div>
         </div>
         {modalOpen && (
-  <div className="fixed inset-0 flex z-10 items-center justify-center bg-black bg-opacity-50">
-    <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 max-h-[80vh] overflow-y-auto">
-      <h3 className="text-xl font-bold mb-4">
-        Journal Entries for {selectedTransaction?.description}
-      </h3>
+          <div className="fixed inset-0 flex z-10 items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 max-h-[80vh] overflow-y-auto">
+              <h3 className="text-xl font-bold mb-4">
+                Journal Entries for {selectedTransaction?.description}
+              </h3>
 
-      {journalEntries.length > 0 ? (
-        journalEntries.map((entry, index) => (
-          <div key={index} className="mb-6 p-4 border border-gray-300 rounded-lg shadow">
-            <h4 className="text-lg font-semibold text-gray-700">
-              Journal Entry #{entry.journal_entry_id} - {entry.date}
-            </h4>
-            <p className="text-gray-600">Description: {entry.description}</p>
+              {journalEntries.length > 0 ? (
+                journalEntries.map((entry, index) => (
+                  <div
+                    key={index}
+                    className="mb-6 p-4 border border-gray-300 rounded-lg shadow"
+                  >
+                    <h4 className="text-lg font-semibold text-gray-700">
+                      Journal Entry #{entry.journal_entry_id} - {entry.date}
+                    </h4>
+                    <p className="text-gray-600">
+                      Description: {entry.description}
+                    </p>
 
-            <table className="w-full border-collapse border border-gray-300 mt-3">
-              <thead>
-                <tr className="bg-gray-200">
-                  <th className="border border-gray-300 px-4 py-2 text-left">Account</th>
-                  <th className="border border-gray-300 px-4 py-2 text-right">Debit</th>
-                  <th className="border border-gray-300 px-4 py-2 text-right">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entry.accounts.map((acc, i) => (
-                  <tr key={i} className="hover:bg-gray-100">
-                    <td className="border border-gray-300 px-4 py-2">{acc.account_name}</td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      {acc.debit > 0 ? acc.debit.toFixed(2) : ""}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      {acc.credit > 0 ? acc.credit.toFixed(2) : ""}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    <table className="w-full border-collapse border border-gray-300 mt-3">
+                      <thead>
+                        <tr className="bg-gray-200">
+                          <th className="border border-gray-300 px-4 py-2 text-left">
+                            Account
+                          </th>
+                          <th className="border border-gray-300 px-4 py-2 text-right">
+                            Debit
+                          </th>
+                          <th className="border border-gray-300 px-4 py-2 text-right">
+                            Credit
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entry.accounts.map((acc, i) => (
+                          <tr key={i} className="hover:bg-gray-100">
+                            <td className="border border-gray-300 px-4 py-2">
+                              {acc.account_name}
+                            </td>
+                            <td className="border border-gray-300 px-4 py-2 text-right">
+                              {acc.debit > 0 ? acc.debit.toFixed(2) : ""}
+                            </td>
+                            <td className="border border-gray-300 px-4 py-2 text-right">
+                              {acc.credit > 0 ? acc.credit.toFixed(2) : ""}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-center">
+                  No journal entries found.
+                </p>
+              )}
+
+              <div className="flex justify-end mt-4">
+                <button
+                  className="bg-gray-500 text-white py-2 px-4 rounded"
+                  onClick={() => setModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
-        ))
-      ) : (
-        <p className="text-gray-500 text-center">No journal entries found.</p>
-      )}
-
-      <div className="flex justify-end mt-4">
-        <button className="bg-gray-500 text-white py-2 px-4 rounded" onClick={() => setModalOpen(false)}>
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        )}
 
         {/* Transactions Table */}
-        <div className="border rounded-lg shadow-sm max-h-[calc(100vh-200px)] overflow-y-scroll">
-        <DataTable
-  columns={columns}
-  data={transactions}
-  progressPending={loading}
-  pagination
-  highlightOnHover
-  striped
-  onRowClicked={(row) => handleRowClick(row)}
-  pointerOnHover
-  customStyles={{
-    rows: {
-      style: { cursor: "pointer", minHeight: "50px", fontSize: "14px",zIndex:1 },
-    },
-    headCells: {
-      style: {
-        backgroundColor: "#f3f4f6",
-        fontWeight: "bold",
-        fontSize: "15px",
-      },
-    },
-    pagination: { style: { fontSize: "14px" } },
-  }}
-/>
-
+        <div
+          id="printable-table"
+          className="border rounded-lg shadow-sm max-h-[calc(100vh-200px)] overflow-y-scroll"
+        >
+          <DataTable
+            columns={columns}
+            data={transactions}
+            progressPending={loading}
+            pagination
+            highlightOnHover
+            paginationRowsPerPageOptions={[
+              10,
+              20,
+              50,
+              100,
+              transactions.length,
+            ]}
+            striped
+            onRowClicked={(row) => handleRowClick(row)}
+            pointerOnHover
+            customStyles={{
+              rows: {
+                style: {
+                  cursor: "pointer",
+                  minHeight: "50px",
+                  fontSize: "14px",
+                  zIndex: 1,
+                },
+              },
+              headCells: {
+                style: {
+                  backgroundColor: "#f3f4f6",
+                  fontWeight: "bold",
+                  fontSize: "15px",
+                },
+              },
+              pagination: { style: { fontSize: "14px" } },
+            }}
+          />
         </div>
       </div>
     </div>

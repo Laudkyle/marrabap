@@ -6894,6 +6894,20 @@ app.get("/journal_entry/:id", (req, res) => {
     );
   });
 });
+app.get("/oldest-entry-date", async (req, res) => {
+  try {
+    const result = await db.get("SELECT MIN(date) AS oldest_date FROM journal_entries");
+    
+    // If result is null or oldest_date is null, default to "2024-01-01"
+    const oldestDate = result?.oldest_date || "2024-01-01";
+    
+    res.json({ oldest_date: oldestDate });
+  } catch (error) {
+    console.error("Error fetching oldest entry date:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
 // ✅ Create a new journal entry with lines
 app.post("/journal_entry", (req, res) => {
