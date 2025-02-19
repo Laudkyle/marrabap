@@ -232,7 +232,7 @@ const ExpenseComponent = () => {
     },
   ];
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 max-h-[calc(100vh-100px)] overflow-y-scroll">
       <div className="flex justify-end mb-6">
         <button
           className="bg-blue-600 text-white py-2 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300"
@@ -247,6 +247,13 @@ const ExpenseComponent = () => {
         columns={columns}
         data={expenses}
         pagination
+        paginationRowsPerPageOptions={[
+          10,
+          20,
+          50,
+          100,
+          expenses.length,
+        ]}
         highlightOnHover
         striped
       />

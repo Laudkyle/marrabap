@@ -149,11 +149,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
           label: "Payment History",
           icon: <List className="w-4 h-4" />,
         },
-        {
-          path: "/process-payment",
-          label: "Process Payment",
-          icon: <FaMoneyBill className="w-4 h-4" />,
-        },
+       
       ],
     },
     {
@@ -178,7 +174,7 @@ const Sidebar = ({ isExpanded, companyName }) => {
         },
         {
           path: "/process-payment",
-          label: "Process Payment",
+          label: "Payment/Purchase",
           icon: <FaMoneyBill className="w-4 h-4" />,
         },
         {

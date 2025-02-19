@@ -3,7 +3,7 @@ import API from "../api";
 import DataTable from "react-data-table-component";
 import { FaPlus, FaTrash, FaSave, FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
-
+import { FiPrinter } from "react-icons/fi";
 const JournalEntry = () => {
   const [journalEntries, setJournalEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -146,6 +146,19 @@ const JournalEntry = () => {
   }
 };
 
+const handlePrint = () => {
+  const printContent = document.getElementById("printable-table").innerHTML;
+  const originalContent = document.body.innerHTML;
+  const originalTitle = document.title; // Store the original title
+
+  document.title = "Journal Entries Report"; // Set a temporary title
+  document.body.innerHTML = printContent;
+  window.print();
+  
+  document.title = originalTitle; // Restore the original title
+  document.body.innerHTML = originalContent;
+};
+
   return (
     <div className="p-6 bg-gray-100 max-h-[calc(100vh-100px)] overflow-y-scroll">
       <h2 className="text-2xl font-bold mb-4">Journal Entries</h2>
@@ -157,7 +170,7 @@ const JournalEntry = () => {
         <FaPlus className="mr-2" /> Add Journal Entry
       </button>
 
-      <div className="bg-white p-4 z-1 shadow-md rounded-lg">
+      <div id="printable-table" className="bg-white p-4 z-1 shadow-md rounded-lg">
         <DataTable
           columns={columns}
           onRowClicked={handleRowClick}
@@ -189,6 +202,14 @@ const JournalEntry = () => {
             },
             pagination: { style: { fontSize: "14px" } },
           }}
+          subHeader
+          subHeaderComponent={ (
+                      <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 bg-blue-600 text-white py-1 px-3 text-sm rounded-md hover:bg-blue-700 transition"
+                      >
+                        <FiPrinter className="text-lg" /> Print
+                      </button>)}
         />
       </div>
 

@@ -7,7 +7,6 @@ import { FiPrinter } from "react-icons/fi"; // Import Print Icon
 import { FaFileExcel } from "react-icons/fa"; // Import Excel Icon
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import { useReactToPrint } from "react-to-print";
 
 const GeneralLedgerComponent = () => {
   const [accounts, setAccounts] = useState([]);
@@ -137,7 +136,6 @@ const GeneralLedgerComponent = () => {
     saveAs(data, `General_Ledger_${new Date().toISOString()}.xlsx`);
   };
   // Reference for printing
-  const printRef = useRef();
 
   const handlePrint = () => {
     const printContent = document.getElementById("printable-table").innerHTML;
