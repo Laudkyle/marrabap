@@ -157,18 +157,6 @@ const Sidebar = ({ isExpanded, companyName }) => {
       ],
     },
     {
-      name: "Expenses",
-      icon: <Calculator className="w-4 h-4" />,
-      dropdown: "expenses",
-      links: [
-        {
-          path: "/expense",
-          label: "Expenses",
-          icon: <Calculator className="w-4 h-4" />,
-        },
-      ],
-    },
-    {
       name: "Transactions",
       icon: <Calculator className="w-4 h-4" />,
       dropdown: "transactions",
@@ -182,6 +170,16 @@ const Sidebar = ({ isExpanded, companyName }) => {
           path: "/funds-transfer",
           label: "Transfer Funds",
           icon: <ArrowLeftRight className="w-4 h-4" />,
+        },
+        {
+          path: "/expense",
+          label: "Expenses",
+          icon: <Calculator className="w-4 h-4" />,
+        },
+        {
+          path: "/process-payment",
+          label: "Process Payment",
+          icon: <FaMoneyBill className="w-4 h-4" />,
         },
         {
           path: "/journal-entry",

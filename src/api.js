@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create Axios instance
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000",
+  baseURL: "http://localhost:5000",
   withCredentials: true, // Needed for refresh tokens (if using cookies)
 });
 
@@ -26,7 +26,7 @@ API.interceptors.response.use(
       try {
         // Try refreshing the token
         const refreshResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}/refresh`,
+          `http://localhost:5000/refresh`,
           {},
           { withCredentials: true }
         );
